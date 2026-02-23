@@ -1,0 +1,480 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import 'dart:async';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../session/account.dart';
+import '../models/user.dart';
+import 'widget/avatar.dart';
+import 'login.dart';
+
+class AccountChangeNotifier {
+  static final AccountChangeNotifier _instance = AccountChangeNotifier._internal();
+  factory AccountChangeNotifier() => _instance;
+  AccountChangeNotifier._internal();
+
+  final StreamController<String?> _controller = StreamController.broadcast();
+
+  Stream<String?> get accountChanges => _controller.stream;
+
+  void notifyAccountChanged(String? accountId) {
+    _controller.add(accountId);
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+class AccountsPage extends StatefulWidget {
+  const AccountsPage({super.key});
+
+  @override
+  State<AccountsPage> createState() => _AccountsPageState();
+}
+
+class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMixin {
+  List<User> _accounts = [];
+  final Set<String> _selectedAccounts = <String>{};
+  bool _isMultiSelectMode = false;
+  String? _currentAccountId;
+  String _selectedPlatform = 'chaoxing'; // 当前选中的平台
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAccounts();
+  }
+
+  Future<void> _loadAccounts() async {
+    await AccountManager.initialize();
+    final current = await AccountManager.getCurrentSession();
+    final accounts = AccountManager.getAllAccounts();
+    AccountChangeNotifier().notifyAccountChanged(current);
+    setState(() {
+      _accounts = accounts;
+      _currentAccountId = current;
+    });
+    debugPrint('账号页面已刷新 - 当前账号: $_currentAccountId, 账号总数: ${accounts.length}');
+  }
+
+  void _toggleSelection(String userId) {
+    setState(() {
+      if (_selectedAccounts.contains(userId)) {
+        _selectedAccounts.remove(userId);
+      } else {
+        _selectedAccounts.add(userId);
+      }
+      if (_selectedAccounts.isEmpty) _isMultiSelectMode = false;
+    });
+  }
+
+  void _toggleMultiSelect() {
+    setState(() {
+      _isMultiSelectMode = !_isMultiSelectMode;
+      if (!_isMultiSelectMode) _selectedAccounts.clear();
+    });
+  }
+
+  Future<void> _deleteSelectedAccounts() async {
+    if (_selectedAccounts.isNotEmpty) {
+      await AccountManager.removeAccounts(_selectedAccounts.toList());
+      await _loadAccounts();
+      _toggleMultiSelect();
+    }
+  }
+
+  Future<void> _switchToAccount(User user) async {
+    if (user.uid == _currentAccountId) {
+      return;
+    }
+    await AccountManager.setCurrentSession(user.uid);
+    AccountChangeNotifier().notifyAccountChanged(user.uid);
+
+    setState(() {
+      _currentAccountId = user.uid;
+      _accounts.remove(user);
+      _accounts.insert(0, user);
+    });
+  }
+
+  Future<void> _navigateToPasswordLogin() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginPage(initialLoginType: 'password')),
+    );
+    if (result == true) {
+      debugPrint('密码登录成功，刷新账号列表');
+      await _loadAccounts();
+    }
+  }
+
+  Future<void> _navigateToCaptchaLogin() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginPage(initialLoginType: 'captcha')),
+    );
+    if (result == true) {
+      debugPrint('验证码登录成功，刷新账号列表');
+      await _loadAccounts();
+    }
+  }
+
+  Future<void> _showQRCodeLoginDialog() async {
+    final qrState = QRCodeLoginState();
+
+    if (!await qrState.initialize()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('获取二维码失败')),
+        );
+      }
+      qrState.dispose();
+      return;
+    }
+
+    qrState.startPolling((bool success) async {
+      if (success && await handlePostLoginSuccess(context) && mounted) {
+        Navigator.pop(context, true);
+        debugPrint('二维码登录成功，刷新账号列表');
+        await _loadAccounts();
+      }
+      qrState.dispose();
+    });
+
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return PopScope(
+              canPop: true,
+              onPopInvokedWithResult: (bool didPop, Object? result) {
+                if (didPop) {
+                  qrState.isLoginActive = false;
+                  qrState.dispose();
+                }
+              },
+              child: AlertDialog(
+                title: const Text('二维码登录'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 220,
+                      height: 220,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withValues(alpha: 0.1),
+                            spreadRadius: 2,
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: qrState.qrImageData != null
+                          ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.memory(
+                          qrState.qrImageData!,
+                          fit: BoxFit.contain,
+                          gaplessPlayback: true,
+                        ),
+                      )
+                          : qrState.isLoading
+                          ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(),
+                            SizedBox(height: 8),
+                            Text('生成中...', style: TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                      )
+                          : const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                            SizedBox(height: 8),
+                            Text('二维码加载失败', style: TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      '使用学习通APP扫码登录',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '二维码失效时会自动刷新',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      qrState.isLoginActive = false;
+                      qrState.dispose();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('取消'),
+                  ),
+                  TextButton(
+                    onPressed: qrState.isRefreshing || qrState.isLoading
+                        ? null
+                        : () async {
+                      setState(() => qrState.isRefreshing = true);
+                      await qrState.refreshQRCode();
+                      setState(() => qrState.isRefreshing = false);
+                    },
+                    child: qrState.isRefreshing ? const Text('刷新中...') : const Text('刷新'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    qrState.dispose();
+  }
+
+  Widget _buildTitle(String name, bool isCurrentAccount) {
+    return Row(
+      children: [
+        Text(name),
+        if (isCurrentAccount)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            margin: const EdgeInsets.only(left: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Text('当前', style: TextStyle(color: Colors.white, fontSize: 12)),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildListItemContent(
+      BuildContext context, User user, bool isSelected, bool isCurrentAccount) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: AvatarWidget(key: ValueKey(user.avatar), imageUrl: user.avatar),
+      title: _buildTitle(user.name, isCurrentAccount),
+      subtitle: Text('ID: ${user.uid}\n手机号: ${user.phone}'),
+      trailing: Visibility(
+        visible: _isMultiSelectMode,
+        child: Checkbox(
+          value: isSelected,
+          onChanged: (bool? value) {
+            if (value != null) _toggleSelection(user.uid);
+          },
+        ),
+      ),
+      onTap: _isMultiSelectMode ? null : () => _switchToAccount(user),
+      onLongPress: () {
+        _toggleMultiSelect();
+        _toggleSelection(user.uid);
+      },
+    );
+  }
+
+  // 处理平台切换逻辑
+  void _handlePlatformSwitch(String platform) {
+    String platformName = platform == 'chaoxing' ? '学习通' : '雨课堂';
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('已切换到 $platformName'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    // TODO 切换平台
+    debugPrint('切换到平台: $platform');
+  }
+
+  void _showAboutDialog() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    final appIcon = Image.asset(
+      'images/logo.png',
+      width: 60,
+      height: 60
+    );
+    
+    showAboutDialog(
+      context: context,
+      applicationName: '课程助手',
+      applicationVersion: packageInfo.version,
+      applicationIcon: appIcon,
+      // applicationLegalese: '',
+      children: [
+        const Text('一个管理学习通、雨课堂课程的应用。'),
+        const Text('支持多账号管理、课程查看、活动签到等功能。'),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            const Text('开发者：'),
+            GestureDetector(
+              onTap: () async {
+                final Uri url = Uri.parse('https://github.com/AneryCoft');
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.inAppBrowserView);
+                }
+              },
+              child: Text(
+                'AneryCoft',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('账号'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+        actions: [
+          if (_isMultiSelectMode)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: _deleteSelectedAccounts,
+              tooltip: '删除选中账号',
+            ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_horiz),
+            onSelected: (String result) {
+              if (result == 'about') {
+                _showAboutDialog();
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              // 平台切换菜单项
+              PopupMenuItem<String>(
+                enabled: true,
+                child: StatefulBuilder(
+                  builder: (BuildContext context, StateSetter setState) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RadioGroup<String>(
+                          groupValue: _selectedPlatform,
+                          onChanged: (String? value) {
+                            if (value != null) {
+                              setState(() {
+                                _selectedPlatform = value;
+                              });
+                              Navigator.pop(context); // 关闭菜单
+                              _handlePlatformSwitch(value);
+                            }
+                          },
+                          child: Column(
+                            children: [
+                              RadioListTile<String>(
+                                title: const Text('学习通'),
+                                value: 'chaoxing',
+                                dense: true,
+                              ),
+                              RadioListTile<String>(
+                                title: const Text('雨课堂'),
+                                value: 'rainclass',
+                                dense: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Divider(height: 1),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              // 关于菜单项
+              const PopupMenuItem<String>(
+                value: 'about',
+                child: Row(
+                  children: [
+                    Text('关于'),
+                  ],
+                ),
+              ),
+            ],
+          )
+        ],
+      ),
+      body: _accounts.isEmpty
+          ? const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('暂无账号', style: TextStyle(fontSize: 18, color: Colors.grey)),
+            SizedBox(height: 8),
+            Text('点击右下角添加账号', style: TextStyle(color: Colors.grey)),
+          ],
+        ),
+      )
+          : ListView.builder(
+        itemCount: _accounts.length,
+        itemBuilder: (context, index) {
+          final user = _accounts[index];
+          final isSelected = _selectedAccounts.contains(user.uid);
+          final isCurrent = user.uid == _currentAccountId;
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: isCurrent ? Theme.of(context).colorScheme.primaryContainer : null,
+            child: _buildListItemContent(context, user, isSelected, isCurrent),
+          );
+        },
+      ),
+      floatingActionButton: SpeedDial(
+        icon: Icons.add,
+        activeIcon: Icons.close,
+        spacing: 5,
+        spaceBetweenChildren: 2,
+        overlayColor: Colors.transparent,
+        overlayOpacity: 0.3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+        children: [
+          SpeedDialChild(
+            child: const Icon(Icons.qr_code),
+            label: '二维码登录',
+            onTap: _showQRCodeLoginDialog,
+          ),
+          SpeedDialChild(
+            child: const Icon(Icons.sms),
+            label: '验证码登录',
+            onTap: _navigateToCaptchaLogin,
+          ),
+          SpeedDialChild(
+            child: const Icon(Icons.password),
+            label: '密码登录',
+            onTap: _navigateToPasswordLogin,
+          ),
+        ],
+      ),
+    );
+  }
+}
