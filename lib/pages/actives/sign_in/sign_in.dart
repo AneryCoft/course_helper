@@ -32,7 +32,7 @@ class SignParams {
 
   // 签到码签到
   String code = '';
-  late int numberCount;
+  int numberCount = 6;
 
   // 二维码签到
   String? enc;

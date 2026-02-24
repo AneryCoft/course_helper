@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinput/pinput.dart';
 
 import '../../../../models/user.dart';
 import '../../../../api/sign_in.dart';
@@ -35,14 +36,10 @@ class CodeSign implements SignStrategy {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 Text('请输入 ${state.signParams.numberCount} 位签到码'),
                 const SizedBox(height: 16),
-
                 _CodeInputField(state: state),
-
                 const SizedBox(height: 16),
-
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -100,110 +97,100 @@ class _CodeInputField extends StatefulWidget {
 }
 
 class _CodeInputFieldState extends State<_CodeInputField> {
-  late List<TextEditingController> _controllers;
-  late List<FocusNode> _focusNodes;
-
+  final TextEditingController _pinController = TextEditingController();
+  final FocusNode _pinFocusNode = FocusNode();
+  
   @override
   void initState() {
     super.initState();
-    final numberCount = widget.state.signParams.numberCount;
-    _controllers = List.generate(numberCount, (index) => TextEditingController());
-    _focusNodes = List.generate(numberCount, (index) => FocusNode());
-
     // 监听输入变化
-    for (var i = 0; i < numberCount; i++) {
-      _controllers[i].addListener(_onTextChanged);
-    }
+    _pinController.addListener(_onPinChanged);
   }
-
+  
   @override
   void dispose() {
-    for (var controller in _controllers) {
-      controller.removeListener(_onTextChanged);
-      controller.dispose();
-    }
-    for (var node in _focusNodes) {
-      node.dispose();
-    }
+    _pinController.removeListener(_onPinChanged);
+    _pinController.dispose();
+    _pinFocusNode.dispose();
     super.dispose();
   }
-
-  void _onTextChanged() {
-    final code = _controllers.map((c) => c.text).join();
-    widget.state.signParams.code = code;
+  
+  void _onPinChanged() {
+    widget.state.signParams.code = _pinController.text;
   }
-
+  
   @override
   Widget build(BuildContext context) {
     final numberCount = widget.state.signParams.numberCount;
+    
+    final defaultPinTheme = PinTheme(
+      width: 56,
+      height: 60,
+      textStyle: const TextStyle(
+        fontSize: 22,
+        color: Color.fromRGBO(30, 60, 87, 1),
+        fontWeight: FontWeight.w600,
+      ),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.transparent),
+      ),
+    );
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: List.generate(numberCount, (index) {
-        return SizedBox(
-          width: 50,
-          child: TextField(
-            controller: _controllers[index],
-            focusNode: _focusNodes[index],
-            keyboardType: TextInputType.number,
-            maxLength: 1,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 20),
-            decoration: InputDecoration(
-              counterText: '',
-              border: OutlineInputBorder(
-                borderSide: BorderSide(
-                  color: Theme.of(context).dividerColor,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(
-                  color: Theme.of(context).colorScheme.primary,
-                  width: 2,
-                ),
-              ),
-            ),
-            onChanged: (value) {
-              if (value.length == 1 && index < numberCount - 1) {
-                // 自动跳到下一个输入框
-                FocusScope.of(context).requestFocus(_focusNodes[index + 1]);
-              }
-
-              // 输入完成时自动验证
-              final currentCode = _controllers.map((c) => c.text).join();
-              if (currentCode.length == numberCount) {
-                _verifyAndAutoSign();
-              }
-            },
+    return SizedBox(
+      height: 68,
+      child: Pinput(
+        length: numberCount,
+        controller: _pinController,
+        focusNode: _pinFocusNode,
+        defaultPinTheme: defaultPinTheme,
+        keyboardType: TextInputType.number,
+        autofillHints: null,
+        showCursor: true,
+        focusedPinTheme: defaultPinTheme.copyWith(
+          height: 68,
+          width: 64,
+          decoration: defaultPinTheme.decoration!.copyWith(
+            border: Border.all(color: Theme.of(context).colorScheme.primary),
           ),
-        );
-      }),
+        ),
+        errorPinTheme: defaultPinTheme.copyWith(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        onCompleted: (pin) {
+          widget.state.signParams.code = pin;
+          _verifyAndAutoSign();
+        },
+      ),
     );
   }
-
+  
   Future<void> _verifyAndAutoSign() async {
-    final code = widget.state.signParams.code;
-
-    // 验证签到码是否正确
     bool? isValid = await SignInApi.checkSignCode(
       widget.state.widget.active.id,
-      code,
+      widget.state.signParams.code
     );
-
+    
     if (isValid == true) {
       // 验证通过，执行签到
       widget.state.performMultiSign();
     } else {
       widget.state.showErrorMessage('签到码不正确，请重新输入');
-
-      // 清空所有输入框
-      for (var controller in _controllers) {
-        controller.clear();
-      }
+      
+      // 清空输入
+      _pinController.clear();
       widget.state.signParams.code = '';
-
-      // 焦点回到第一个输入框
-      _focusNodes[0].requestFocus();
+      
+      // 焦点回到输入框
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _pinFocusNode.requestFocus();
+        }
+      });
     }
   }
 }
