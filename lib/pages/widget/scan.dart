@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_qr_reader_plus/flutter_qr_reader.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
+import 'dart:async';
 
 class ScanPage extends StatefulWidget {
   final Function(String)? onScanResult; // 添加回调函数参数
@@ -13,12 +14,16 @@ class ScanPage extends StatefulWidget {
 }
 
 class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
-  QrReaderViewController? _controller;
+  MobileScannerController? _controller;
   String? scanResult;
+  StreamSubscription<Object?>? _subscription;
   
   final int animationTime = 2000;
   AnimationController? _animationController;
   bool isScan = false;
+  bool _isInitializing = false;
+
+
 
   @override
   void initState() {
@@ -36,34 +41,50 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     }
     
     // 再安全地停止相机
-    try {
-      _controller?.stopCamera();
-    } catch (e) {
-      // 忽略停止相机时的异常
-    }
+    unawaited(_subscription?.cancel());
+    _stopController();
     _controller = null;
     
     isScan = false;
     super.dispose();
   }
 
+  // 安全地停止相机
+  void _stopController() {
+    try {
+      _controller?.stop();
+    } catch (e) {
+      // 忽略停止相机时的异常
+    }
+  }
+
   // 请求摄像头权限
   Future<void> _requestCameraPermission() async {
+    setState(() {
+      _isInitializing = true;
+    });
+    
     var status = await Permission.camera.status;
 
     if (status.isRestricted || status.isPermanentlyDenied) {
       openAppSettings();
+      setState(() {
+        _isInitializing = false;
+      });
       return;
     } else if (!status.isGranted) {
       status = await Permission.camera.request();
     }
 
     if (status.isDenied) {
+      setState(() {
+        _isInitializing = false;
+      });
       _showPermissionDeniedDialog();
       return;
     }
 
-    startScan();
+    _initializeScanner();
   }
 
   // 显示权限被拒绝的对话框
@@ -84,9 +105,34 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
             ),
             TextButton(
               onPressed: () async {
-                Navigator.of(context).pop();
-                await Permission.camera.request();
-                _requestCameraPermission(); // 重新请求权限
+                Navigator.of(context).pop(); // 先关闭弹窗
+                // 等待 UI 更新完成
+                await Future.delayed(const Duration(milliseconds: 100));
+                
+                setState(() {
+                  _isInitializing = true;
+                });
+                
+                var newStatus = await Permission.camera.request();
+                if (newStatus.isGranted) {
+                  // 关键：先完全释放旧的控制器
+                  if (_controller != null) {
+                    try {
+                      await _controller!.stop();
+                      _controller!.dispose();
+                      _controller = null;
+                    } catch (e) {
+                      // 忽略释放时的错误
+                    }
+                  }
+                  // 重新初始化扫描器
+                  await _initializeScanner();
+                } else {
+                  setState(() {
+                    _isInitializing = false;
+                  });
+                  _showPermissionDeniedDialog();
+                }
               },
               child: const Text('重试'),
             ),
@@ -96,16 +142,52 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     );
   }
 
-  void _onCreateController(QrReaderViewController controller) async {
-    _controller = controller;
-    startScan();
+  void _handleBarcodeEvent(BarcodeCapture capture) {
+    if (!mounted) return;
+    
+    if (capture.barcodes.isNotEmpty) {
+      final code = capture.barcodes.first.rawValue;
+      if (code != null) {
+        _handleScanResult(code);
+      }
+    }
+  }
+
+
+
+  Future<void> _initializeScanner() async {
+    if (!mounted) return;
+    
+    try {
+      _controller = MobileScannerController(
+        detectionSpeed: DetectionSpeed.normal,
+        torchEnabled: false,
+        facing: CameraFacing.back,
+        formats: [BarcodeFormat.qrCode],
+        autoZoom: true
+      );
+      
+      await _controller!.start();
+      
+    if (mounted) {
+      setState(() {
+        _isInitializing = false;
+      });
+      startScan();
+    }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
+      }
+    }
   }
 
   void startScan() async {
     if (!mounted) return;
     
     isScan = true;
-    _controller?.startCamera(_onScan);
     _initAnimation();
   }
 
@@ -121,11 +203,15 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
 
         if (state == AnimationStatus.completed) {
           Future.delayed(Duration(seconds: 1), () {
-            _animationController?.reverse();
+            if (_animationController != null && _animationController!.status != AnimationStatus.dismissed) {
+              _animationController?.reverse();
+            }
           });
         } else if (state == AnimationStatus.dismissed) {
           Future.delayed(Duration(seconds: 1), () {
-            _animationController?.forward();
+            if (_animationController != null && _animationController!.status != AnimationStatus.forward) {
+              _animationController?.forward();
+            }
           });
         }
       });
@@ -134,17 +220,10 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
   }
 
   void stop() {
-    if (!isScan) {
-      return;
-    }
+    if (!isScan) return;
 
     isScan = false;
-    try {
-      _controller?.stopCamera();
-    } catch (e) {
-      // 忽略停止相机时的异常
-    }
-    _controller = null;
+    _stopController();
     
     if (_animationController != null) {
       _animationController?.stop();
@@ -157,15 +236,19 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     setState(() {});
   }
 
-
-
-  void scanImage(String path) {
-    FlutterQrReader.imgScan(path).then((value) {
+  void scanImage(String path) async {
+    try {
+      final barcodeCapture = await _controller?.analyzeImage(path);
       stop();
-      if (mounted && value != null) {
-        _handleScanResult(value);
+      if (mounted && barcodeCapture != null && barcodeCapture.barcodes.isNotEmpty) {
+        final code = barcodeCapture.barcodes.first.rawValue;
+        if (code != null) {
+          _handleScanResult(code);
+        }
       }
-    });
+    } catch (e) {
+      debugPrint('Failed to analyze image: $e');
+    }
   }
 
   @override
@@ -178,16 +261,26 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
 
         return Stack(
           children: [
-            SizedBox(
-              width: constraints.maxWidth,
-              height: constraints.maxHeight,
-              child: QrReaderView(
-                width: constraints.maxWidth,
-                height: constraints.maxHeight,
-                autoFocusIntervalInMs: 1000,
-                callback: _onCreateController,
-              ),
+            MobileScanner(
+              controller: _controller,
+              onDetect: (BarcodeCapture capture) {
+                debugPrint('检测到条码，数量：${capture.barcodes.length}');
+                if (capture.barcodes.isNotEmpty) {
+                  final code = capture.barcodes.first.rawValue;
+                  debugPrint('条码内容：$code');
+                  if (code != null) {
+                    _handleBarcodeEvent(capture);
+                  }
+                }
+              },
             ),
+            // 在初始化期间显示加载指示器
+            if (_isInitializing)
+              const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                ),
+              ),
             Positioned(
               left: (constraints.maxWidth - qrScanSize) / 2,
               top: (constraints.maxHeight - qrScanSize) * 0.333333,
@@ -239,10 +332,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     );
   }
 
-  void _onScan(String code, List<Offset> offsets) {
-    if (!isScan || !mounted) return;
-    _handleScanResult(code);
-  }
+
 
   void _handleScanResult(String data) async {
     if (!mounted) return;
@@ -265,6 +355,8 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     } else {
       // 保持原有行为（显示弹窗）
       _showScanResultDialog(data);
+      // 显示弹窗后重新开始扫描
+      startScan();
     }
   }
 

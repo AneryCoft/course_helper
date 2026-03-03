@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../models/user.dart';
 import '../../../../api/sign_in.dart';
@@ -259,6 +260,7 @@ class QRCodeSign implements SignStrategy {
   static void _scanQRCode(SignInPageState state) {
     final BuildContext context = state.context;
 
+    // 权限已获得，打开扫描页面
     Navigator.push(
       context,
       MaterialPageRoute(

@@ -294,14 +294,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.33"
-  flutter_qr_reader_plus:
-    dependency: "direct main"
-    description:
-      name: flutter_qr_reader_plus
-      sha256: ae374b5caf0be28e00572475c899ec272afc777505c2174b1149cfa2506c8bde
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.6"
   flutter_speed_dial:
     dependency: "direct main"
     description:
@@ -472,14 +464,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.2"
-  image_pickers:
-    dependency: transitive
-    description:
-      name: image_pickers
-      sha256: e2f5d19a7b0a40af3af5d49c5855b22a755e6f79b22e0b58a65c44311b9d67c8
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.6"
   js:
     dependency: transitive
     description:
@@ -552,6 +536,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  mobile_scanner:
+    dependency: "direct main"
+    description:
+      name: mobile_scanner
+      sha256: c92c26bf2231695b6d3477c8dcf435f51e28f87b1745966b1fe4c47a286171ce
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.2.0"
   package_info_plus:
     dependency: "direct main"
     description:
