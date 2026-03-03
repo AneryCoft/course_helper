@@ -630,7 +630,7 @@ class _LoginPageState extends State<LoginPage> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      //padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: Text(
                       _currentLoginType == '1'
