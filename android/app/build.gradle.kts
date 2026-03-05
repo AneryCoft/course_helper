@@ -73,6 +73,6 @@ flutter {
 
 dependencies {
     implementation("com.baidu.lbsyun:BaiduMapSDK_Map:7.6.7")
-    implementation("com.baidu.lbsyun:BaiduMapSDK_Location:9.6.6")
+    // flutter_bmflocation 插件已包含 BaiduMapSDK_Location_All
     implementation("com.baidu.lbsyun:BaiduMapSDK_Util:7.6.7")
 }

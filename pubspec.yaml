@@ -51,9 +51,11 @@ dependencies:
   path: ^1.9.0
   pattern_lock: ^2.0.0
   geolocator: ^14.0.2
-  flutter_baidu_mapapi_map: ^3.9.9
-  flutter_baidu_mapapi_base: ^3.9.9
-  flutter_baidu_mapapi_search: ^3.9.9
+  flutter_baidu_mapapi_map: 3.9.9
+  flutter_baidu_mapapi_base: 3.9.9
+  flutter_baidu_mapapi_search: 3.9.9
+  flutter_bmflocation: 3.8.3
+  # 百度地图SDK真弱智
   file_picker: ^10.3.10
   dynamic_color: ^1.8.1
   image_picker: ^1.2.1
