@@ -275,4 +275,30 @@ class SignInApi{
     }
     return null;
   }
+
+  /// 获取活动详细
+  static Future<Map<String, dynamic>?> getActiveInfoWeb(String activeId) async {
+    try {
+      final url = 'https://mobilelearn.chaoxing.com/v2/apis/active/getPPTActiveInfo?activeId=$activeId';
+
+      final response = await ApiService.sendRequest(url);
+      return response.data;
+    } catch (e) {
+      debugPrint('getActiveInfo error: $e');
+    }
+    return null;
+  }
+
+  /// 获取签到详细
+  static Future<Map<String, dynamic>?> getAttendInfoWeb(String activeId) async {
+    try {
+      final url = 'https://mobilelearn.chaoxing.com/v2/apis/sign/getAttendInfo?activeId=$activeId&moreClassAttendEnc=';
+
+      final response = await ApiService.sendRequest(url);
+      return response.data;
+    } catch (e) {
+      debugPrint('getActiveInfo error: $e');
+    }
+    return null;
+  }
 }

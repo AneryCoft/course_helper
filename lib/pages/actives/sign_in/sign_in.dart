@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:dio/dio.dart';
 
-import '../../../api/api_service.dart';
 import '../../../../api/sign_in.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
@@ -32,7 +30,7 @@ class SignParams {
 
   // 签到码签到
   String code = '';
-  int numberCount = 6;
+  int numberCount = 0;
 
   // 二维码签到
   String? enc;
@@ -131,6 +129,8 @@ class SignInPageState extends State<SignInPage> {
   SignStrategy? _currentStrategy;
   late SignParams _signParams;
 
+  bool _needCaptcha = false;
+
   // 签到状态管理
   bool _isLoading = false;
   bool _isMultiSigning = false;
@@ -138,9 +138,8 @@ class SignInPageState extends State<SignInPage> {
   // 签到数据
   // late bool _needPhoto;
   bool _needPhoto = false;
-  bool _needLocation = false;
-  String _designatedPlace = '';
-  late int _numberCount;
+  String? _locationRange;
+  String? _designatedPlace;
 
   // 签到码相关
   final List<TextEditingController> _codeControllers = [];
@@ -156,8 +155,8 @@ class SignInPageState extends State<SignInPage> {
 
   // Getter
   bool get needPhoto => _needPhoto;
-  bool get needLocation => _needLocation;
-  String get designatedPlace => _designatedPlace;
+  String? get designatedPlace => _designatedPlace;
+  String? get locationRange => _locationRange;
   List<User> get selectedAccounts => _selectedAccounts;
   User? get currentUser => _currentUser;
   SignStrategy? get currentStrategy => _currentStrategy;
@@ -194,50 +193,55 @@ class SignInPageState extends State<SignInPage> {
     _initSignStrategy();
   }
 
-  Future<void> _parseHtmlContent() async {
+  Future<void> _parseSignInfo() async {
     try {
-      final preSignPage = await ApiService.sendRequest(
-          widget.active.url,
-          responseType: ResponseType.plain
-      );
-      final String html = preSignPage.data;
-
-      // 检查当前用户是否已经签到成功
-      if (html.contains('<em style="color:#666666">签到成功</em>')) {
-        _showSuccessMessage('当前用户已签到');
-        // 移除当前用户从待签到列表中
-        if (_currentUser != null) {
-          setState(() {
-            _selectedAccounts.removeWhere((user) => user.uid == _currentUser!.uid);
-          });
+      final results = await Future.wait([
+        SignInApi.getActiveInfoWeb(widget.active.id),
+        SignInApi.getAttendInfoWeb(widget.active.id)
+      ]);
+  
+      final activeInfo = results[0];
+      final attendInfo = results[1];
+  
+      if (activeInfo != null && activeInfo['result'] == 1){
+        // openPreventCheatFlag 1
+        final activeData = activeInfo['data'];
+        _needCaptcha = activeData['showVCode'] == 1;
+  
+        switch (widget.active.signType) {
+          case SignType.normal:
+            _needPhoto = activeData['ifphoto'] == 1;
+            break;
+          case SignType.code:
+            _signParams.numberCount = activeData['numberCount'];
+            break;
+          case SignType.qrCode:
+          case SignType.location:
+            _locationRange = activeData['locationRange'];
+            _designatedPlace = activeData['locationText'];
+            break;
+          case _:
         }
       }
-
-      if (html.contains('点击拍照')){
-        _needPhoto = true;
-      } else if (html.contains('id="ifopenAddress" value="1"')){
-        _needLocation = true;
-        RegExp regExp = RegExp(r'id="locationText" value="(.+?)">');
-        Match? match = regExp.firstMatch(html);
-        if (match != null) {
-          _designatedPlace = match.group(1)!;
-        }
-      } else {
-        RegExp regExp = RegExp(r'numberCount = (\d+);');
-        Match? match = regExp.firstMatch(html);
-        if (match != null) {
-          _numberCount = int.parse(match.group(1)!);
-          _signParams.numberCount = _numberCount;
+  
+      if (attendInfo != null && attendInfo['result'] == 1){
+        if (attendInfo['data']['status'] == 1){
+          _showSuccessMessage('当前用户已签到');
+          if (_currentUser != null) {
+            setState(() {
+              _selectedAccounts.removeWhere((user) => user.uid == _currentUser!.uid);
+            });
+          }
         }
       }
       if (mounted) setState(() {});
     } catch (e) {
-      debugPrint('HTML解析失败: $e');
+      debugPrint('签到信息解析失败：$e');
     }
   }
 
   Future<void> _initSignStrategy() async {
-    await _parseHtmlContent();
+    await _parseSignInfo();
     _currentStrategy = SignStrategyFactory.create(widget.active.signType);
 
     if (_currentStrategy != null) {
@@ -596,7 +600,7 @@ class SignInPageState extends State<SignInPage> {
   String getCodeInput() => _codeControllers.map((c) => c.text).join('');
   void checkCodeCompletion() {
     final code = getCodeInput();
-    if (code.length == _numberCount) {
+    if (code.length == _signParams.numberCount) {
       _signParams.code = code;
     }
   }

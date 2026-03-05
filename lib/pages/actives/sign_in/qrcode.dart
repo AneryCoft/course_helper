@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../models/user.dart';
 import '../../../../api/sign_in.dart';
@@ -45,7 +44,7 @@ class QRCodeSign implements SignStrategy {
                 children: [
 
                   // 指定签到地点显示
-                  if (state.needLocation && state.designatedPlace.isNotEmpty) ...[
+                  if (state.designatedPlace != null && state.designatedPlace!.isNotEmpty) ...[
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -59,7 +58,7 @@ class QRCodeSign implements SignStrategy {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              '指定签到地点：${state.designatedPlace}',
+                              '指定签到地点：${state.designatedPlace!}\n范围：${state.locationRange!}米',
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.onPrimaryContainer,
                                 fontWeight: FontWeight.w500,
@@ -73,7 +72,7 @@ class QRCodeSign implements SignStrategy {
                   ],
 
                   // 位置选择按钮（未选位置时显示）
-                  if (state.needLocation && state.signParams.address == null) ...[
+                  if (state.designatedPlace != null && state.designatedPlace!.isNotEmpty && state.signParams.address == null) ...[
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(

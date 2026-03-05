@@ -44,7 +44,7 @@ class LocationSign implements SignStrategy {
               children: [
 
                 // 指定签到地点显示
-                if (state.designatedPlace.isNotEmpty) ...[
+                if (state.designatedPlace != null && state.designatedPlace!.isNotEmpty) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -58,7 +58,7 @@ class LocationSign implements SignStrategy {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '指定签到地点：${state.designatedPlace}',
+                            '指定签到地点：${state.designatedPlace!}\n范围：${state.locationRange!}米',
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onPrimaryContainer,
                               fontWeight: FontWeight.w500,
