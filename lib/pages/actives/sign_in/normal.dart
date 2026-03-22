@@ -176,8 +176,8 @@ class NormalSign implements SignStrategy {
     for (int i = 0; i < selectedAccounts.length; i++) {
       final user = selectedAccounts[i];
       
-      await AccountManager.setCurrentSession(user.uid);
-      await SignInApi.updateUser();
+      AccountManager.setCurrentSessionTemp(user.uid);
+      SignInApi.updateUser();
       state.showProgressSnackBar('正在为账号 ${user.name} ${source == ImageSource.camera ? '拍照' : '选择图片'} (${i + 1}/${selectedAccounts.length})');
       
       try {
@@ -209,7 +209,7 @@ class NormalSign implements SignStrategy {
     
     // 恢复原账号
     if (state.currentUser != null) {
-      await AccountManager.setCurrentSession(state.currentUser!.uid);
+      AccountManager.setCurrentSessionTemp(state.currentUser!.uid);
     }
     
     state.updateMultiSignStatus(false);

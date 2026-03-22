@@ -14,8 +14,8 @@ class TopicDiscussApi {
   static String get userName => _user?.name ?? '';
   
   /// 更新当前用户信息（从会话管理器获取）
-  static Future<void> updateUser() async {
-    String? currentUid = await AccountManager.getCurrentSession();
+  static void updateUser() {
+    String? currentUid = AccountManager.currentSessionId;
     if (currentUid != null) {
       User? currentUser = AccountManager.getAccountById(currentUid);
       if (currentUser != null) {

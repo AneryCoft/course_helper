@@ -55,7 +55,7 @@ class QuizApi {
   static Future<Map<String, dynamic>?> answerReceipt(String classId, String activeId) async {
     try {
       final url = 'https://mobilelearn.chaoxing.com/pptTestPaperStu/answerReceipt';
-      String currentUid = await AccountManager.getCurrentSession() ?? '';
+      String currentUid = AccountManager.currentSessionId ?? '';
       final params = {
         'classId': classId,
         'activePrimaryId': activeId,

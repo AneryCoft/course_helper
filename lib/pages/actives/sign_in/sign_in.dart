@@ -75,13 +75,13 @@ abstract class SignStrategy {
       BuildContext context,
       SignInPageState state,
       SignParams params,
-      );
+  );
 
   /// 为单个账号执行签到（批量签到使用）
   Future<String?> signForAccount(
       User user,
       SignParams params,
-      );
+  );
 
   /// 获取签到类型名称
   String get signTypeName;
@@ -183,7 +183,7 @@ class SignInPageState extends State<SignInPage> {
   }
 
   Future<void> _initializeAccounts() async {
-    String? currentUserId = await AccountManager.getCurrentSession();
+    String? currentUserId = AccountManager.currentSessionId;
     _currentUser = AccountManager.getAccountById(currentUserId!);
     setState(() {
       _selectedAccounts = _currentUser != null ? [_currentUser!] : [];
@@ -414,24 +414,24 @@ class SignInPageState extends State<SignInPage> {
       _failedAccounts.clear();
     });
 
-    await Future.wait(_selectedAccounts.map((user) async {
-      await AccountManager.setCurrentSession(user.uid);
-      await SignInApi.updateUser();
-
+    for (var user in _selectedAccounts) {
+      AccountManager.setCurrentSessionTemp(user.uid);
+      SignInApi.updateUser();
+    
       try {
         final result = await _currentStrategy!.signForAccount(user, _signParams);
         await _handleSignResult(result, user);
       } catch (e) {
-        _addFailedAccount(user, '异常: $e');
+        _addFailedAccount(user, '异常：$e');
       } finally {
         if (mounted) {
           setState(() => _signedCount++);
         }
       }
-    }));
+    }
 
     if (_currentUser != null) {
-      await AccountManager.setCurrentSession(_currentUser!.uid);
+      AccountManager.setCurrentSessionTemp(_currentUser!.uid);
     }
 
     if (mounted) {

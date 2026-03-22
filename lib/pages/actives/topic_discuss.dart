@@ -50,7 +50,7 @@ class _TopicDiscussPageState extends State<TopicDiscussPage> {
   }
   
   Future<void> _initialize() async {
-    await TopicDiscussApi.updateUser();
+    TopicDiscussApi.updateUser();
     await _loadTopicData();
   }
 
@@ -114,10 +114,10 @@ class _TopicDiscussPageState extends State<TopicDiscussPage> {
 
     try {
       for (var account in _selectedAccounts) {
-        await AccountManager.setCurrentSession(account.uid);
-        
-        // 更新TopicDiscussAPI的用户信息
-        await TopicDiscussApi.updateUser();
+        AccountManager.setCurrentSessionTemp(account.uid);
+              
+        // 更新 TopicDiscussAPI 的用户信息
+        TopicDiscussApi.updateUser();
         
         try {
           final result = await TopicDiscussApi.addReply(
@@ -141,7 +141,7 @@ class _TopicDiscussPageState extends State<TopicDiscussPage> {
       
       // 恢复当前账号
       if (_currentUser != null) {
-        await AccountManager.setCurrentSession(_currentUser!.uid);
+        AccountManager.setCurrentSessionTemp(_currentUser!.uid);
       }
       
       // 重新加载评论

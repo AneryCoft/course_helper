@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../session/account.dart';
 import '../models/user.dart';
+import '../platform.dart';
 import 'widget/avatar.dart';
 import 'login.dart';
 
@@ -39,7 +40,7 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
   final Set<String> _selectedAccounts = <String>{};
   bool _isMultiSelectMode = false;
   String? _currentAccountId;
-  String _selectedPlatform = 'chaoxing'; // 当前选中的平台
+  PlatformType _selectedPlatform = PlatformManager().currentPlatform;
 
   @override
   void initState() {
@@ -48,15 +49,14 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
   }
 
   Future<void> _loadAccounts() async {
-    await AccountManager.initialize();
-    final current = await AccountManager.getCurrentSession();
-    final accounts = AccountManager.getAllAccounts();
-    AccountChangeNotifier().notifyAccountChanged(current);
+    final current = AccountManager.currentSessionId;
+    final allAccounts = AccountManager.getAllAccounts();
+    final platformAccounts = allAccounts.where((user) => user.platform == _selectedPlatform.name).toList();
+
     setState(() {
-      _accounts = accounts;
+      _accounts = platformAccounts;
       _currentAccountId = current;
     });
-    debugPrint('账号页面已刷新 - 当前账号: $_currentAccountId, 账号总数: ${accounts.length}');
   }
 
   void _toggleSelection(String userId) {
@@ -105,7 +105,6 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
       MaterialPageRoute(builder: (_) => const LoginPage(initialLoginType: 'password')),
     );
     if (result == true) {
-      debugPrint('密码登录成功，刷新账号列表');
       await _loadAccounts();
     }
   }
@@ -116,7 +115,6 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
       MaterialPageRoute(builder: (_) => const LoginPage(initialLoginType: 'captcha')),
     );
     if (result == true) {
-      debugPrint('验证码登录成功，刷新账号列表');
       await _loadAccounts();
     }
   }
@@ -135,9 +133,8 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
     }
 
     qrState.startPolling((bool success) async {
-      if (success && await handlePostLoginSuccess(context) && mounted) {
+      if (success && await handleCXLoginSuccess(context) && mounted) {
         Navigator.pop(context, true);
-        debugPrint('二维码登录成功，刷新账号列表');
         await _loadAccounts();
       }
       qrState.dispose();
@@ -294,21 +291,6 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
     );
   }
 
-  // 处理平台切换逻辑
-  void _handlePlatformSwitch(String platform) {
-    String platformName = platform == 'chaoxing' ? '学习通' : '雨课堂';
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('已切换到 $platformName'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-
-    // TODO 切换平台
-    debugPrint('切换到平台: $platform');
-  }
-
   void _showAboutDialog() async {
     final packageInfo = await PackageInfo.fromPlatform();
     final appIcon = Image.asset(
@@ -350,6 +332,13 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
     );
   }
 
+  /// 切换平台
+  void _switchPlatform(PlatformType platform) async {
+    await PlatformManager().setPlatform(platform);
+    await _loadAccounts();
+    AccountChangeNotifier().notifyAccountChanged(AccountManager.currentSessionId);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -380,27 +369,27 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        RadioGroup<String>(
+                        RadioGroup<PlatformType>(
                           groupValue: _selectedPlatform,
-                          onChanged: (String? value) {
+                          onChanged: (PlatformType? value) {
                             if (value != null) {
                               setState(() {
                                 _selectedPlatform = value;
                               });
-                              Navigator.pop(context); // 关闭菜单
-                              _handlePlatformSwitch(value);
+                              Navigator.pop(context);
+                              _switchPlatform(value);
                             }
                           },
                           child: Column(
                             children: [
-                              RadioListTile<String>(
+                              RadioListTile<PlatformType>(
                                 title: const Text('学习通'),
-                                value: 'chaoxing',
+                                value: PlatformType.chaoxing,
                                 dense: true,
                               ),
-                              RadioListTile<String>(
+                              RadioListTile<PlatformType>(
                                 title: const Text('雨课堂'),
-                                value: 'rainclass',
+                                value: PlatformType.rainClassroom,
                                 dense: true,
                               ),
                             ],

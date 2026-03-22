@@ -395,7 +395,7 @@ class _QuizPageState extends State<QuizPage> {
 
     try {
       for (var account in _selectedAccounts) {
-        await AccountManager.setCurrentSession(account.uid);
+        AccountManager.setCurrentSessionTemp(account.uid);
         try {
           final result = await QuizApi.submitAnswer(
               widget.classId, widget.courseId, widget.active.id, submitData
@@ -414,7 +414,7 @@ class _QuizPageState extends State<QuizPage> {
       
       // 恢复当前账号
       if (_currentUser != null) {
-        await AccountManager.setCurrentSession(_currentUser!.uid);
+        AccountManager.setCurrentSessionTemp(_currentUser!.uid);
       }
       
       _showSubmitResult();

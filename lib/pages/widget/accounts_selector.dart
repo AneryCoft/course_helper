@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/user.dart';
 import '../../session/account.dart';
+import '../../platform.dart';
 
 class AccountsSelector extends StatefulWidget {
   final ValueChanged<List<User>> onSelectionChanged;
@@ -10,7 +11,7 @@ class AccountsSelector extends StatefulWidget {
   const AccountsSelector({
     super.key,
     required this.onSelectionChanged,
-    this.title = '选择参加活动的账号',
+    this.title = '选择参加的账号',
     this.initiallyExpanded = true,
   });
 
@@ -36,30 +37,33 @@ class _AccountsSelectorState extends State<AccountsSelector> {
   Future<void> _loadAccounts() async {
     try {
       // 获取所有账号
-      _allAccounts = AccountManager.getAllAccounts();
-      
+      List<User> allAccounts = AccountManager.getAllAccounts();
+        
+      // 根据当前平台过滤账号
+      final currentPlatform = PlatformManager().currentPlatform;
+      final platformString = currentPlatform == PlatformType.chaoxing ? 'chaoxing' : 'rainClassroom';
+      _allAccounts = allAccounts.where((account) => account.platform == platformString).toList();
+        
       // 获取当前账号
-      String? currentUserId = await AccountManager.getCurrentSession();
-      _currentUser = _allAccounts.firstWhere(
-        (user) => user.uid == currentUserId,
-        orElse: () => _allAccounts.isNotEmpty ? _allAccounts.first : User(name: '', avatar: '', phone: '', uid: ''),
-      );
-      
+      String? currentUserId = AccountManager.currentSessionId;
+      _currentUser = _allAccounts.isEmpty ?
+      null : _allAccounts.firstWhere((user) => user.uid == currentUserId, orElse: () => _allAccounts.first,);
+        
       // 默认选中所有账号
       _selectedAccounts = List.from(_allAccounts);
       _selectAll = _allAccounts.isNotEmpty;
-      
+        
       setState(() {
         _isLoading = false;
       });
-      
+        
       // 通知外部初始选中状态
       widget.onSelectionChanged(_selectedAccounts);
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
-      debugPrint('加载账号失败: $e');
+      debugPrint('加载账号失败：$e');
     }
   }
 

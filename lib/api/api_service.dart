@@ -8,61 +8,110 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import '../utils/encrypt.dart';
 import '../session/cookie.dart';
+import '../platform.dart';
+
+class HeadersManager {
+  static const _brand = 'google';
+  static const _deviceModel = 'Pixel 9 Pro';
+  static const _systemVersion = '16';
+  static const _buildNumber = '1610';
+  static const _incremental = '14624737'; // ro.build.version.incremental
+  static const _systemHttpAgent = 'Dalvik/2.1.0 (Linux; U; Android 16; Pixel 9 Pro Build/BP4A.260205.002)';
+
+  static const _rcVersion = '1.3.3';
+
+  static const _cxProductId = '3';
+  static const _cxVersion = '6.7.4';
+  static const _cxVersionCode = '10940';
+  static const _cxApiVersion = '314';
+
+  static const _uniqueIdKey = 'app_unique_id';
+  static late String _uniqueId;
+
+  static late String _cxUserAgent;
+
+  static late Map<String, String> _cxHeaders;
+
+  static final Map<String, String> _rcHeaders = {
+    'user-agent': 'Android',
+    'brand': '$_brand $_deviceModel',
+    'uuid': '',
+    'buildnumber': _buildNumber,
+    'xtua': 'client=app&tag=$_rcVersion&platform=Android',
+    'systemversion': _systemVersion,
+    'incremental': _incremental,
+    'accept': 'application/json',
+    'isphysicaldevice': 'true',
+    'xtbz': 'ykt',
+    'x-client': 'app'
+  };
+
+  static Future<void> updateChaoxingHeaders() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (prefs.containsKey(_uniqueIdKey)){
+      _uniqueId = prefs.getString(_uniqueIdKey)!;
+    } else {
+      _uniqueId = EncryptionUtil.getUniqueId();
+      prefs.setString(_uniqueIdKey, _uniqueId);
+    }
+    // 内测版：@Azeroth
+    // 正式版：@Kalimdor
+    final userAgentTemp = '(device:$_deviceModel) Language/zh_CN com.chaoxing.mobile/ChaoXingStudy_${_cxProductId}_${_cxVersion}_android_phone_${_cxVersionCode}_$_cxApiVersion (@Kalimdor)_$_uniqueId';
+    final schild = EncryptionUtil.md5Hash('(schild:${Constant.schildSalt}) $userAgentTemp');
+    _cxUserAgent = '$_systemHttpAgent (schild:$schild) $userAgentTemp';
+
+    _cxHeaders = {
+      'User-Agent': _cxUserAgent,
+      'Accept-Language': 'zh_CN',
+      'Connection': 'keep-alive',
+      'Accept-Encoding': 'gzip',
+      'content-type': 'application/x-www-form-urlencoded'
+      // 'X-Requested-With': 'com.chaoxing.mobile'
+    };
+  }
+
+  static Map<String, String> get chaoxingHeaders => Map.unmodifiable(_cxHeaders);
+
+  static Map<String, String> get rainClassroomHeaders => Map.unmodifiable(_rcHeaders);
+}
+
 
 
 class ApiService {
   static late Dio _dio;
+  static void Function(PlatformType)? onPlatformChange;
 
-  // Header
-  static const String _systemHttpAgent = 'Dalvik/2.1.0 (Linux; U; Android 15; PKG110 Build/UKQ1.231108.001)';
-  static const String _device = 'PKG110';
-  static const String _productId = '3';
-  static const String _version = '6.7.2';
-  static const String _versionCode = '10936';
-  static const String _apiVersion = '311';
-  // 内测版: @Azeroth
-  // 正式版: @Kalimdor
-  static const String _uniqueIdKey = 'app_unique_id';
-  static late String uniqueId;
-  static late String userAgent;
-
-  static void _updateUserAgent(String uniqueId) {
-    final userAgentTemp = '(device:$_device) Language/zh_CN com.chaoxing.mobile/ChaoXingStudy_${_productId}_${_version}_android_phone_${_versionCode}_$_apiVersion (@Kalimdor)_$uniqueId';
-    final schild = EncryptionUtil.md5Hash('(schild:${Constant.schildSalt}) $userAgentTemp');
-
-    userAgent = '$_systemHttpAgent (schild:$schild) $userAgentTemp';
+  // 初始化平台变化回调函数
+  static void _setupPlatformChangeCallback() {
+    onPlatformChange = (PlatformType newPlatform) async {
+      final platformManager = PlatformManager();
+      if (platformManager.isChaoxing) {
+        _dio.options.headers = HeadersManager.chaoxingHeaders;
+        (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+          final client = HttpClient();
+          client.userAgent = HeadersManager._cxUserAgent;
+          return client;
+        }; // dio 自动重定向会使用默认的 User-Agent
+      } else if (platformManager.isRainClassroom) {
+        _dio.options.headers = HeadersManager.rainClassroomHeaders;
+      }
+    };
   }
 
   static Future<void> initialize() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    if (prefs.containsKey(_uniqueIdKey)){
-      uniqueId = prefs.getString(_uniqueIdKey)!;
-    } else {
-      uniqueId = EncryptionUtil.getUniqueId();
-      prefs.setString(_uniqueIdKey, uniqueId);
-    }
-
-    _updateUserAgent(uniqueId);
-
+    await HeadersManager.updateChaoxingHeaders();
+    
     _dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
-      contentType: Headers.formUrlEncodedContentType, // application/x-www-form-urlencoded
-      headers: {
-        'User-Agent': userAgent,
-        'Accept-Language': 'zh_CN',
-        'Connection': 'keep-alive',
-        'Accept-Encoding': 'gzip'
-        // 'X-Requested-With': 'com.chaoxing.mobile'
-      },
+      sendTimeout: const Duration(seconds: 10),
+      // contentType: Headers.formUrlEncodedContentType, // application/x-www-form-urlencoded
+      // headers: HeadersManager.chaoxingHeaders,
       // validateStatus: (status) => status! < 500
     ));
 
-    (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-      final client = HttpClient();
-      client.userAgent = userAgent;
-      return client;
-    }; // dio自动重定向会使用默认的User-Agent
+    // 初始化平台变化回调
+    _setupPlatformChangeCallback();
 
     _dio.interceptors.add(CookieInterceptor());
 
@@ -84,7 +133,7 @@ class ApiService {
     ));
   }
 
-  // 发送HTTP请求
+  // 发送 HTTP 请求
   static Future<Response> sendRequest(
       String url,
       {
@@ -121,7 +170,7 @@ class ApiService {
       if (response.data is String) {
         response.data = jsonDecode(response.data);
       }
-    } // dio的json解析有问题
+    } // dio 的 json 解析有问题
 
     return response;
   }

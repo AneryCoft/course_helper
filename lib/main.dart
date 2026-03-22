@@ -1,21 +1,24 @@
-import 'package:flutter/material.dart';
-import 'package:dynamic_color/dynamic_color.dart';
+import'package:flutter/material.dart';
+import'package:dynamic_color/dynamic_color.dart';
 
-import './pages/accounts.dart';
-import './pages/courses.dart';
-import './pages/login.dart';
-import './api/api_service.dart';
-import './session/cookie.dart';
-import './session/account.dart';
+import'./pages/accounts.dart';
+import'./pages/courses.dart';
+import'./pages/login.dart';
+import'./api/api_service.dart';
+import'./session/cookie.dart';
+import'./session/account.dart';
+import'./platform.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  await ApiService.initialize();
+
+  await PlatformManager().initialize();
+
   await AccountManager.initialize();
 
   await CookieManager.initialize();
-
-  await ApiService.initialize();
 
   runApp(const MyApp());
 }
