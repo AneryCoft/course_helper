@@ -631,9 +631,8 @@ class _QuizPageState extends State<QuizPage> {
 
           return RadioListTile<String>(
             title: Text(
-              (quiz['type'] == 16) 
-                  ? ''  // 判断题只显示"对"/"错"
-                  : optionContent,
+              (quiz['type'] == 16) ?
+              '' : optionContent, // 判断题只显示"对"/"错"
               style: TextStyle(
                 color: isAnswer
                     ? Theme.of(context).colorScheme.primary
@@ -652,7 +651,9 @@ class _QuizPageState extends State<QuizPage> {
               child: Text(
                 optionLabel,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey[700],
+                  color: isSelected ?
+                  Colors.white : isAnswer?
+                  Theme.of(context).colorScheme.primary : Colors.grey[700],
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
@@ -695,15 +696,17 @@ class _QuizPageState extends State<QuizPage> {
           secondary: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: isSelected 
-                  ? Theme.of(context).colorScheme.primary 
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary
                   : Colors.grey[300],
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               optionLabel,
               style: TextStyle(
-                color: isSelected ? Colors.white : Colors.grey[700],
+                color: isSelected ?
+                Colors.white : isAnswer?
+                Theme.of(context).colorScheme.primary : Colors.grey[700],
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
               ),
