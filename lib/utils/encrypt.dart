@@ -25,8 +25,11 @@ class Constant {
   static const String infEncToken = "4faa8662c59590c6f43ae9fe5b002b42";
   static const String infEncKey = "Z(AfY@XS";
 
-  // 验证码
-  static const String captchaId = "Qt9FIw9o4pwRjOyqM6yizZBh682qN2TU";
+  // 学习通验证码
+  static const String cxCaptchaId = "Qt9FIw9o4pwRjOyqM6yizZBh682qN2TU";
+
+  // 雨课堂腾讯验证码
+  static const String  tCaptchaAppId = '2091064951';
 }
 
 class EncryptionUtil {
@@ -101,6 +104,7 @@ class EncryptionUtil {
     var uuid = Uuid();
     return uuid.v4();
   }
+
   /// 获取文件的CRC（非标准）
   static Future<String> getCRC(File file) async {
     final totalSize = await file.length();

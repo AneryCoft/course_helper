@@ -4,8 +4,9 @@ import 'dart:convert';
 
 import '../api/api_service.dart';
 import '../utils/encrypt.dart';
+import '../session/cookie.dart';
 
-class LoginApi {
+class CXLoginApi {
   /// Web登录
   static Future<Map<String, dynamic>?> loginWeb(String username, String password) async {
     try {
@@ -23,10 +24,13 @@ class LoginApi {
         'validate': ''
       };
 
+      CookieManager.isLoggingIn = true;
       final response = await ApiService.sendRequest(url, method: "POST", body: formData);
       return response.data;
     } catch (e) {
       debugPrint('Login error: $e');
+    } finally {
+      CookieManager.isLoggingIn = false;
     }
     return null;
   }
@@ -54,7 +58,7 @@ class LoginApi {
     return null;
   }
 
-  /// APP登录
+  /// APP 登录
   static Future<Map<String, dynamic>?> loginAPP(String loginType, String username, String code) async {
     try {
       final url = 'https://passport2-api.chaoxing.com/v11/loginregister?cx_xxt_passport=json';
@@ -75,11 +79,14 @@ class LoginApi {
         formData['countrycode'] = '86';
       }
 
+      CookieManager.isLoggingIn = true;
       final response = await ApiService.sendRequest(url, method: "POST", body: formData);
       return response.data;
       // {"mes":"验证通过","type":1,"url":"https://sso.chaoxing.com/apis/login/userLogin4Uname.do","status":true}
     } catch (e) {
       debugPrint('Login error: $e');
+    } finally {
+      CookieManager.isLoggingIn = false;
     }
     return null;
   }
@@ -89,10 +96,13 @@ class LoginApi {
     try {
       final url = 'https://sso.chaoxing.com/apis/login/userLogin4Uname.do';
 
+      CookieManager.isLoggingIn = true;
       final response = await ApiService.sendRequest(url);
       return response.data;
     } catch (e) {
       debugPrint('getUserInfo error: $e');
+    } finally {
+      CookieManager.isLoggingIn = false;
     }
     return null;
   }
@@ -156,16 +166,113 @@ class LoginApi {
         'doubleFactorLogin': '0',
         'forbidotherlogin': '0'
       };
-      
+
+      CookieManager.isLoggingIn = true;
       final response = await ApiService.sendRequest(
         authStatusUrl, 
         method: "POST", 
         body: formData
       );
-      
       return response.data;
     } catch (e) {
       debugPrint('checkQRAuthStatus error: $e');
+    } finally {
+      CookieManager.isLoggingIn = false;
+    }
+    return null;
+  }
+}
+
+class RCLoginApi {
+  /// 发送验证码
+  static Future<Map<String, dynamic>?> sendCaptcha(String phone, String ticket, String rand) async {
+    try {
+      final url = 'https://www.yuketang.cn/api/v3/user/code/send';
+
+      final jsonData = {
+        'phoneNumber': phone,
+        'email': '',
+        'ticket': ticket,
+        'rand': rand
+      };
+
+      final response = await ApiService.sendRequest(url, method: 'POST', body: jsonData);
+      return response.data;
+    } catch (e) {
+      debugPrint('sendCaptcha error: $e');
+    }
+    return null;
+  }
+
+  /// 验证验证码
+  static Future<Map<String, dynamic>?> verifyCaptcha(String phone, String code) async {
+    try {
+      final url = 'https://www.yuketang.cn/api/v3/user/code/verify';
+
+      final jsonData = {
+        'phoneNumber': phone,
+        'email': '',
+        'code': code
+      };
+
+      final response = await ApiService.sendRequest(url, method: 'POST', body: jsonData);
+      return response.data;
+    } catch (e) {
+      debugPrint('verifyCaptcha error: $e');
+    }
+    return null;
+  }
+
+  /// 验证码 密码登录
+  static Future<Map<String, dynamic>?> login(int loginType, String account, String code, String ticket, String rand) async {
+    try {
+      final url = 'https://www.yuketang.cn/api/v3/user/login/app';
+
+      final jsonData = {
+        'type': loginType,
+        'phoneNumber': '',
+        'password': '',
+        'email': '',
+        'code': '',
+        'pushDeviceId': '',
+        'ticket': ticket,
+        'rand': rand
+      };
+      if (loginType == 2) {
+        jsonData['password'] = code;
+      } else if (loginType == 3) {
+        jsonData['code'] = code;
+      }
+
+      if (account.contains('@')) {
+        jsonData['email'] = account;
+      } else {
+        jsonData['phoneNumber'] = account;
+      }
+
+      CookieManager.isLoggingIn = true;
+      final response = await ApiService.sendRequest(url, method: 'POST', body: jsonData);
+      return response.data;
+    } catch (e) {
+      debugPrint('login error: $e');
+    } finally {
+      CookieManager.isLoggingIn = false;
+    }
+    return null;
+  }
+
+  /// 获取用户信息
+  static Future<Map<String, dynamic>?> getUserInfo() async {
+    try {
+      final url = 'https://www.yuketang.cn/v/course_meta/user_info';
+
+      CookieManager.isLoggingIn = true;
+      final response = await ApiService.sendRequest(url);
+      return response.data;
+    } catch (e) {
+      debugPrint('getUserInfo error: $e');
+    } finally {
+      CookieManager.isLoggingIn = false;
     }
     return null;
   }

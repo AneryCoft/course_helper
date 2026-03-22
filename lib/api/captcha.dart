@@ -20,7 +20,7 @@ class CaptchaApi {
       final configUrl = 'https://captcha.chaoxing.com/captcha/get/conf';
       final configParams = {
         'callback': 'cx_captcha_function',
-        'captchaId': Constant.captchaId,
+        'captchaId': Constant.cxCaptchaId,
         '_': _timestamp.toString()
       };
 
@@ -40,13 +40,13 @@ class CaptchaApi {
 
       int serviceTime = config['t'];
       String captchaKey = EncryptionUtil.md5Hash('$serviceTime${_uuid()}');
-      String token = '${EncryptionUtil.md5Hash('$serviceTime${Constant.captchaId}slide$captchaKey')}:${serviceTime + 300000}';
-      _iv = EncryptionUtil.md5Hash('${Constant.captchaId}slide$_timestamp${_uuid()}');
+      String token = '${EncryptionUtil.md5Hash('$serviceTime${Constant.cxCaptchaId}slide$captchaKey')}:${serviceTime + 300000}';
+      _iv = EncryptionUtil.md5Hash('${Constant.cxCaptchaId}slide$_timestamp${_uuid()}');
 
       final imageUrl = 'https://captcha.chaoxing.com/captcha/get/verification/image';
       final imageParams = {
         'callback': 'cx_captcha_function',
-        'captchaId': Constant.captchaId,
+        'captchaId': Constant.cxCaptchaId,
         'type': 'slide',
         'version': '1.1.20',
         'captchaKey': captchaKey,
@@ -82,7 +82,7 @@ class CaptchaApi {
       final url = 'https://captcha.chaoxing.com/captcha/check/verification/result';
       final params = {
         'callback': 'cx_captcha_function',
-        'captchaId': Constant.captchaId,
+        'captchaId': Constant.cxCaptchaId,
         'type': 'slide',
         'token': token,
         'textClickArr': '[{"x":${xValue.round()}}]',

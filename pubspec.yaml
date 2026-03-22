@@ -61,6 +61,7 @@ dependencies:
   image_picker: ^1.2.1
   url_launcher: ^6.2.5
   pinput: ^6.0.2
+  flutter_tencent_captcha: ^0.1.2
 
 
 dev_dependencies:

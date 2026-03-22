@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../api/captcha.dart';
 
+/// 学习通验证码
 class CaptchaPage extends StatefulWidget {
   final String? referer;
   final bool isSlideCaptcha;
