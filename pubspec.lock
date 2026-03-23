@@ -313,10 +313,11 @@ packages:
   flutter_tencent_captcha:
     dependency: "direct main"
     description:
-      name: flutter_tencent_captcha
-      sha256: cd5759ae697824bb33daa4539cc3b26a24f5b358e190601dac3cc29a14ae5bf5
-      url: "https://pub.dev"
-    source: hosted
+      path: "."
+      ref: master
+      resolved-ref: "1e0f8741fa3f07b6a03bcdc24928fffff8029521"
+      url: "https://github.com/AneryCoft/flutter_tencent_captcha.git"
+    source: git
     version: "0.1.2"
   flutter_test:
     dependency: "direct dev"

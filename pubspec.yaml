@@ -55,13 +55,16 @@ dependencies:
   flutter_baidu_mapapi_base: 3.9.9
   flutter_baidu_mapapi_search: 3.9.9
   flutter_bmflocation: 3.8.3
-  # 百度地图SDK真弱智
   file_picker: ^10.3.10
   dynamic_color: ^1.8.1
   image_picker: ^1.2.1
   url_launcher: ^6.2.5
   pinput: ^6.0.2
-  flutter_tencent_captcha: ^0.1.2
+  # flutter_tencent_captcha: ^0.1.2
+  flutter_tencent_captcha:
+    git:
+      url: https://github.com/AneryCoft/flutter_tencent_captcha.git
+      ref: master
 
 
 dev_dependencies:
