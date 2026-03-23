@@ -59,7 +59,7 @@ class PlatformManager {
     if (oldPlatform != platform) {
       _currentPlatform = platform;
       try {
-        await _prefs.setString(_platformKey, platformStr);
+        await _prefs.setString(_platformKey, currentPlatformName);
       } catch (e) {
         debugPrint('保存平台失败：$e');
       }
@@ -69,7 +69,7 @@ class PlatformManager {
   }
 
   /// 获取平台字符串标识
-  String get platformStr {
+  String get currentPlatformName {
     return _currentPlatform == PlatformType.chaoxing ?
     'chaoxing' : 'rainClassroom';
   }

@@ -41,19 +41,11 @@ class _AccountsSelectorState extends State<AccountsSelector> {
   Future<void> _loadAccounts() async {
     try {
       // 获取所有账号
-      List<User> allAccounts = AccountManager.getAllAccounts();
-
-      // 根据当前平台过滤账号
-      final currentPlatform = PlatformManager().currentPlatform;
-      final platformString =
-      currentPlatform == PlatformType.chaoxing ? 'chaoxing' : 'rainClassroom';
-      _allAccounts =
-          allAccounts.where((account) => account.platform == platformString).toList();
+      _allAccounts = AccountManager.getPlatformsAllAccounts();
+      _selectedAccounts = _allAccounts;
 
       String? currentUserId = AccountManager.currentSessionId;
-      _currentUser = _allAccounts.isEmpty ?
-      null : _allAccounts.firstWhere((user) => user.uid == currentUserId);
-      _selectedAccounts = List.from(_allAccounts);
+      _currentUser = AccountManager.getAccountById(currentUserId!);
 
       setState(() {
         _isLoading = false;

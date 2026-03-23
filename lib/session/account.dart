@@ -133,9 +133,14 @@ class AccountManager {
     return _currentSessionId != null && _currentSessionId!.isNotEmpty;
   }
 
-  /// 获取所有账户（同步，使用缓存）
+  /// 获取所有账户
   static List<User> getAllAccounts() {
     return _accounts;
+  }
+
+  /// 获取所有当前平台的账户
+  static List<User> getPlatformsAllAccounts() {
+    return _accounts.where((user) => user.platform == PlatformManager().currentPlatformName).toList();
   }
 
   /// 根据ID获取账户（同步，使用缓存）
@@ -149,7 +154,7 @@ class AccountManager {
 
   /// 添加账户（如果已存在则更新）
   static Future<void> addAccount(User user) async {
-    final accounts = getAllAccounts();
+    final accounts = _accounts;
     final index = accounts.indexWhere((acc) => acc.uid == user.uid);
     if (index != -1) {
       accounts[index] = user;

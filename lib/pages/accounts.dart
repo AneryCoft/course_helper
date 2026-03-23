@@ -50,11 +50,10 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
 
   Future<void> _loadAccounts() async {
     final current = AccountManager.currentSessionId;
-    final allAccounts = AccountManager.getAllAccounts();
-    final platformAccounts = allAccounts.where((user) => user.platform == _selectedPlatform.name).toList();
+    final allAccounts = AccountManager.getPlatformsAllAccounts();
 
     setState(() {
-      _accounts = platformAccounts;
+      _accounts = allAccounts;
       _currentAccountId = current;
     });
   }
