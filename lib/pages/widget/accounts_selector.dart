@@ -23,9 +23,13 @@ class _AccountsSelectorState extends State<AccountsSelector> {
   List<User> _allAccounts = [];
   List<User> _selectedAccounts = [];
   User? _currentUser;
-  bool _selectAll = false;
   bool _isLoading = true;
   late bool _isExpanded;
+
+  // 为tristate创造条件
+  bool get _hasSelectableAccounts => _allAccounts.any((user) => user != _currentUser);
+  int get _selectableCount => _allAccounts.where((user) => user != _currentUser).length;
+  int get _selectedSelectableCount => _selectedAccounts.where((user) => user != _currentUser).length;
 
   @override
   void initState() {
@@ -38,25 +42,23 @@ class _AccountsSelectorState extends State<AccountsSelector> {
     try {
       // 获取所有账号
       List<User> allAccounts = AccountManager.getAllAccounts();
-        
+
       // 根据当前平台过滤账号
       final currentPlatform = PlatformManager().currentPlatform;
-      final platformString = currentPlatform == PlatformType.chaoxing ? 'chaoxing' : 'rainClassroom';
-      _allAccounts = allAccounts.where((account) => account.platform == platformString).toList();
-        
-      // 获取当前账号
+      final platformString =
+      currentPlatform == PlatformType.chaoxing ? 'chaoxing' : 'rainClassroom';
+      _allAccounts =
+          allAccounts.where((account) => account.platform == platformString).toList();
+
       String? currentUserId = AccountManager.currentSessionId;
       _currentUser = _allAccounts.isEmpty ?
-      null : _allAccounts.firstWhere((user) => user.uid == currentUserId, orElse: () => _allAccounts.first,);
-        
-      // 默认选中所有账号
+      null : _allAccounts.firstWhere((user) => user.uid == currentUserId);
       _selectedAccounts = List.from(_allAccounts);
-      _selectAll = _allAccounts.isNotEmpty;
-        
+
       setState(() {
         _isLoading = false;
       });
-        
+
       // 通知外部初始选中状态
       widget.onSelectionChanged(_selectedAccounts);
     } catch (e) {
@@ -67,31 +69,28 @@ class _AccountsSelectorState extends State<AccountsSelector> {
     }
   }
 
-  void _updateSelectAllState() {
-    _selectAll = _selectedAccounts.length == _allAccounts.length && _allAccounts.isNotEmpty;
-  }
-
-  // 全选
+  // 全选/全不选逻辑
   void _toggleSelectAll(bool? value) {
-    setState(() {
-      _selectAll = value ?? false;
+    bool selectAll = value ?? false;
 
-      if (_selectAll) {
-        _selectedAccounts = List.from(_allAccounts);
-      } else {
-        _selectedAccounts = _currentUser != null ? [_currentUser!] : [];
+    final currentUser = _currentUser;
+    Set<User> newSelected = {?currentUser};
+
+    if (selectAll) {
+      for (var user in _allAccounts) {
+        if (user != currentUser) {
+          newSelected.add(user);
+        }
       }
-
+    }
+    setState(() {
+      _selectedAccounts = newSelected.toList();
       widget.onSelectionChanged(_selectedAccounts);
     });
   }
 
+  // 单个账号选择/取消
   void _toggleAccountSelection(User user, bool? value) {
-    // 当前用户不能被操作
-    if (user == _currentUser) {
-      return;
-    }
-
     setState(() {
       if (value == true) {
         if (!_selectedAccounts.contains(user)) {
@@ -101,8 +100,6 @@ class _AccountsSelectorState extends State<AccountsSelector> {
         _selectedAccounts.remove(user);
       }
 
-      // 更新全选状态
-      _updateSelectAllState();
       widget.onSelectionChanged(_selectedAccounts);
     });
   }
@@ -114,53 +111,62 @@ class _AccountsSelectorState extends State<AccountsSelector> {
     }
 
     return Card(
-        child: Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            initiallyExpanded: _isExpanded,
-            onExpansionChanged: (expanded) {
-              setState(() {
-                _isExpanded = expanded;
-              });
-            },
-            title: Text(
-              widget.title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('全选'),
-                Checkbox(
-                  value: _selectAll,
-                  onChanged: _toggleSelectAll,
-                  fillColor: WidgetStateProperty.resolveWith<Color>(
-                        (Set<WidgetState> states) {
-                      if (states.contains(WidgetState.selected)) {
-                        return Theme.of(context).colorScheme.primary;
-                      }
-                      return Colors.transparent;
-                    },
-                  ),
-                ),
-                // 添加展开/收起图标
-                Icon(
-                  _isExpanded ? Icons.expand_less : Icons.expand_more,
-                  color: Colors.grey,
-                ),
-              ],
-            ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: _isExpanded,
+          onExpansionChanged: (expanded) {
+            setState(() {
+              _isExpanded = expanded;
+            });
+          },
+          title: Text(
+            widget.title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              if (_allAccounts.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text(
-                    '没有账户',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                )
-              else
-                ..._allAccounts.map((user) {
+              const Text('全选'),
+              Checkbox(
+                tristate: true,
+                value: !_hasSelectableAccounts ?
+                false : _selectedSelectableCount == _selectableCount ?
+                true : _selectedSelectableCount == 0 ?
+                false : null,
+                onChanged: _hasSelectableAccounts ? _toggleSelectAll : null,
+                fillColor: WidgetStateProperty.resolveWith<Color>(
+                      (Set<WidgetState> states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return Theme.of(context).colorScheme.primary;
+                    }
+                    return Colors.transparent;
+                  },
+                ),
+              ),
+              // 展开/收起图标
+              Icon(
+                _isExpanded ? Icons.expand_less : Icons.expand_more,
+                color: Colors.grey,
+              ),
+            ],
+          ),
+          children: [
+            if (_allAccounts.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  '没有账户',
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                ),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _allAccounts.length,
+                itemBuilder: (context, index) {
+                  final user = _allAccounts[index];
                   bool isCurrentUser = user == _currentUser;
                   bool isSelected = _selectedAccounts.contains(user);
 
@@ -171,7 +177,8 @@ class _AccountsSelectorState extends State<AccountsSelector> {
                         if (isCurrentUser) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: Theme.of(context).colorScheme.primary,
                               borderRadius: BorderRadius.circular(12),
@@ -189,15 +196,17 @@ class _AccountsSelectorState extends State<AccountsSelector> {
                       ],
                     ),
                     value: isSelected,
-                    onChanged: isCurrentUser ? null : (bool? value) => _toggleAccountSelection(user, value),
+                    onChanged: isCurrentUser ?
+                    null : (bool? value) => _toggleAccountSelection(user, value),
                     enabled: !isCurrentUser,
                     checkColor: isCurrentUser ? Colors.white : null,
                     activeColor: Theme.of(context).colorScheme.primary,
                   );
-                }),
-            ],
-          ),
-        )
+                },
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
