@@ -23,8 +23,7 @@ class AccountManager {
 
   /// 从存储中获取所有账户（异步，从当前平台读取）
   static Future<List<User>> _getAllAccountsFromStorage() async {
-    final platform = PlatformManager().currentPlatform;
-    final accountsKey = platform == PlatformType.chaoxing ?
+    final accountsKey = PlatformManager().isChaoxing ?
     _chaoxingAccountsKey : _rainClassroomAccountsKey;
     
     final String? accountsJson = _prefs.getString(accountsKey);
@@ -37,8 +36,7 @@ class AccountManager {
 
   /// 保存账户列表到存储（保存到当前平台）
   static Future<void> _saveAccounts(List<User> accounts) async {
-    final platform = PlatformManager().currentPlatform;
-    final accountsKey = platform == PlatformType.chaoxing ?
+    final accountsKey = PlatformManager().isChaoxing ?
     _chaoxingAccountsKey : _rainClassroomAccountsKey;
     
     final accountsJson = json.encode(accounts.map((u) => u.toJson()).toList());
@@ -101,9 +99,7 @@ class AccountManager {
   
   /// 获取当前会话的用户 ID
   static Future<String?> getCurrentSession() async {
-    final currentPlatform = PlatformManager().currentPlatform;
-
-    final sessionKey = currentPlatform == PlatformType.chaoxing ?
+    final sessionKey = PlatformManager().isChaoxing ?
     _chaoxingSessionKey : _rainClassroomSessionKey;
     _currentSessionId = _prefs.getString(sessionKey);
     debugPrint('当前SessionId：$_currentSessionId');
@@ -113,9 +109,7 @@ class AccountManager {
   /// 设置当前会话的用户 ID
   static Future<void> setCurrentSession(String? userId) async {
     _currentSessionId = userId;
-    // 根据当前平台保存对应的会话 ID
-    final platform = PlatformManager().currentPlatform;
-    final sessionKey = platform == PlatformType.chaoxing ? 
+    final sessionKey = PlatformManager().isChaoxing ?
     _chaoxingSessionKey : _rainClassroomSessionKey;
     
     if (userId != null) {
@@ -133,14 +127,14 @@ class AccountManager {
     return _currentSessionId != null && _currentSessionId!.isNotEmpty;
   }
 
+  /// 从存储中获取账户列表
+  static Future<void> refreshAccounts() async {
+    _accounts = await _getAllAccountsFromStorage();
+  }
+
   /// 获取所有账户
   static List<User> getAllAccounts() {
     return _accounts;
-  }
-
-  /// 获取所有当前平台的账户
-  static List<User> getPlatformsAllAccounts() {
-    return _accounts.where((user) => user.platform == PlatformManager().currentPlatformName).toList();
   }
 
   /// 根据ID获取账户（同步，使用缓存）
@@ -172,22 +166,6 @@ class AccountManager {
     }
   }
 
-  /// 删除账户
-  static Future<void> removeAccount(String userId) async {
-    final accounts = await _getAllAccountsFromStorage();
-    accounts.removeWhere((acc) => acc.uid == userId);
-    await _saveAccounts(accounts);
-
-    // 如果删除的是当前会话账户，则清除会话和该用户的 Cookie
-    final current = await getCurrentSession();
-    if (current == userId) {
-      await clearCurrentSession();
-    } else {
-      // 如果不是当前用户，也要清除该用户的 Cookie 数据
-      await CookieManager.clearCookiesForUser(userId);
-    }
-  }
-
   /// 批量删除账户
   static Future<void> removeAccounts(List<String> userIds) async {
     final accounts = await _getAllAccountsFromStorage();
@@ -210,9 +188,7 @@ class AccountManager {
 
   /// 清除当前会话（仅清除会话 ID，不清除账户数据）
   static Future<void> clearCurrentSession() async {
-    // 根据当前平台清除对应的会话 ID
-    final platform = PlatformManager().currentPlatform;
-    final sessionKey = platform == PlatformType.chaoxing ?
+    final sessionKey = PlatformManager().isChaoxing ?
     _chaoxingSessionKey : _rainClassroomSessionKey;
     await _prefs.remove(sessionKey);
     final currentUserId = _currentSessionId;

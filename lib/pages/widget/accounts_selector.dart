@@ -41,7 +41,7 @@ class _AccountsSelectorState extends State<AccountsSelector> {
   Future<void> _loadAccounts() async {
     try {
       // 获取所有账号
-      _allAccounts = AccountManager.getPlatformsAllAccounts();
+      _allAccounts = AccountManager.getAllAccounts();
       _selectedAccounts = _allAccounts;
 
       String? currentUserId = AccountManager.currentSessionId;

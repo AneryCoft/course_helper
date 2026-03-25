@@ -1,3 +1,4 @@
+import 'package:course_helper/session/cookie.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -44,9 +45,7 @@ class PlatformManager {
       }
 
       // 触发平台变化回调，初始化 headers
-      if (ApiService.onPlatformChange != null) {
-        ApiService.onPlatformChange!(_currentPlatform);
-      }
+      ApiService.onPlatformChange!();
     } catch (e) {
       debugPrint('加载平台失败：$e');
     }
@@ -64,7 +63,9 @@ class PlatformManager {
         debugPrint('保存平台失败：$e');
       }
       await AccountManager.switchToPlatformAccount();
-      ApiService.onPlatformChange?.call(platform);
+      await AccountManager.refreshAccounts();
+      await CookieManager.loadAllCookies();
+      ApiService.onPlatformChange?.call();
     }
   }
 

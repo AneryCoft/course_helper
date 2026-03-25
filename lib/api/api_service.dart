@@ -79,20 +79,14 @@ class HeadersManager {
 
 class ApiService {
   static late Dio _dio;
-  static void Function(PlatformType)? onPlatformChange;
+  static void Function()? onPlatformChange;
 
   // 初始化平台变化回调函数
   static void _setupPlatformChangeCallback() {
-    onPlatformChange = (PlatformType newPlatform) async {
-      final platformManager = PlatformManager();
-      if (platformManager.isChaoxing) {
+    onPlatformChange = () async {
+      if (PlatformManager().isChaoxing) {
         _dio.options.headers = HeadersManager.chaoxingHeaders;
-        (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-          final client = HttpClient();
-          client.userAgent = HeadersManager._cxUserAgent;
-          return client;
-        }; // dio 自动重定向会使用默认的 User-Agent
-      } else if (platformManager.isRainClassroom) {
+      } else if (PlatformManager().isRainClassroom) {
         _dio.options.headers = HeadersManager.rainClassroomHeaders;
       }
     };
@@ -111,6 +105,12 @@ class ApiService {
     ));
 
     // 初始化平台变化回调
+    (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+      final client = HttpClient();
+      client.userAgent = HeadersManager._cxUserAgent;
+      return client;
+    }; // dio 自动重定向会使用默认的 User-Agent
+    // 似乎无法在初始化结束后进行更改
     _setupPlatformChangeCallback();
 
     _dio.interceptors.add(CookieInterceptor());

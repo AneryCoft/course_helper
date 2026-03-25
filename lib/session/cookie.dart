@@ -11,9 +11,8 @@ class CookieInterceptor extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     final uri = options.uri;
     List<Cookie> cookies = [];
-    late CookieJar? cookieJar;
-    cookieJar = CookieManager.isLoggingIn ?
-    CookieManager.getTempCookieJar() : CookieManager.getCurrentUserCookieJar();
+    CookieJar? cookieJar= CookieManager.isLoggingIn ?
+    CookieManager.getTempCookieJar() : CookieManager.getCurrentUserCookieJar();;
     if (cookieJar != null) {
       cookies = await cookieJar.loadForRequest(uri);
     }
@@ -62,7 +61,10 @@ class CookieManager {
 
   static Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
+    await loadAllCookies();
+  }
 
+  static Future<void> loadAllCookies() async {
     // 获取所有账号并预加载 CookieJar
     final accounts = AccountManager.getAllAccounts();
     if (accounts.isEmpty) {
@@ -185,6 +187,7 @@ class CookieManager {
       return null;
     }
     final cookieJar = _userCookieJars[currentUserId];
+
     return cookieJar;
   }
 
