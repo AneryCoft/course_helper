@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/user.dart';
 import '../../session/account.dart';
-import '../../platform.dart';
 
 class AccountsSelector extends StatefulWidget {
   final ValueChanged<List<User>> onSelectionChanged;
@@ -38,27 +37,26 @@ class _AccountsSelectorState extends State<AccountsSelector> {
     _loadAccounts();
   }
 
-  Future<void> _loadAccounts() async {
+  void _loadAccounts() {
     try {
       // 获取所有账号
       _allAccounts = AccountManager.getAllAccounts();
       _selectedAccounts = _allAccounts;
 
-      String? currentUserId = AccountManager.currentSessionId;
+      final currentUserId = AccountManager.currentSessionId;
       _currentUser = AccountManager.getAccountById(currentUserId!);
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      // 通知外部初始选中状态
-      widget.onSelectionChanged(_selectedAccounts);
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
       debugPrint('加载账号失败：$e');
     }
+    // 通知外部初始选中状态
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          widget.onSelectionChanged(_selectedAccounts);
+          _isLoading = false;
+        });
+      }
+    });
   }
 
   // 全选/全不选逻辑
