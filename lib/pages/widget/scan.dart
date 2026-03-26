@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 
 class ScanPage extends StatefulWidget {
-  final Function(String)? onScanResult; // 添加回调函数参数
+  final Function(String)? onScanResult;
   
   const ScanPage({super.key, this.onScanResult});
 
@@ -23,12 +22,10 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
   bool isScan = false;
   bool _isInitializing = false;
 
-
-
   @override
   void initState() {
     super.initState();
-    _requestCameraPermission();
+    _initializeScanner();
   }
 
   @override
@@ -42,126 +39,20 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     
     // 再安全地停止相机
     unawaited(_subscription?.cancel());
-    _stopController();
+    _controller?.stop();
     _controller = null;
     
     isScan = false;
     super.dispose();
   }
 
-  // 安全地停止相机
-  void _stopController() {
-    try {
-      _controller?.stop();
-    } catch (e) {
-      // 忽略停止相机时的异常
-    }
-  }
-
-  // 请求摄像头权限
-  Future<void> _requestCameraPermission() async {
-    setState(() {
-      _isInitializing = true;
-    });
-    
-    var status = await Permission.camera.status;
-
-    if (status.isRestricted || status.isPermanentlyDenied) {
-      openAppSettings();
-      setState(() {
-        _isInitializing = false;
-      });
-      return;
-    } else if (!status.isGranted) {
-      status = await Permission.camera.request();
-    }
-
-    if (status.isDenied) {
-      setState(() {
-        _isInitializing = false;
-      });
-      _showPermissionDeniedDialog();
-      return;
-    }
-
-    _initializeScanner();
-  }
-
-  // 显示权限被拒绝的对话框
-  void _showPermissionDeniedDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('需要摄像头权限'),
-          content: const Text('请授予摄像头权限以使用扫描功能'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop(); // 返回上一个页面
-              },
-              child: const Text('取消'),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.of(context).pop(); // 先关闭弹窗
-                // 等待 UI 更新完成
-                await Future.delayed(const Duration(milliseconds: 100));
-                
-                setState(() {
-                  _isInitializing = true;
-                });
-                
-                var newStatus = await Permission.camera.request();
-                if (newStatus.isGranted) {
-                  // 关键：先完全释放旧的控制器
-                  if (_controller != null) {
-                    try {
-                      await _controller!.stop();
-                      _controller!.dispose();
-                      _controller = null;
-                    } catch (e) {
-                      // 忽略释放时的错误
-                    }
-                  }
-                  // 重新初始化扫描器
-                  await _initializeScanner();
-                } else {
-                  setState(() {
-                    _isInitializing = false;
-                  });
-                  _showPermissionDeniedDialog();
-                }
-              },
-              child: const Text('重试'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _handleBarcodeEvent(BarcodeCapture capture) {
-    if (!mounted) return;
-    
-    if (capture.barcodes.isNotEmpty) {
-      final code = capture.barcodes.first.rawValue;
-      if (code != null) {
-        _handleScanResult(code);
-      }
-    }
-  }
-
-
-
   Future<void> _initializeScanner() async {
     if (!mounted) return;
     
     try {
       _controller = MobileScannerController(
+        autoStart: false,
         detectionSpeed: DetectionSpeed.normal,
-        torchEnabled: false,
         facing: CameraFacing.back,
         formats: [BarcodeFormat.qrCode],
         autoZoom: true
@@ -169,12 +60,12 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
       
       await _controller!.start();
       
-    if (mounted) {
-      setState(() {
-        _isInitializing = false;
-      });
-      startScan();
-    }
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
+        startScan();
+      }
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -185,19 +76,17 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
   }
 
   void startScan() async {
-    if (!mounted) return;
-    
     isScan = true;
     _initAnimation();
   }
 
   void _initAnimation() {
-    _animationController ??= AnimationController(vsync: this, duration: Duration(milliseconds: animationTime));
-    _animationController
-      ?..addListener(_upState)
+    _animationController ??= AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: animationTime),
+    )..addListener(() => setState(() {}))
       ..addStatusListener((state) {
         if (!mounted) {
-          stop();
           return;
         }
 
@@ -223,7 +112,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     if (!isScan) return;
 
     isScan = false;
-    _stopController();
+    _controller?.stop();
     
     if (_animationController != null) {
       _animationController?.stop();
@@ -232,9 +121,6 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     }
   }
 
-  void _upState() {
-    setState(() {});
-  }
 
   void scanImage(String path) async {
     try {
@@ -264,12 +150,11 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
             MobileScanner(
               controller: _controller,
               onDetect: (BarcodeCapture capture) {
-                debugPrint('检测到条码，数量：${capture.barcodes.length}');
                 if (capture.barcodes.isNotEmpty) {
                   final code = capture.barcodes.first.rawValue;
                   debugPrint('条码内容：$code');
                   if (code != null) {
-                    _handleBarcodeEvent(capture);
+                    _handleScanResult(code);
                   }
                 }
               },
@@ -302,14 +187,9 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
                 children: [
                   IconButton(
                     onPressed: () async {
-                      final result = await FilePicker.platform.pickFiles(
-                        type: FileType.image,
-                        allowMultiple: false,
-                      );
-                      if (result == null || result.files.isEmpty) return;
-                      final path = result.files.first.path;
-                      if (path == null) return;
-                      scanImage(path);
+                      final XFile? image = await ImagePicker().pickImage(source: ImageSource.gallery);
+                      if (image == null) return;
+                      scanImage(image.path);
                     },
                     icon: const Icon(Icons.photo_library, color: Colors.white, size: 35),
                   ),
@@ -341,51 +221,12 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     stop();
     
     if (!mounted) return;
-    
-    // 如果有回调函数，直接传回结果并返回上一页
-    if (widget.onScanResult != null) {
-      try {
-        widget.onScanResult!(data);
-        if (mounted) {
-          Navigator.of(context).pop(data);
-        }
-      } catch (e) {
-        // 忽略导航异常
-      }
-    } else {
-      // 保持原有行为（显示弹窗）
-      _showScanResultDialog(data);
-      // 显示弹窗后重新开始扫描
-      startScan();
+    try {
+      widget.onScanResult!(data);
+      Navigator.of(context).pop(data);
+    } catch (e) {
+      debugPrint('Navigator $e');
     }
-  }
-
-  void _showScanResultDialog(String result) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('扫描结果'),
-          content: SelectableText(result),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // 关闭对话框
-                _requestCameraPermission(); // 重新开始扫描
-              },
-              child: const Text('继续扫描'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // 关闭对话框
-                Navigator.of(context).pop(); // 返回上一页
-              },
-              child: const Text('完成'),
-            ),
-          ],
-        );
-      },
-    );
   }
 }
 
