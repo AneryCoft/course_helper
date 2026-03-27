@@ -111,6 +111,7 @@ class SignInPage extends StatefulWidget {
   final String courseId;
   final String classId;
   final String cpi;
+  final String? enc;
 
   const SignInPage({
     super.key,
@@ -118,6 +119,7 @@ class SignInPage extends StatefulWidget {
     required this.courseId,
     required this.classId,
     required this.cpi,
+    this.enc,
   });
 
   @override
@@ -165,13 +167,21 @@ class SignInPageState extends State<SignInPage> {
   @override
   void initState() {
     super.initState();
-    _initializeAccounts();
+    final currentSessionId = AccountManager.currentSessionId!;
+    _currentUser = AccountManager.getAccountById(currentSessionId);
+    _initSignStrategy();
+    
     _signParams = SignParams(
       active: widget.active,
       courseId: widget.courseId,
       classId: widget.classId,
       cpi: widget.cpi,
     );
+
+    // 扫码签到
+    if (widget.enc != null) {
+      _signParams.enc = widget.enc;
+    }
   }
 
   @override
@@ -180,17 +190,6 @@ class SignInPageState extends State<SignInPage> {
       controller.dispose();
     }
     super.dispose();
-  }
-
-  Future<void> _initializeAccounts() async {
-    String? currentUserId = AccountManager.currentSessionId;
-    _currentUser = AccountManager.getAccountById(currentUserId!);
-    setState(() {
-      _selectedAccounts = _currentUser != null ? [_currentUser!] : [];
-    });
-
-    // 账号初始化完成后初始化签到策略
-    _initSignStrategy();
   }
 
   Future<void> _parseSignInfo() async {
@@ -223,7 +222,6 @@ class SignInPageState extends State<SignInPage> {
           case _:
         }
       }
-  
       if (attendInfo != null && attendInfo['result'] == 1){
         if (attendInfo['data']['status'] == 1){
           _showSuccessMessage('当前用户已签到');
@@ -243,7 +241,6 @@ class SignInPageState extends State<SignInPage> {
   Future<void> _initSignStrategy() async {
     await _parseSignInfo();
     _currentStrategy = SignStrategyFactory.create(widget.active.signType);
-
     if (_currentStrategy != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _currentStrategy!.execute(context, this, _signParams);
@@ -306,7 +303,6 @@ class SignInPageState extends State<SignInPage> {
 
                 // 账号选择
                 AccountsSelector(
-                  // accounts_selector 现在自己获取数据
                   onSelectionChanged: (selected) {
                     setState(() {
                       _selectedAccounts = selected;
@@ -413,7 +409,6 @@ class SignInPageState extends State<SignInPage> {
       _totalCount = _selectedAccounts.length;
       _failedAccounts.clear();
     });
-
     for (var user in _selectedAccounts) {
       AccountManager.setCurrentSessionTemp(user.uid);
       SignInApi.updateUser();
@@ -429,7 +424,6 @@ class SignInPageState extends State<SignInPage> {
         }
       }
     }
-
     if (_currentUser != null) {
       AccountManager.setCurrentSessionTemp(_currentUser!.uid);
     }
@@ -475,9 +469,6 @@ class SignInPageState extends State<SignInPage> {
       debugPrint('账号 ${user.name} 签到成功');
     } else if (result == 'success2') {
       _addFailedAccount(user, '已过截止时间');
-    } else if (result.contains('不在可签到范围内')){
-      // 距教师指定签到地点150582.0米，不在可签到范围内。
-      _addFailedAccount(user, result);
     } else {
       _addFailedAccount(user, result);
     }

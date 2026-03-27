@@ -102,7 +102,6 @@ class AccountManager {
     final sessionKey = PlatformManager().isChaoxing ?
     _chaoxingSessionKey : _rainClassroomSessionKey;
     _currentSessionId = _prefs.getString(sessionKey);
-    debugPrint('当前SessionId：$_currentSessionId');
     return _currentSessionId;
   }
 

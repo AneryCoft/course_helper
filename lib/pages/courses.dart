@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:dio/dio.dart';
 
+import '../platform.dart';
 import '../api/course.dart';
 import '../api/api_service.dart';
-import '../api/sign_in.dart';
 import '../session/account.dart';
 import '../models/course.dart';
 import '../models/active.dart';
@@ -13,6 +13,7 @@ import 'actives/sign_in/sign_in.dart';
 import 'actives/topic_discuss.dart';
 import 'actives/quiz.dart';
 import 'accounts.dart';
+import 'presentation.dart';
 
 
 class CourseContentPage extends StatefulWidget {
@@ -49,62 +50,13 @@ class _CourseContentPageState extends State<CourseContentPage> {
     });
 
     try {
-      final String joinClassTime = (await CourseApi.getJoinClassTime(
+      final List<Active>? contentList = await CXCourseApi.getActiveList(
         widget.courseId,
         widget.classId,
         widget.cpi,
-      )) ??
-          '';
-      final Map<String, dynamic>? taskData =
-      await CourseApi.getTaskActivityList(
-        widget.courseId,
-        widget.classId,
-        widget.cpi,
-        joinClassTime,
-      );
-      final Map<String, dynamic>? pcTaskData =
-      await CourseApi.getTaskActivityListWeb(
-        widget.courseId,
-        widget.classId,
       );
 
-      if (taskData != null && pcTaskData != null) {
-        List<Active> contentList = [];
-        List<dynamic> activeList = taskData['activeList'];
-        List<dynamic> pcActiveList = pcTaskData['data']['activeList'];
-
-        // app和web的api活动结束时间存在差异 顺序会匹配错误
-        Map<String, dynamic> pcMap = {
-          for (var pcItem in pcActiveList) pcItem['id'].toString(): pcItem
-        };
-
-        for (var activeData in activeList) {
-          Active active = Active.fromJson(activeData);
-          String activeId = activeData['id'].toString();
-
-          if (pcMap.containsKey(activeId)) {
-            var pcItem = pcMap[activeId];
-            if (active.status){
-              if (active.description.isEmpty){
-                active.description = pcItem['nameFour'];
-              }
-            }
-
-            if (active.activeType == ActiveType.signIn ||
-                active.activeType == ActiveType.signOut) {
-              final otherId = pcItem['otherId'];
-              if (otherId != null) {
-                try {
-                  active.signType = getSignTypeFromIndex(int.parse(otherId));
-                } catch (e) {
-                  debugPrint('解析 otherId 失败: $otherId, 错误: $e');
-                }
-              }
-            }
-          }
-          contentList.add(active);
-        }
-
+      if (contentList != null) {
         setState(() {
           _activeList = contentList;
           _isContentLoading = false;
@@ -127,7 +79,7 @@ class _CourseContentPageState extends State<CourseContentPage> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('获取内容列表时发生错误: $e')),
+          SnackBar(content: Text('获取内容列表时发生错误：$e')),
         );
       }
     }
@@ -194,8 +146,7 @@ class _CourseContentPageState extends State<CourseContentPage> {
                   if (active.status) {
                     if (active.activeType == ActiveType.signIn ||
                         active.activeType == ActiveType.signOut ||
-                        active.activeType ==
-                            ActiveType.scheduledSignIn) {
+                        active.activeType == ActiveType.scheduledSignIn) {
                       // 跳转到签到页面
                       Navigator.push(
                         context,
@@ -276,7 +227,6 @@ class _CoursesPageState extends State<CoursesPage> {
     // 监听账户变更事件
     _accountChangeSubscription =
         AccountChangeNotifier().accountChanges.listen((accountId) {
-          debugPrint('接收到账户变更通知: $accountId');
           if (mounted) {
             // 账户变更时自动刷新课程数据
             _loadCourses();
@@ -284,30 +234,12 @@ class _CoursesPageState extends State<CoursesPage> {
         });
   }
 
-  /// 解析课程数据
-  static List<Course> parseCourses(Map<String, dynamic>? coursesData) {
-    List<Course> courses = [];
-
-    if (coursesData != null && coursesData['result'] == 1) {
-      List<dynamic> channelList = coursesData['channelList'];
-
-      for (var channel in channelList) {
-        if (channel['content']['course'] != null){ // 自己创建的课程
-          courses.add(Course.fromJson(channel));
-        }
-      }
-    }
-
-    return courses;
-  }
-
   Future<void> _loadCourses() async {
     setState(() {
       _isLoading = true;
     });
 
-    String? currentUserId = await AccountManager.getCurrentSession();
-    if (currentUserId == null || currentUserId.isEmpty) {
+    if (!AccountManager.hasActiveSession()) {
       setState(() {
         _isLoading = false;
       });
@@ -315,14 +247,18 @@ class _CoursesPageState extends State<CoursesPage> {
     }
 
     try {
-      List<Course>? coursesData = parseCourses(await CourseApi.getCourses());
-      coursesData = coursesData.where((course) => course.state).toList(); // 过滤已结课的课程
+      List<Course>? coursesData;
+      if (PlatformManager().isChaoxing) {
+        coursesData =  await CXCourseApi.getCoursesList();
+      } else if (PlatformManager().isRainClassroom) {
+        coursesData =  await RCCourseApi.getCoursesList();
+      }
 
       setState(() {
         _courses = coursesData!;
         _isLoading = false;
       });
-        } catch (e) {
+    } catch (e) {
       setState(() {
         _courses = [];
         _isLoading = false;
@@ -330,89 +266,213 @@ class _CoursesPageState extends State<CoursesPage> {
     }
   }
 
-  void handleScanContent(String result) {
-    // 简单判断是否为URL
+  Future<void> handleScanContent(String result) async {
+    if (!AccountManager.hasActiveSession()){
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('二维码内容'),
+              content: SelectableText(result),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('关闭'),
+                ),
+              ],
+            );
+          },
+        );
+      });
+      return;
+    }
+  
     if (result.startsWith('http')) {
       try {
         final uri = Uri.parse(result);
         final baseUrl = uri.origin + uri.path;
         final params = uri.queryParameters;
-
-        // 判断是否为签到URL
+  
+        // 判断是否为签到 URL
         if (baseUrl == 'https://mobilelearn.chaoxing.com/widget/sign/e') {
+          if (!PlatformManager().isChaoxing) {
+            await PlatformManager().setPlatform(PlatformType.chaoxing);
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('自动切换平台为学习通')),
+            );
+          }
+  
           final activeId = params['id'];
           if (activeId != null) {
-            ApiService.sendRequest(result, responseType: ResponseType.plain).then((response) async {
-              String? location = response.realUri.toString();
+            final response = await ApiService.sendRequest(result, responseType: ResponseType.plain);
+            String? location = response.realUri.toString();
 
-              // 重定向到https://mobilelearn.chaoxing.com/newsign/preSign?
-              // courseId=&classId=$classId&activePrimaryId=4000147729438&general=1&sys=1&ls=1&appType=15&uid=$uid&
-              // rcode=SIGNIN%3Aaid%3D4000147729438%26source%3D15%26Code%3D4000147729438%26enc%3DE39EE73BB53907CC04850F4C6EE077B6
-              final uri = Uri.parse(location);
-              final params = uri.queryParameters;
+            // 重定向到 https://mobilelearn.chaoxing.com/newsign/preSign?
+            // courseId=&classId=$classId&activePrimaryId=4000147729438&general=1&sys=1&ls=1&appType=15&uid=$uid&
+            // rcode=SIGNIN%3Aaid%3D4000147729438%26source%3D15%26Code%3D4000147729438%26enc%3DE39EE73BB53907CC04850F4C6EE077B6
+            final uri = Uri.parse(location);
+            final params = uri.queryParameters;
 
-              final activeId = params['activePrimaryId'];
-              final decodedRcode = Uri.decodeComponent(params['rcode']!);
-              debugPrint('rcode $decodedRcode');
-              RegExp encRegex = RegExp(r'enc=([^&\s]+)');
-              Match? match = encRegex.firstMatch(decodedRcode);
+            final classId = params['classId'] ?? '';
+            // final activePrimaryId = params['activePrimaryId'] ?? '';
+            final decodedRcode = Uri.decodeComponent(params['rcode']!);
+            RegExp encRegex = RegExp(r'enc=([^&\s]+)');
+            Match? match = encRegex.firstMatch(decodedRcode);
 
-              if (match != null) {
-                final result = await SignInApi.qrCodeSign(
-                    '', activeId!, match.group(1)!);
-                if (result == 'success') {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('签到成功')),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('签到失败: $result')),
-                  );
-                }
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('未找到enc参数')),
-                );
-              }
-            });
-          }
-        } else {
-          // 其他URL处理
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Text('扫描到链接'),
-                content: SelectableText(result),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('取消'),
+            if (match != null) {
+              final enc = match.group(1);
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SignInPage(
+                    active: Active(
+                        type: 2,
+                        id: activeId,
+                        name: '二维码签到',
+                        description: '',
+                        startTime: 0,
+                        url: '',
+                        status: true,
+                        extras: {},
+                        signType: SignType.qrCode
+                    ),
+                    courseId: '',
+                    classId: classId,
+                    cpi: '',
+                    enc: enc
                   ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('打开链接: $result')),
-                      );
-                    },
-                    child: const Text('打开'),
-                  ),
-                ],
+                ),
               );
-            },
-          );
+            } else {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('未找到 enc 参数')),
+              );
+            }
+          }
+        } else if (baseUrl == 'https://www.yuketang.cn/api/v3/lesson/check-in/dynamic-qr-code'){
+          if (!PlatformManager().isRainClassroom) {
+            await PlatformManager().setPlatform(PlatformType.rainClassroom);
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('自动切换平台为雨课堂')),
+            );
+          }
+  
+          // https://www.yuketang.cn/api/v3/lesson/check-in/dynamic-qr-code?
+          // c=fL5xO1crTr6AC1Re3BaUEurgVNpZL0zydLypc0f2m2A&t=1772409038563&s=B53F5736FCCAF827&v=2
+  
+          await _multiScan(context, result);
+        } else {
+          // 其他 URL 处理
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: const Text('扫描到链接'),
+                  content: SelectableText(result),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('关闭'),
+                    ),
+                  ],
+                );
+              },
+            );
+          });
         }
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('URL解析失败: $e')),
+          SnackBar(content: Text('URL 解析失败：$e')),
         );
       }
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('扫描结果: $result')),
+        SnackBar(content: Text('扫描结果：$result')),
       );
     }
+  }
+
+  /// 为所有用户扫描
+  Future<void> _multiScan(BuildContext context, String qrCodeUrl) async {
+    final allAccounts = AccountManager.getAllAccounts();
+    if (allAccounts.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('没有可用的账号进行签到'))
+      );
+      return;
+    }
+  
+    setState(() {
+      _isLoading = true;
+    });
+  
+    int successCount = 0;
+    final List<String> failedAccounts = [];
+  
+    final currentUserId = AccountManager.currentSessionId;
+    for (final user in allAccounts) {
+      AccountManager.setCurrentSessionTemp(user.uid);
+      try {
+        // 扫描二维码并签到
+        final status = await RCCourseApi.scan(qrCodeUrl);
+        if (status == 0) {
+          successCount++;
+        } else if (status == 51203){
+          failedAccounts.add('${user.name} (动态二维码过期)');
+        } else {
+          failedAccounts.add('${user.name} (错误码：$status)');
+        }
+      } catch (e) {
+        failedAccounts.add('${user.name} (异常：$e)');
+      }
+    }
+    AccountManager.setCurrentSessionTemp(currentUserId!);
+  
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+    });
+  
+    _showMultiScanResult(context, successCount, allAccounts.length, failedAccounts);
+  }
+
+  /// 显示所有签到结果
+  void _showMultiScanResult(BuildContext context, int successCount, int totalCount, List<String> failedAccounts) {
+    String message = '签到完成！\n成功: $successCount/$totalCount';
+    if (failedAccounts.isNotEmpty) {
+      message += '\n\n失败账号:\n${failedAccounts.join('\n')}';
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          successCount == totalCount ? '全部签到成功' : '部分失败',
+          style: TextStyle(
+            color: successCount == totalCount ? Colors.green : Colors.orange,
+          ),
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -459,12 +519,18 @@ class _CoursesPageState extends State<CoursesPage> {
                 onTap: () {
                   Navigator.push(
                     context,
+                    PlatformManager().isChaoxing ?
                     MaterialPageRoute(
                       builder: (context) => CourseContentPage(
                         courseId: course.courseId,
                         courseName: course.name,
                         classId: course.classId,
-                        cpi: course.cpi,
+                        cpi: course.cpi!
+                      ),
+                    ) : MaterialPageRoute(
+                      builder: (context) => PresentationPage(
+                        lessonId: course.lessonId!,
+                        title: course.name
                       ),
                     ),
                   );
@@ -487,9 +553,7 @@ class _CoursesPageState extends State<CoursesPage> {
                                   width: 50,
                                   height: 50,
                                   fit: BoxFit.cover,
-                                  headers: {
-                                    'User-Agent': ApiService.userAgent
-                                  },
+                                  headers: PlatformManager().isChaoxing ? HeadersManager.chaoxingHeaders : null,
                                   // FIXME 部分图片由 star3/origin/ 重定向到 star4/
                                 ),
                               )
@@ -586,6 +650,7 @@ class _CoursesPageState extends State<CoursesPage> {
       ),
     );
   }
+
 
   @override
   void dispose() {

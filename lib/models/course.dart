@@ -1,36 +1,39 @@
 class Course {
   final String courseId;
   final String classId;
-  final String cpi;
+  final String? cpi;
   final String image;
   final String name;
   final String teacher;
   final bool state;
 
   final String? note;
-  final String? schools;
+  String? schools;
   final String? beginDate;
   final String? endDate;
+
+  final String? lessonId;
 
 
   Course({
     required this.courseId,
     required this.classId,
-    required this.cpi,
+    this.cpi,
     required this.image,
     required this.name,
     required this.teacher,
-    required this.schools,
-    required this.note,
+    this.schools,
+    this.note,
     required this.state,
-    required this.beginDate,
-    required this.endDate
+    this.beginDate,
+    this.endDate,
+    this.lessonId
   });
 
-  /// channelList
-  factory Course.fromJson(Map<String, dynamic> json) {
-    dynamic content = json['content'];
-    dynamic courseData = content['course']['data'][0];
+  factory Course.fromCXJson(Map<String, dynamic> json) {
+    final content = json['content'];
+    final courseData = content['course']['data'][0];
+    
     return Course(
       courseId: courseData['id'].toString(),
       classId: content['id'].toString(),
@@ -46,19 +49,30 @@ class Course {
     );
   }
 
-  Map<String, String> toJson() {
-    return {
-      'courseId': courseId,
-      'classId': classId,
-      'cpi': cpi,
-      'image': image,
-      'name': name,
-      'teacher': teacher,
-      'schools': schools ?? '',
-      'note': note ?? '',
-      'state': state.toString(),
-      'beginDate': beginDate ?? '',
-      'endDate': endDate ?? ''
-    };
+  factory Course.fromRCJson(Map<String, dynamic> json) {
+    return Course(
+      courseId: json['course_id']?.toString() ?? '',
+      classId: json['classroom_id']?.toString() ?? '',
+      image: json['teacher']?['avatar'] ?? '',
+      name: json['course_name'] ?? '未知课程',
+      teacher: json['teacher']?['name'] ?? '未知教师',
+      note: json['classroom_name'],
+      state: true,
+      lessonId : json['lesson_id']
+    );
   }
+
+  Map<String, String> toJson() => {
+    'courseId': courseId,
+    'classId': classId,
+    'cpi': cpi ?? '',
+    'image': image,
+    'name': name,
+    'teacher': teacher,
+    'schools': schools ?? '',
+    'note': note ?? '',
+    'state': state.toString(),
+    'beginDate': beginDate ?? '',
+    'endDate': endDate ?? '',
+  };
 }

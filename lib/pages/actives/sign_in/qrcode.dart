@@ -17,6 +17,11 @@ class QRCodeSign implements SignStrategy {
       SignInPageState state,
       SignParams params,
       ) async {
+    if (params.enc != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        state.performMultiSign();
+      });
+    }
   }
 
   @override

@@ -7,7 +7,7 @@
 - [x] 主题讨论
 - [x] 随堂测试（自动提交答案）
 - [ ] 作业
-- [ ] 雨课堂
+- [x] 雨课堂
 
 ## 致谢
 - [Yuuki](https://github.com/SoyBeanMilkx) 提供学习通脱壳包

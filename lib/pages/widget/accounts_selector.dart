@@ -41,7 +41,7 @@ class _AccountsSelectorState extends State<AccountsSelector> {
     try {
       // 获取所有账号
       _allAccounts = AccountManager.getAllAccounts();
-      _selectedAccounts = _allAccounts;
+      _selectedAccounts = List.from(_allAccounts);
 
       final currentUserId = AccountManager.currentSessionId;
       _currentUser = AccountManager.getAccountById(currentUserId!);

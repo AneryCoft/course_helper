@@ -41,11 +41,26 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
   bool _isMultiSelectMode = false;
   String? _currentAccountId;
   PlatformType _selectedPlatform = PlatformManager().currentPlatform;
+  StreamSubscription? _accountChangeSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadAccounts();
+
+    // 监听账户变更事件
+    _accountChangeSubscription =
+        AccountChangeNotifier().accountChanges.listen((accountId) {
+          if (mounted) {
+            _loadAccounts();
+          }
+        });
+  }
+
+  @override
+  void dispose() {
+    _accountChangeSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadAccounts() async {
@@ -331,13 +346,6 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
     );
   }
 
-  /// 切换平台
-  void _switchPlatform(PlatformType platform) async {
-    await PlatformManager().setPlatform(platform);
-    await _loadAccounts();
-    AccountChangeNotifier().notifyAccountChanged(AccountManager.currentSessionId);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -370,13 +378,13 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                       children: [
                         RadioGroup<PlatformType>(
                           groupValue: _selectedPlatform,
-                          onChanged: (PlatformType? value) {
+                          onChanged: (PlatformType? value) async {
                             if (value != null) {
                               setState(() {
                                 _selectedPlatform = value;
                               });
                               Navigator.pop(context);
-                              _switchPlatform(value);
+                              await PlatformManager().setPlatform(value);
                             }
                           },
                           child: Column(
