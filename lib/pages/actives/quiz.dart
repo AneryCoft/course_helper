@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter_html/flutter_html.dart';
 
 import '../../../api/api_service.dart';
 import '../../../api/quiz.dart';
@@ -199,13 +200,14 @@ class _QuizPageState extends State<QuizPage> {
 
   Future<void> _loadQuizDataFromHtml(String htmlContent) async {
     try {
-      // 提取quizList数据
-      RegExp quizListRegex = RegExp(r'quizList = (.+?);');
-      RegExp activeRegex = RegExp(r'active = (.+?);');
-      
+      // 提取 quizList 数据 - 使用更精确的正则表达式
+      // 匹配 quizList = 开头，直到 ]; 结尾（数组结束）
+      RegExp quizListRegex = RegExp(r'quizList\s*=\s*(\[.*?\]);', multiLine: true, dotAll: true);
+      RegExp activeRegex = RegExp(r'active\s*=\s*(\{.*?\});', multiLine: true, dotAll: true);
+        
       Match? quizListMatch = quizListRegex.firstMatch(htmlContent);
       Match? activeMatch = activeRegex.firstMatch(htmlContent);
-      
+        
       if (quizListMatch != null && activeMatch != null) {
         String quizListJson = quizListMatch.group(1)!;
         String activeJson = activeMatch.group(1)!;
@@ -285,9 +287,9 @@ class _QuizPageState extends State<QuizPage> {
       // 解析HTML中的JavaScript数据
       String htmlContent = response.data.toString();
         
-        // 提取quizList数据
-        RegExp quizListRegex = RegExp(r'quizList = (.+?);');
-        RegExp activeRegex = RegExp(r'active = (.+?);');
+        // 提取 quizList 数据
+        RegExp quizListRegex = RegExp(r'quizList\s*=\s*(\[.*?\]);', multiLine: true, dotAll: true);
+        RegExp activeRegex = RegExp(r'active\s*=\s*(\{.*?\});', multiLine: true, dotAll: true);
         
         Match? quizListMatch = quizListRegex.firstMatch(htmlContent);
         Match? activeMatch = activeRegex.firstMatch(htmlContent);
@@ -484,7 +486,7 @@ class _QuizPageState extends State<QuizPage> {
               // 使用对应位置的正确答案
               if (i < answers.length) {
                 final correctAnswer = answers[i];
-                blank['content'] = _stripHtmlTags(correctAnswer['content'] ?? '');
+                blank['content'] = correctAnswer['content'] ?? '';
               }
             }
           }
@@ -497,7 +499,7 @@ class _QuizPageState extends State<QuizPage> {
           // 使用第一个答案作为简答题答案
           if (answers.isNotEmpty) {
             final correctAnswer = answers[0];
-            quizData['personAnswer']['content'] = _stripHtmlTags(correctAnswer['answer'] ?? '');
+            quizData['personAnswer']['content'] = correctAnswer['answer'] ?? '';
           }
         }
         break;
@@ -537,7 +539,6 @@ class _QuizPageState extends State<QuizPage> {
 
   Widget _buildQuizItem(dynamic quiz, int index) {
     final quizType = quiz['type'];
-    final quizContent = _stripHtmlTags(quiz['content'] ?? '');
     final isMust = quiz['ismust'] == 1;
     
     return Card(
@@ -568,9 +569,20 @@ class _QuizPageState extends State<QuizPage> {
                     ),
                   ),
                 Expanded(
-                  child: Text(
-                    '[${_getQuizTypeName(quizType)}] $quizContent',
-                    style: const TextStyle(fontSize: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '[${_getQuizTypeName(quizType)}] ',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      Html(
+                        data: quiz['content'] ?? '',
+                        style: {
+                          "img": Style(width: Width(300)),
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -625,20 +637,15 @@ class _QuizPageState extends State<QuizPage> {
       child: Column(
         children: answers.map((option) {
           final optionLabel = _getOptionLabel(option, quiz['type']);
-          final optionContent = _stripHtmlTags(option['content'] ?? '');
           final isAnswer = option['isanswer'] == true;
           final isSelected = quiz['personAnswer']['myoption'] == option['name'];
 
           return RadioListTile<String>(
-            title: Text(
-              (quiz['type'] == 16) ?
-              '' : optionContent, // 判断题只显示"对"/"错"
-              style: TextStyle(
-                color: isAnswer
-                    ? Theme.of(context).colorScheme.primary
-                    : null,
-                fontWeight: isAnswer ? FontWeight.bold : FontWeight.normal,
-              ),
+            title: Html(
+              data: option['content'] ?? '',
+              style: {
+                "img": Style(width: Width(200)),
+              },
             ),
             secondary: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -651,9 +658,11 @@ class _QuizPageState extends State<QuizPage> {
               child: Text(
                 optionLabel,
                 style: TextStyle(
-                  color: isSelected ?
-                  Colors.white : isAnswer?
-                  Theme.of(context).colorScheme.primary : Colors.grey[700],
+                  color: isSelected
+                      ? Colors.white 
+                      : isAnswer
+                          ? Theme.of(context).colorScheme.primary 
+                          : Colors.grey[700],
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
@@ -678,20 +687,16 @@ class _QuizPageState extends State<QuizPage> {
     return Column(
       children: answers.map((option) {
         final optionLabel = _getOptionLabel(option, quiz['type']);
-        final optionContent = _stripHtmlTags(option['content'] ?? '');
         final isAnswer = option['isanswer'] == true;
         final selectedOptions = (quiz['personAnswer']['myoption'] as String?)?.split('') ?? [];
         final isSelected = selectedOptions.contains(option['name']);
         
         return CheckboxListTile(
-          title: Text(
-            optionContent,
-            style: TextStyle(
-              color: isAnswer
-                  ? Theme.of(context).colorScheme.primary 
-                  : null,
-              fontWeight: isAnswer ? FontWeight.bold : FontWeight.normal,
-            ),
+          title: Html(
+            data: option['content'] ?? '',
+            style: {
+              "img": Style(width: Width(200)),
+            },
           ),
           secondary: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -705,7 +710,7 @@ class _QuizPageState extends State<QuizPage> {
               optionLabel,
               style: TextStyle(
                 color: isSelected ?
-                Colors.white : isAnswer?
+                Colors.white : isAnswer ?
                 Theme.of(context).colorScheme.primary : Colors.grey[700],
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
@@ -739,20 +744,20 @@ class _QuizPageState extends State<QuizPage> {
     if (blankAnswers == null || blankAnswers.isEmpty) {
       return const Text('无填空');
     }
-    
+      
     return Column(
       children: blankAnswers.asMap().entries.map((entry) {
         final index = entry.key;
         final blank = entry.value;
         final correctAnswer = correctAnswers != null && index < correctAnswers.length 
-            ? _stripHtmlTags(correctAnswers[index]['content'] ?? '')
+            ? correctAnswers[index]['content'] ?? ''
             : '';
-        
-        // 为每个输入框创建唯一的key
+          
+        // 为每个输入框创建唯一的 key
         final controllerKey = 'blank_${quizIndex}_$index';
         final controller = _controllers.putIfAbsent(controllerKey, 
           () => TextEditingController(text: blank['content'] ?? ''));
-        
+          
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Column(
@@ -760,7 +765,7 @@ class _QuizPageState extends State<QuizPage> {
             children: [
               Text('第${index + 1}空：', style: const TextStyle(color: Colors.grey)),
               TextField(
-                key: ValueKey(controllerKey), // 添加key确保widget唯一性
+                key: ValueKey(controllerKey), // 添加 key 确保 widget 唯一性
                 maxLines: null,
                 decoration: InputDecoration(
                   hintText: correctAnswer.isNotEmpty ? correctAnswer : '请输入答案',
@@ -790,17 +795,17 @@ class _QuizPageState extends State<QuizPage> {
     // 获取简答题的正确答案
     final correctAnswers = quiz['answer'] as List?;
     final correctAnswer = correctAnswers != null && correctAnswers.isNotEmpty
-        ? _stripHtmlTags(correctAnswers[0]['answer'] ?? '')
+        ? correctAnswers[0]['answer'] ?? ''
         : '';
-    
-    // 为简答题创建唯一的key
+      
+    // 为简答题创建唯一的 key
     final controllerKey = 'short_$quizIndex';
-    // 获取或创建controller
+    // 获取或创建 controller
     final controller = _controllers.putIfAbsent(controllerKey,
       () => TextEditingController(text: quiz['personAnswer']['content'] ?? ''));
-    
+      
     return TextField(
-      key: ValueKey(controllerKey), // 添加key确保widget唯一性
+      key: ValueKey(controllerKey), // 添加 key 确保 widget 唯一性
       maxLines: 5,
       decoration: InputDecoration(
         hintText: correctAnswer.isNotEmpty ? correctAnswer : '请输入答案',
@@ -819,11 +824,6 @@ class _QuizPageState extends State<QuizPage> {
         });
       },
     );
-  }
-
-  String _stripHtmlTags(String html) {
-    final RegExp exp = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: false);
-    return html.replaceAll(exp, '');
   }
 
   String _getQuizTypeName(int type) {
