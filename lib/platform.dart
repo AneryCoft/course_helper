@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_service.dart';
 import '../session/account.dart';
+import 'pages/accounts.dart';
 
 /// 平台类型枚举
 enum PlatformType {
@@ -66,6 +67,7 @@ class PlatformManager {
       await AccountManager.refreshAccounts();
       await CookieManager.loadAllCookies();
       ApiService.onPlatformChange?.call();
+      AccountChangeNotifier().notifyAccountChanged(AccountManager.currentSessionId);
     }
   }
 

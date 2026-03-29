@@ -304,6 +304,25 @@ class _CoursesPageState extends State<CoursesPage> {
               const SnackBar(content: Text('自动切换平台为学习通')),
             );
           }
+          if (!AccountManager.hasActiveSession()){
+            if (!mounted) return;
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: const Text('提示'),
+                  content: const Text('没有可用账号'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('确定'),
+                    ),
+                  ],
+                );
+              },
+            );
+            return;
+          }
   
           final activeId = params['id'];
           if (activeId != null) {
@@ -361,6 +380,24 @@ class _CoursesPageState extends State<CoursesPage> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('自动切换平台为雨课堂')),
             );
+          }
+          if (!AccountManager.hasActiveSession()){
+            if (!mounted) return;
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  content: const Text('没有可用账号'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('确定'),
+                    ),
+                  ],
+                );
+              },
+            );
+            return;
           }
   
           // https://www.yuketang.cn/api/v3/lesson/check-in/dynamic-qr-code?
@@ -498,155 +535,155 @@ class _CoursesPageState extends State<CoursesPage> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _courses.isEmpty
-          ? const Center(
-        child: Text(
-          '暂无课程数据',
-          style: TextStyle(fontSize: 18, color: Colors.grey),
-        ),
-      )
-          : RefreshIndicator(
+      body: RefreshIndicator(
         onRefresh: _loadCourses,
-        child: ListView.builder(
-          itemCount: _courses.length,
-          itemBuilder: (context, index) {
-            var course = _courses[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    PlatformManager().isChaoxing ?
-                    MaterialPageRoute(
-                      builder: (context) => CourseContentPage(
-                        courseId: course.courseId,
-                        courseName: course.name,
-                        classId: course.classId,
-                        cpi: course.cpi!
-                      ),
-                    ) : MaterialPageRoute(
-                      builder: (context) => PresentationPage(
-                        lessonId: course.lessonId!,
-                        title: course.name
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _courses.isEmpty
+            ? const Center(
+                child: Text(
+                  '暂无课程数据',
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                ),
+              )
+            : ListView.builder(
+                itemCount: _courses.length,
+                itemBuilder: (context, index) {
+                  var course = _courses[index];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          PlatformManager().isChaoxing ?
+                          MaterialPageRoute(
+                            builder: (context) => CourseContentPage(
+                              courseId: course.courseId,
+                              courseName: course.name,
+                              classId: course.classId,
+                              cpi: course.cpi!
+                            ),
+                          ) : MaterialPageRoute(
+                            builder: (context) => PresentationPage(
+                              lessonId: course.lessonId!,
+                              title: course.name
+                            ),
+                          ),
+                        );
+                      },
+                      child: Stack(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (course.image.isNotEmpty)
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Image.network(
+                                          course.image,
+                                          width: 50,
+                                          height: 50,
+                                          fit: BoxFit.cover,
+                                          headers: PlatformManager().isChaoxing ? HeadersManager.chaoxingHeaders : null,
+                                          // FIXME 部分图片由 star3/origin/ 重定向到 star4/
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        width: 50,
+                                        height: 50,
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).colorScheme.secondaryContainer,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            Icons.school,
+                                            color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                            size: 25,
+                                          ),
+                                        ),
+                                      ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            course.name,
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            course.teacher,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+          
+                                const SizedBox(height: 5),
+                                if (course.note != null)
+                                  Text(
+                                    course.note!,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                if (course.schools != null)
+                                  Text(
+                                    course.schools!,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                if (course.beginDate != null && course.endDate != null)
+                                  Text(
+                                    '开课时间：${course.beginDate} 至 ${course.endDate}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            right: 16,
+                            top: 0,
+                            bottom: 0,
+                            child: Align(
+                              alignment: Alignment.center,
+                              child: Icon(
+                                Icons.chevron_right,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
                 },
-                child: Stack(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (course.image.isNotEmpty)
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: Image.network(
-                                  course.image,
-                                  width: 50,
-                                  height: 50,
-                                  fit: BoxFit.cover,
-                                  headers: PlatformManager().isChaoxing ? HeadersManager.chaoxingHeaders : null,
-                                  // FIXME 部分图片由 star3/origin/ 重定向到 star4/
-                                ),
-                              )
-                            else
-                              Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.secondaryContainer,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Center(
-                                  child: Icon(
-                                    Icons.school,
-                                    color: Theme.of(context).colorScheme.onSecondaryContainer,
-                                    size: 25,
-                                  ),
-                                ),
-                              ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    course.name,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    course.teacher,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 5),
-                        if (course.note != null)
-                          Text(
-                            course.note!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        if (course.schools != null)
-                          Text(
-                            course.schools!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        if (course.beginDate != null && course.endDate != null)
-                          Text(
-                            '开课时间: ${course.beginDate} 至 ${course.endDate}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    right: 16,
-                    top: 0,
-                    bottom: 0,
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.chevron_right,
-                        color: Colors.grey[400],
-                      ),
-                    ),
-                  ),
-                ],
               ),
-            ),
-            );
-          },
-        ),
       ),
     );
   }
