@@ -12,7 +12,7 @@ class CookieInterceptor extends Interceptor {
     final uri = options.uri;
     List<Cookie> cookies = [];
     CookieJar? cookieJar= CookieManager.isLoggingIn ?
-    CookieManager.getTempCookieJar() : CookieManager.getCurrentUserCookieJar();;
+    CookieManager.getTempCookieJar() : CookieManager.getCurrentUserCookieJar();
     if (cookieJar != null) {
       cookies = await cookieJar.loadForRequest(uri);
     }

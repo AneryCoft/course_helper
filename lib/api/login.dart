@@ -234,7 +234,7 @@ class RCLoginApi {
         'password': '',
         'email': '',
         'code': '',
-        'pushDeviceId': '',
+        'pushDeviceId': '', // 密码登录会有
         'ticket': ticket,
         'rand': rand
       };
@@ -247,6 +247,7 @@ class RCLoginApi {
       if (account.contains('@')) {
         jsonData['email'] = account;
       } else {
+        jsonData['type'] = 1;
         jsonData['phoneNumber'] = account;
       }
 

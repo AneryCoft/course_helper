@@ -456,7 +456,7 @@ class _LoginPageState extends State<LoginPage> {
           }
         } else {
           result = await RCLoginApi.login(
-            _currentLoginType == '2' ? 3 : 2, // 2: 密码登录 3: 验证码登录
+            _currentLoginType == '2' ? 3 : 2, // 1: 密码登录 2: 邮箱登录 3: 验证码登录
             _usernameController.text,
             _currentLoginType == '2' ? _captchaController.text : _passwordController.text,
             _ticket!,
@@ -495,6 +495,8 @@ class _LoginPageState extends State<LoginPage> {
       } finally {
         if (mounted) {
           setState(() {
+            _ticket = null;
+            _randstr = null;
             _isLoading = false;
           });
         }
