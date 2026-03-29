@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'dart:io';
+import 'package:dio/dio.dart';
 
 import 'api_service.dart';
 import '../session/account.dart';
@@ -196,42 +198,67 @@ class RCCourseApi {
   // userId -> [bearerToken, lessonToken]
   static final Map<String, List<String>> _tokens = {};
 
+  static String get _currentSessionId => AccountManager.currentSessionId!;
+
+
   /// 获取当前用户的 bearerToken
   static String? getBearerToken() {
-    final currentSessionId = AccountManager.currentSessionId;
-    if (currentSessionId == null) return null;
-    final tokens = _tokens[currentSessionId];
-    return tokens != null && tokens.isNotEmpty ? tokens[0] : null;
-  }
-
-  /// 设置当前用户的 bearerToken
-  static void setBearerToken(String token) {
-    final currentSessionId = AccountManager.currentSessionId;
-    if (currentSessionId != null) {
-      if (_tokens.containsKey(currentSessionId)) {
-        _tokens[currentSessionId]![0] = token;
-      } else {
-        _tokens[currentSessionId] = [token, ''];
-      }
-    }
+    return _tokens[_currentSessionId]?[0];
   }
 
   static String? getLessonToken() {
-    final currentSessionId = AccountManager.currentSessionId;
-    if (currentSessionId == null) return null;
-    final tokens = _tokens[currentSessionId];
-    return tokens != null && tokens.length > 1 ? tokens[1] : null;
+    return _tokens[_currentSessionId]?[1];
   }
 
-  static void setLessonToken(String token) {
-    final currentSessionId = AccountManager.currentSessionId;
-    if (currentSessionId != null) {
-      if (_tokens.containsKey(currentSessionId)) {
-        _tokens[currentSessionId]![1] = token;
-      } else {
-        _tokens[currentSessionId] = ['', token];
+  static void _setToken(String bearerToken, String lessonToken) {
+    _tokens[_currentSessionId] = [bearerToken, lessonToken];
+  }
+
+  /// 上传图片到七牛云
+  static Future<String?> uploadImageToQiniu(File imageFile) async {
+    try {
+      final tokenUrl = 'https://www.yuketang.cn/pc/generate_qiniu_token';
+      final jsonData = {
+        'bucket_name': 'cms-attachment',
+        'expired_time': 3600
+      };
+      final tokenResponse = await ApiService.sendRequest(tokenUrl, method: 'POST', body: jsonData);
+
+      if (tokenResponse.data == null || 
+          tokenResponse.data['success'] != true ||
+          tokenResponse.data['data'] == null) {
+        debugPrint('Failed to get qiniu token');
+        return null;
       }
+      
+      final token = tokenResponse.data['data']['token'];
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final originalFileName = imageFile.path.split('/').last;
+      final fileName = '$timestamp$originalFileName';
+
+      final uploadUrl = 'https://upload.qiniup.com/';
+      FormData formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(imageFile.path, filename: fileName),
+        'token': token,
+        'key': fileName,
+        'fname': originalFileName
+      });
+      final uploadResponse = await ApiService.sendRequest(uploadUrl, method: 'POST', body: formData);
+
+      if (uploadResponse.data == null || 
+          uploadResponse.data['success'] != true) {
+        debugPrint('Failed to upload to qiniu');
+        return null;
+      }
+
+      final key = uploadResponse.data['key'];
+      final imageUrl = 'https://qn-scd1.yuketang.cn/$key';
+      return imageUrl;
+    } catch (e) {
+      debugPrint('uploadImageToQiniu error: $e');
     }
+    return null;
   }
 
   static Future<Map<String, dynamic>?> getCourses() async {
@@ -314,7 +341,9 @@ class RCCourseApi {
       final int code = data['code'];
       if (code == 0) {
         // 为当前用户保存 bearerToken（从响应头获取）
-        setBearerToken(response.headers.value('set-auth')!);
+        final bearerToken = response.headers.value('set-auth')!;
+        final lessonToken = data['data']['lessonToken'];
+        _setToken(bearerToken, lessonToken);
         return 0;
       } else {
         // {"code":50070,"msg":"DYNAMIC_QR_CHECK_IN_REFUSED","data":null}
@@ -367,7 +396,7 @@ class RCCourseApi {
   }
 
   static Future<Map<String, dynamic>?> answer(String problemId, int problemType,
-      {List<String>? options, String? content}) async {
+      {List<String>? options, String? content, File? imageFile}) async {
     try {
       final url = 'https://www.yuketang.cn/api/v3/lesson/problem/answer';
       final bearerToken = getBearerToken();
@@ -379,16 +408,20 @@ class RCCourseApi {
       final timestampMS = DateTime.now().millisecondsSinceEpoch;
       late dynamic result;
       if (problemType == 5) { // 主观题
+        String? imageUrl;
+        if (imageFile != null) {
+          imageUrl = await uploadImageToQiniu(imageFile);
+        }
         result = {
           'content': content,
           'pics': [
             {
-              'pic': '', // https://qn-v.yuketang.cn/tmp_.jpg
-              'thumb': ''
+              'pic': imageUrl ?? '', // https://qn-v.yuketang.cn/tmp_.jpg
+              'thumb': imageUrl != null ? '$imageUrl?imageView2/2/w/568' : ''
             }
           ],
           'videos': [],
-        }; // TODO 支持照片 视频上传
+        };
       } else {
         result = options;
       }
