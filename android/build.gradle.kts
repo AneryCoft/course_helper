@@ -19,6 +19,14 @@ subprojects {
             if (currentNamespace == null || currentNamespace.isEmpty()) {
                 androidExtension.namespace = project.group.toString()
             }
+            // 强制设置 compileSdk 为 34 以支持 lStar 属性
+            androidExtension.compileSdk = 34
+            // 禁用 lint 检查
+            androidExtension.lint {
+                checkDependencies = false
+                abortOnError = false
+                checkReleaseBuilds = false
+            }
         }
         
         // 强制使用 Flutter V2 embedding

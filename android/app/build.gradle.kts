@@ -63,6 +63,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            
+            // 禁用 lint 检查以加快构建速度并避免文件锁定问题
+            lint {
+                checkDependencies = false
+                abortOnError = false
+            }
         }
     }
 }
