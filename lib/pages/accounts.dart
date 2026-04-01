@@ -360,6 +360,62 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
               onPressed: _deleteSelectedAccounts,
               tooltip: '删除选中账号',
             ),
+          if (_selectedPlatform == PlatformType.rainClassroom)
+            PopupMenuButton<RainClassroomServerType>(
+              icon: const Icon(Icons.dns),
+              tooltip: '切换服务器',
+              onSelected: (RainClassroomServerType server) async {
+                await PlatformManager().setServer(server);
+              },
+              itemBuilder: (BuildContext context) => [
+                PopupMenuItem<RainClassroomServerType>(
+                  enabled: true,
+                  child: StatefulBuilder(
+                    builder: (BuildContext context, StateSetter setPopupState) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          RadioGroup<RainClassroomServerType>(
+                            groupValue: PlatformManager().currentServer,
+                            onChanged: (RainClassroomServerType? value) async {
+                              if (value != null) {
+                                setPopupState(() {});
+                                Navigator.pop(context);
+                                await PlatformManager().setServer(value);
+                              }
+                            },
+                            child: Column(
+                              children: [
+                                RadioListTile<RainClassroomServerType>(
+                                  title: const Text('雨课堂'),
+                                  value: RainClassroomServerType.yuketang,
+                                  dense: true
+                                ),
+                                RadioListTile<RainClassroomServerType>(
+                                  title: const Text('荷塘 · 雨课堂'),
+                                  value: RainClassroomServerType.pro,
+                                  dense: true
+                                ),
+                                RadioListTile<RainClassroomServerType>(
+                                  title: const Text('长江 · 雨课堂'),
+                                  value: RainClassroomServerType.changjiang,
+                                  dense: true
+                                ),
+                                RadioListTile<RainClassroomServerType>(
+                                  title: const Text('黄河 · 雨课堂'),
+                                  value: RainClassroomServerType.huanghe,
+                                  dense: true
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
             onSelected: (String result) {
