@@ -187,7 +187,7 @@ class RCLoginApi {
   /// 发送验证码
   static Future<Map<String, dynamic>?> sendCaptcha(String phone, String ticket, String rand) async {
     try {
-      final url = 'https://www.yuketang.cn/api/v3/user/code/send';
+      final url = '/api/v3/user/code/send';
 
       final jsonData = {
         'phoneNumber': phone,
@@ -226,7 +226,7 @@ class RCLoginApi {
   /// 验证码 密码登录
   static Future<Map<String, dynamic>?> login(int loginType, String account, String code, String ticket, String rand) async {
     try {
-      final url = 'https://www.yuketang.cn/api/v3/user/login/app';
+      final url = '/api/v3/user/login/app';
 
       final jsonData = {
         'type': loginType,
@@ -265,7 +265,7 @@ class RCLoginApi {
   /// 获取用户信息
   static Future<Map<String, dynamic>?> getUserInfo() async {
     try {
-      final url = 'https://www.yuketang.cn/v/course_meta/user_info';
+      final url = '/v/course_meta/user_info';
 
       CookieManager.isLoggingIn = true;
       final response = await ApiService.sendRequest(url);

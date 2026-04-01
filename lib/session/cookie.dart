@@ -53,7 +53,7 @@ class CookieInterceptor extends Interceptor {
 
 class CookieManager {
   static const cxDomain = '.chaoxing.com';
-  static const rcDomain = 'www.yuketang.cn';
+  static const rcDomain = '.yuketang.cn';
   static bool isLoggingIn = false;
   static final Map<String, CookieJar> _userCookieJars = {};
   static CookieJar? _tempCookieJar; // 临时保存登录的 Cookie

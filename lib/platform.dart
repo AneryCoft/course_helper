@@ -12,6 +12,14 @@ enum PlatformType {
   rainClassroom // 雨课堂
 }
 
+/// 雨课堂服务器类型枚举
+enum RainClassroomServerType {
+  yuketang, // 雨课堂
+  pro, // 荷塘雨课堂
+  changjiang, // 长江雨课堂
+  huanghe // 黄河雨课堂
+}
+
 /// 平台状态管理器
 class PlatformManager {
   static final PlatformManager _instance = PlatformManager._internal();
@@ -20,13 +28,32 @@ class PlatformManager {
 
   late SharedPreferences _prefs;
   static const _platformKey = 'current_platform';
+  static const _serverKey = 'current_server';
   PlatformType _currentPlatform = PlatformType.chaoxing;
+  RainClassroomServerType _currentServer = RainClassroomServerType.yuketang;
 
   /// 获取当前平台
   PlatformType get currentPlatform => _currentPlatform;
 
   bool get isChaoxing => _currentPlatform == PlatformType.chaoxing;
   bool get isRainClassroom => _currentPlatform == PlatformType.rainClassroom;
+  
+  /// 获取当前雨课堂服务器
+  RainClassroomServerType get currentServer => _currentServer;
+  
+  /// 获取雨课堂服务器名称
+  String get serverName {
+    switch (_currentServer) {
+      case RainClassroomServerType.yuketang:
+        return 'yuketang';
+      case RainClassroomServerType.pro:
+        return 'pro';
+      case RainClassroomServerType.changjiang:
+        return 'changjiang';
+      case RainClassroomServerType.huanghe:
+        return 'huanghe';
+    }
+  }
 
   /// 初始化平台
   Future<void> initialize() async {
@@ -44,7 +71,26 @@ class PlatformManager {
             break;
         }
       }
-
+      
+      // 加载雨课堂服务器设置
+      final serverStr = _prefs.getString(_serverKey);
+      if (serverStr != null && serverStr.isNotEmpty) {
+        switch (serverStr.toLowerCase()) {
+          case 'yuketang':
+            _currentServer = RainClassroomServerType.yuketang;
+            break;
+          case 'pro':
+            _currentServer = RainClassroomServerType.pro;
+            break;
+          case 'changjiang':
+            _currentServer = RainClassroomServerType.changjiang;
+            break;
+          case 'huanghe':
+            _currentServer = RainClassroomServerType.huanghe;
+            break;
+        }
+      }
+      
       // 触发平台变化回调，初始化 headers
       ApiService.onPlatformChange!();
     } catch (e) {
@@ -68,6 +114,19 @@ class PlatformManager {
       await CookieManager.loadAllCookies();
       ApiService.onPlatformChange?.call();
       AccountChangeNotifier().notifyAccountChanged(AccountManager.currentSessionId);
+    }
+  }
+  
+  /// 设置雨课堂服务器
+  Future<void> setServer(RainClassroomServerType server) async {
+    if (_currentServer != server) {
+      _currentServer = server;
+      try {
+        await _prefs.setString(_serverKey, serverName);
+      } catch (e) {
+        debugPrint('保存服务器失败：$e');
+      }
+      ApiService.onPlatformChange?.call();
     }
   }
 

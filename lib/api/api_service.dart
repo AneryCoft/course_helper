@@ -81,12 +81,23 @@ class ApiService {
   static late Dio _dio;
   static void Function()? onPlatformChange;
 
+  /// 获取雨课堂服务器对应的 baseUrl
+  static const _serverBaseUrlMap = {
+    RainClassroomServerType.yuketang: 'https://www.yuketang.cn',
+    RainClassroomServerType.pro: 'https://pro.yuketang.cn',
+    RainClassroomServerType.changjiang: 'https://changjiang.yuketang.cn',
+    RainClassroomServerType.huanghe: 'https://huanghe.yuketang.cn'
+  };
+
+
   // 初始化平台变化回调函数
   static void _setupPlatformChangeCallback() {
     onPlatformChange = () async {
       if (PlatformManager().isChaoxing) {
+        _dio.options.baseUrl = '';
         _dio.options.headers = HeadersManager.chaoxingHeaders;
       } else if (PlatformManager().isRainClassroom) {
+        _dio.options.baseUrl = _serverBaseUrlMap[PlatformManager().currentServer]!;
         _dio.options.headers = HeadersManager.rainClassroomHeaders;
       }
     };

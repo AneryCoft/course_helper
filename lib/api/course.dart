@@ -217,7 +217,7 @@ class RCCourseApi {
   /// 上传图片到七牛云
   static Future<String?> uploadImageToQiniu(File imageFile) async {
     try {
-      final tokenUrl = 'https://www.yuketang.cn/pc/generate_qiniu_token';
+      final tokenUrl = '/pc/generate_qiniu_token';
       final jsonData = {
         'bucket_name': 'cms-attachment',
         'expired_time': 3600
@@ -264,7 +264,7 @@ class RCCourseApi {
   static Future<Map<String, dynamic>?> getCourses() async {
     try {
       final response = await ApiService.sendRequest(
-        'https://www.yuketang.cn/v/course_meta/learning_list/',
+        '/v/course_meta/learning_list/',
       );
       return response.data;
     } catch (e) {
@@ -276,7 +276,7 @@ class RCCourseApi {
   static Future<Map<String, dynamic>?> getOnLessonAndUpcomingExam() async {
     try {
       final response = await ApiService.sendRequest(
-        'https://www.yuketang.cn/api/v3/classroom/on-lesson-upcoming-exam',
+        '/api/v3/classroom/on-lesson-upcoming-exam',
       );
       return response.data;
     } catch (e) {
@@ -329,7 +329,7 @@ class RCCourseApi {
 
   static Future<int?> checkIn(String lessonId) async {
     try {
-      final url = 'https://www.yuketang.cn/api/v3/lesson/checkin';
+      final url = '/api/v3/lesson/checkin';
       final jsonData = {
         'source': 21, // 21: 扫码跳转 23: 点击课堂
         'lessonId': lessonId,
@@ -357,7 +357,7 @@ class RCCourseApi {
 
   static Future<int?> scan(String qrCodeUrl) async {
     try {
-      final url = 'https://www.yuketang.cn/api/v3/app/scan';
+      final url = '/api/v3/app/scan';
       final jsonData = {'url': qrCodeUrl};
       final response = await ApiService.sendRequest(url, method: 'POST', body: jsonData);
       final data = response.data;
@@ -380,7 +380,7 @@ class RCCourseApi {
 
   static Future<Map<String, dynamic>?> getPresentation(String presentationId) async {
     try {
-      final url = 'https://www.yuketang.cn/api/v3/lesson/presentation/fetch?presentation_id=$presentationId';
+      final url = '/api/v3/lesson/presentation/fetch?presentation_id=$presentationId';
       final bearerToken = getBearerToken();
       if (bearerToken == null) {
         debugPrint('bearerToken 为空');
@@ -398,7 +398,7 @@ class RCCourseApi {
   static Future<Map<String, dynamic>?> answer(String problemId, int problemType,
       {List<String>? options, String? content, File? imageFile}) async {
     try {
-      final url = 'https://www.yuketang.cn/api/v3/lesson/problem/answer';
+      final url = '/api/v3/lesson/problem/answer';
       final bearerToken = getBearerToken();
       if (bearerToken == null) {
         debugPrint('bearerToken 为空');
