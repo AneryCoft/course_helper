@@ -86,7 +86,9 @@ class Active {
   }) : activeType = ActiveType.fromValue(type) ?? ActiveType.signIn;
 
   factory Active.fromJson(Map<String, dynamic> json) {
-    int activeType = json['activeType'] ?? 0;
+    int activeType = json['activeType'] is int ?
+    json['activeType'] : int.tryParse(json['activeType']?.toString() ?? '0') ?? 0;
+    // 接口不稳定
     return Active(
       type: activeType,
       id: json['id'].toString(),
