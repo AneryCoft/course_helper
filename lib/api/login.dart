@@ -240,15 +240,15 @@ class RCLoginApi {
       };
       if (loginType == 2) {
         jsonData['password'] = code;
+        if (account.contains('@')) {
+          jsonData['email'] = account;
+        } else {
+          jsonData['type'] = 1;
+          jsonData['phoneNumber'] = account;
+        }
       } else if (loginType == 3) {
-        jsonData['code'] = code;
-      }
-
-      if (account.contains('@')) {
-        jsonData['email'] = account;
-      } else {
-        jsonData['type'] = 1;
         jsonData['phoneNumber'] = account;
+        jsonData['code'] = code;
       }
 
       CookieManager.isLoggingIn = true;
