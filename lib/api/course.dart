@@ -396,7 +396,7 @@ class RCCourseApi {
   }
 
   static Future<Map<String, dynamic>?> answer(String problemId, int problemType,
-      {List<String>? options, String? content, File? imageFile}) async {
+      {List<String>? options, String? content, List<String>? imageUrls}) async {
     try {
       final url = '/api/v3/lesson/problem/answer';
       final bearerToken = getBearerToken();
@@ -408,19 +408,24 @@ class RCCourseApi {
       final timestampMS = DateTime.now().millisecondsSinceEpoch;
       late dynamic result;
       if (problemType == 5) { // 主观题
-        String? imageUrl;
-        if (imageFile != null) {
-          imageUrl = await uploadImageToQiniu(imageFile);
+        var pics = [];
+        if (imageUrls != null) {
+          for (var imageUrl in imageUrls) {
+            pics.add({
+              'pic': imageUrl, // https://qn-v.yuketang.cn/tmp_.jpg
+              'thumb': '$imageUrl?imageView2/2/w/568'
+            });
+          }
+        } else {
+          pics = [{
+            'pic': '', // https://qn-v.yuketang.cn/tmp_.jpg
+            'thumb': ''
+          }];
         }
         result = {
-          'content': content,
-          'pics': [
-            {
-              'pic': imageUrl ?? '', // https://qn-v.yuketang.cn/tmp_.jpg
-              'thumb': imageUrl != null ? '$imageUrl?imageView2/2/w/568' : ''
-            }
-          ],
-          'videos': [],
+          'content': content ?? '',
+          'pics': pics,
+          'videos': [] // 雨课堂对视频的支持不好 不做处理了
         };
       } else {
         result = options;

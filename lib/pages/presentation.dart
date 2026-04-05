@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show WebSocket;
+import 'dart:io' show WebSocket, File;
 
 import '../api/course.dart';
 import '../models/presentation.dart';
@@ -40,6 +41,11 @@ class _PresentationPageState extends State<PresentationPage> {
   List<String>? _answer;
   String? _textAnswer;
   bool _isProblemExpanded = true;
+  
+  // 图片选择相关
+  final List<XFile> _selectedImages = [];
+  static const int _maxImageCount = 9;
+  final List<String> _uploadedImageUrls = []; // 已上传的图片 URL
   
   // 倒计时相关
   int? _countdownSeconds;
@@ -587,11 +593,11 @@ class _PresentationPageState extends State<PresentationPage> {
                       ),
                     ),
                     Expanded(
-                      child: Column(
-                        children: [
-                          if (_currentProblem != null)
-                            IntrinsicHeight(
-                              child: Container(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            if (_currentProblem != null)
+                              Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
                                   color: Theme.of(context).colorScheme.surface,
@@ -601,7 +607,7 @@ class _PresentationPageState extends State<PresentationPage> {
                                   ),
                                 ),
                                 child: Column(
-                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisSize: MainAxisSize.max,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     GestureDetector(
@@ -727,27 +733,19 @@ class _PresentationPageState extends State<PresentationPage> {
                                   ],
                                 ),
                               ),
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              controller: _scrollController,
+                              padding: const EdgeInsets.all(12),
+                              itemCount: _timeline.length,
+                              itemBuilder: (context, index) {
+                                final event = _timeline[index];
+                                return _buildTimelineItem(event);
+                              },
                             ),
-                          Expanded(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                border: Border(
-                                  top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant, width: 1),
-                                ),
-                              ),
-                              child: ListView.builder(
-                                controller: _scrollController,
-                                padding: const EdgeInsets.all(12),
-                                itemCount: _timeline.length,
-                                itemBuilder: (context, index) {
-                                  final event = _timeline[index];
-                                  return _buildTimelineItem(event);
-                                },
-                              ),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -897,7 +895,8 @@ class _PresentationPageState extends State<PresentationPage> {
     final problemType = _currentProblem!.problemType;
     final problemId = _currentProblem!.problemId;
 
-    if (_answer == null && _textAnswer == null) {
+    // 检查是否有答案或图片
+    if (_answer == null && _textAnswer == null && _uploadedImageUrls.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('请先选择或填写答案')),
@@ -906,11 +905,11 @@ class _PresentationPageState extends State<PresentationPage> {
       return;
     }
 
-    // 为所有用户提交答案
-    await _submitAnswerForAllAccounts(problemId, problemType);
+    // 为所有用户提交答案（带已上传的图片 URL）
+    await _submitForAllAccounts(problemId, problemType, _uploadedImageUrls);
   }
 
-  Future<void> _submitAnswerForAllAccounts(String problemId, int problemType) async {
+  Future<void> _submitForAllAccounts(String problemId, int problemType, List<String>? imageUrls) async {
     final allAccounts = AccountManager.getAllAccounts();
     final currentUserId = AccountManager.currentSessionId;
     
@@ -935,7 +934,8 @@ class _PresentationPageState extends State<PresentationPage> {
             problemId,
             problemType,
             options: _answer,
-            content: _textAnswer
+            content: _textAnswer,
+            imageUrls: imageUrls
           );
 
           if (result != null && result['code'] == 0) {
@@ -951,9 +951,11 @@ class _PresentationPageState extends State<PresentationPage> {
 
       _showSubmitResult(successCount, allAccounts.length, failedAccounts);
       
-      // 提交成功后禁用按钮
+      // 提交成功后禁用按钮并清空图片
       setState(() {
         _countdownSeconds = 0;
+        _selectedImages.clear();
+        _uploadedImageUrls.clear();
       });
     } finally {
       // 确保状态能被重置
@@ -1000,28 +1002,154 @@ class _PresentationPageState extends State<PresentationPage> {
       case 1: // 单选题
       case 2: // 多选题
         return _buildChoiceOptions();
-      
       case 3: // 投票题
         return _buildPollingOptions();
-      
-      case 4: // 判断题
-        return _buildChoiceOptions();
-      case 5: // 填空题
+      case 4: // 填空题
         return _buildFillBlankInputs();
-      case 6: // 简答题
-        return TextField(
-          decoration: const InputDecoration(
-            hintText: '请输入答案',
-            border: OutlineInputBorder(),
-          ),
-          maxLines: 3,
-          onChanged: (value) {
-            _textAnswer = value;
-          },
-        );
+      case 5: // 主观题
+        return _buildShortAnswerInputs();
+      case 6: // 判断题
+        return _buildChoiceOptions();
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  Future<void> _pickImages() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+
+      final remainingCount = _maxImageCount - _selectedImages.length;
+
+      final List<XFile> images = await picker.pickMultiImage(
+          limit: remainingCount,
+          imageQuality: 80
+      );
+
+      if (images.isNotEmpty) {
+        // 并行上传所有图片
+        final uploadFutures = images.map((image) async {
+          try {
+            final file = File(image.path);
+            final imageUrl = await RCCourseApi.uploadImageToQiniu(file);
+            return {'image': image, 'url': imageUrl};
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('图片上传失败：${image.path}')),
+              );
+            }
+            return null;
+          }
+        }).toList();
+
+        // 等待所有上传完成
+        final results = await Future.wait(uploadFutures);
+
+        // 更新状态
+        if (mounted) {
+          setState(() {
+            for (final result in results) {
+              if (result != null && result['url'] != null) {
+                _selectedImages.add(result['image'] as XFile);
+                _uploadedImageUrls.add(result['url'] as String);
+              }
+            }
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('选择图片失败：$e')),
+        );
+      }
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+      _uploadedImageUrls.removeAt(index);
+    });
+  }
+
+  Widget _buildShortAnswerInputs() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextField(
+                decoration: const InputDecoration(
+                  hintText: '请输入答案',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                onChanged: (value) {
+                  _textAnswer = value;
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.add_photo_alternate_outlined, size: 32),
+              onPressed: _pickImages,
+              tooltip: '添加图片（最多 9 张）'
+            ),
+          ],
+        ),
+        if (_selectedImages.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 80,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _selectedImages.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(_selectedImages[index].path),
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        right: 4,
+                        top: 4,
+                        child: GestureDetector(
+                          onTap: () => _removeImage(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.8),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   Widget _buildFillBlankInputs() {
