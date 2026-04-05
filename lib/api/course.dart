@@ -286,15 +286,19 @@ class RCCourseApi {
   }
 
   /// 获取处理后的课程列表
-  static Future<List<Course>?> getCoursesList() async {
+  static Future<List<Course>?> getCoursesList([Map<String, dynamic>? onLessonCourses]) async {
     try {
-      final results = await Future.wait([
-        getCourses(),
-        getOnLessonAndUpcomingExam()
-      ]);
-
-      final courses = results[0];
-      final onLessonCourses = results[1];
+      late Map<String, dynamic>? courses;
+      if (onLessonCourses == null) {
+        final results = await Future.wait([
+          getCourses(),
+          getOnLessonAndUpcomingExam()
+        ]);
+        courses = results[0];
+        onLessonCourses = results[1];
+      } else {
+        courses = await getCourses();
+      }
 
       if (courses == null || onLessonCourses == null) {
         return null;

@@ -214,9 +214,34 @@ class _CoursesPageState extends State<CoursesPage> {
   List<Course> _courses = [];
   bool _isLoading = true;
   StreamSubscription? _accountChangeSubscription;
+  Timer? _refreshTimer;
+  Map<String, dynamic>? _lastOnLessonCourses;
 
   void refreshCourses() {
     _loadCourses();
+  }
+
+  /// 启动定时刷新
+  void _startPeriodicRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (!mounted || !AccountManager.hasActiveSession()) return;
+      
+      if (!PlatformManager().isRainClassroom) return;
+
+      try {
+        final onLessonCourses = await RCCourseApi.getOnLessonAndUpcomingExam();
+        if (onLessonCourses != null && mounted) {
+          // 检查数据是否有变化
+          if (_lastOnLessonCourses == null || _lastOnLessonCourses.toString() != onLessonCourses.toString()) {
+            _lastOnLessonCourses = onLessonCourses;
+            await _loadCourses(onLessonCourses);
+          }
+        }
+      } catch (e) {
+        debugPrint('Periodic refresh error: $e');
+      }
+    });
   }
 
   @override
@@ -232,9 +257,14 @@ class _CoursesPageState extends State<CoursesPage> {
             _loadCourses();
           }
         });
+
+    // 仅雨课堂每3秒刷新一次在线课堂
+    if (PlatformManager().isRainClassroom) {
+      _startPeriodicRefresh();
+    }
   }
 
-  Future<void> _loadCourses() async {
+  Future<void> _loadCourses([Map<String, dynamic>? onLessonCourses]) async {
     setState(() {
       _isLoading = true;
     });
@@ -251,13 +281,19 @@ class _CoursesPageState extends State<CoursesPage> {
       if (PlatformManager().isChaoxing) {
         coursesData =  await CXCourseApi.getCoursesList();
       } else if (PlatformManager().isRainClassroom) {
-        coursesData =  await RCCourseApi.getCoursesList();
+        coursesData =  await RCCourseApi.getCoursesList(onLessonCourses);
       }
 
-      setState(() {
-        _courses = coursesData!;
-        _isLoading = false;
-      });
+      if (coursesData != null && coursesData.isNotEmpty) {
+        setState(() {
+          _courses = coursesData!;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       setState(() {
         _courses = [];
@@ -692,6 +728,7 @@ class _CoursesPageState extends State<CoursesPage> {
   @override
   void dispose() {
     _accountChangeSubscription?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 }
