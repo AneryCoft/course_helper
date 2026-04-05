@@ -101,6 +101,31 @@ class _QuizPageState extends State<QuizPage> {
   // 账号选择
   List<User> _selectedAccounts = [];
   User? _currentUser;
+
+  /// 将Star3图片转换为Star4 减少一次重定向
+  String toNewImageUrl(String url) {
+    // https://p.cldisk.com/star3/100_100c/{fileName}.png
+    // -> https://p.cldisk.com/star4/{fileName}/100_100c.png
+    try {
+      final uri = Uri.parse(url);
+      final pathSegments = uri.pathSegments;
+      
+      if (pathSegments.length >= 3) {
+        final size = pathSegments[1];
+        final fileNameWithExt = pathSegments[2];
+
+        final lastDotIndex = fileNameWithExt.lastIndexOf('.');
+        if (lastDotIndex != -1) {
+          final filename = fileNameWithExt.substring(0, lastDotIndex);
+          final extension = fileNameWithExt.substring(lastDotIndex);
+          return '${uri.scheme}://${uri.host}/star4/$filename/$size$extension';
+        }
+      }
+    } catch (e) {
+      debugPrint('URL转换失败: $e');
+    }
+    return url;
+  }
   
   @override
   void initState() {
@@ -579,8 +604,20 @@ class _QuizPageState extends State<QuizPage> {
                       Html(
                         data: quiz['content'] ?? '',
                         style: {
-                          "img": Style(width: Width(300)),
+                          "img": Style(width: Width(80)),
                         },
+                        extensions: [
+                          ImageExtension(
+                            builder: (context) {
+                              final imageUrl = toNewImageUrl(context.attributes['src'] ?? '');
+                              return Image.network(
+                                imageUrl,
+                                headers: HeadersManager.chaoxingHeaders,
+                                width: 80
+                              );
+                            }
+                          )
+                        ]
                       ),
                     ],
                   ),
@@ -644,8 +681,20 @@ class _QuizPageState extends State<QuizPage> {
             title: Html(
               data: option['content'] ?? '',
               style: {
-                "img": Style(width: Width(200)),
+                "img": Style(width: Width(60)),
               },
+              extensions: [
+                ImageExtension(
+                  builder: (context) {
+                    final imageUrl = toNewImageUrl(context.attributes['src'] ?? '');
+                    return Image.network(
+                      imageUrl,
+                      headers: HeadersManager.chaoxingHeaders,
+                      width: 60
+                    );
+                  }
+                )
+              ]
             ),
             secondary: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -695,8 +744,20 @@ class _QuizPageState extends State<QuizPage> {
           title: Html(
             data: option['content'] ?? '',
             style: {
-              "img": Style(width: Width(200)),
+              "img": Style(width: Width(60)),
             },
+            extensions: [
+              ImageExtension(
+                builder: (context) {
+                  final imageUrl = toNewImageUrl(context.attributes['src'] ?? '');
+                  return Image.network(
+                    imageUrl,
+                    headers: HeadersManager.chaoxingHeaders,
+                    width: 60
+                  );
+                }
+              )
+            ]
           ),
           secondary: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
