@@ -106,19 +106,26 @@ class _QuizPageState extends State<QuizPage> {
   String toNewImageUrl(String url) {
     // https://p.cldisk.com/star3/100_100c/{fileName}.png
     // -> https://p.cldisk.com/star4/{fileName}/100_100c.png
+      
+    // https://p.cldisk.com/star3/origin/{fileName}
+    // -> https://p.cldisk.com/star4/{fileName}/origin.png
     try {
       final uri = Uri.parse(url);
       final pathSegments = uri.pathSegments;
-      
+        
       if (pathSegments.length >= 3) {
         final size = pathSegments[1];
         final fileNameWithExt = pathSegments[2];
-
+  
         final lastDotIndex = fileNameWithExt.lastIndexOf('.');
         if (lastDotIndex != -1) {
+          // 有扩展名: 100_100c/fileName.png
           final filename = fileNameWithExt.substring(0, lastDotIndex);
           final extension = fileNameWithExt.substring(lastDotIndex);
           return '${uri.scheme}://${uri.host}/star4/$filename/$size$extension';
+        } else {
+          // 无扩展名: origin/fileName
+          return '${uri.scheme}://${uri.host}/star4/$fileNameWithExt/$size.png';
         }
       }
     } catch (e) {
@@ -603,9 +610,6 @@ class _QuizPageState extends State<QuizPage> {
                       ),
                       Html(
                         data: quiz['content'] ?? '',
-                        style: {
-                          "img": Style(width: Width(80)),
-                        },
                         extensions: [
                           ImageExtension(
                             builder: (context) {
@@ -613,7 +617,8 @@ class _QuizPageState extends State<QuizPage> {
                               return Image.network(
                                 imageUrl,
                                 headers: HeadersManager.chaoxingHeaders,
-                                width: 80
+                                width: 80,
+                                alignment: Alignment.bottomCenter
                               );
                             }
                           )
@@ -680,9 +685,6 @@ class _QuizPageState extends State<QuizPage> {
           return RadioListTile<String>(
             title: Html(
               data: option['content'] ?? '',
-              style: {
-                "img": Style(width: Width(60)),
-              },
               extensions: [
                 ImageExtension(
                   builder: (context) {
@@ -690,7 +692,8 @@ class _QuizPageState extends State<QuizPage> {
                     return Image.network(
                       imageUrl,
                       headers: HeadersManager.chaoxingHeaders,
-                      width: 60
+                      width: 60,
+                      alignment: Alignment.bottomCenter
                     );
                   }
                 )
@@ -743,9 +746,6 @@ class _QuizPageState extends State<QuizPage> {
         return CheckboxListTile(
           title: Html(
             data: option['content'] ?? '',
-            style: {
-              "img": Style(width: Width(60)),
-            },
             extensions: [
               ImageExtension(
                 builder: (context) {
@@ -753,7 +753,8 @@ class _QuizPageState extends State<QuizPage> {
                   return Image.network(
                     imageUrl,
                     headers: HeadersManager.chaoxingHeaders,
-                    width: 60
+                    width: 60,
+                    alignment: Alignment.bottomCenter
                   );
                 }
               )
