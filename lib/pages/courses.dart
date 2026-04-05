@@ -12,6 +12,7 @@ import 'widget/scan.dart';
 import 'actives/sign_in/sign_in.dart';
 import 'actives/topic_discuss.dart';
 import 'actives/quiz.dart';
+import 'actives/evaluate.dart';
 import 'accounts.dart';
 import 'presentation.dart';
 
@@ -180,7 +181,20 @@ class _CourseContentPageState extends State<CourseContentPage> {
                               ),
                         ),
                       );
-                    } else {
+                    } else if (active.activeType == ActiveType.evaluation) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              EvaluatePage(
+                                active: active,
+                                courseId: widget.courseId,
+                                classId: widget.classId,
+                              ),
+                        ),
+                      );
+                    }
+                    else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                             content:
