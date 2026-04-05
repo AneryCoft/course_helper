@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
-import '../api/login.dart';
-import '../models/user.dart';
-import '../session/account.dart';
 import 'package:flutter_tencent_captcha/flutter_tencent_captcha.dart';
-import '../utils/encrypt.dart';
-import '../platform.dart';
-
 import 'dart:async';
 import 'dart:typed_data';
 
-/// 学习通登录成功处理
-Future<bool> handleCXLoginSuccess(BuildContext context) async {
+import '../api/login.dart';
+import '../models/user.dart';
+import '../session/account.dart';
+import '../utils/encrypt.dart';
+import '../platform.dart';
+
+/// 登录成功处理
+Future<bool> handleLoginSuccess(BuildContext context) async {
   try {
-    final userInfo = await CXLoginApi.getUserInfo();
-    if (userInfo == null) {
+    late User? user;
+    if (PlatformManager().isChaoxing) {
+      user = await CXLoginApi.getUserInfo();
+    } else {
+      user = await RCLoginApi.getUserInfo();
+    }
+    if (user == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('获取用户信息失败')),
@@ -21,15 +26,6 @@ Future<bool> handleCXLoginSuccess(BuildContext context) async {
       }
       return false;
     }
-    final data = userInfo['msg'];
-    final user = User(
-      uid: data['puid']?.toString() ?? '',
-      name: data['name'] ?? '未知用户',
-      avatar: data['pic'] ?? '',
-      phone: data['phone'] ?? '未知手机号',
-      school: data['schoolname'] ?? '未知学校',
-      platform: 'chaoxing'
-    );
 
     await AccountManager.addAccount(user);
 
@@ -41,48 +37,6 @@ Future<bool> handleCXLoginSuccess(BuildContext context) async {
     return true;
   } catch (e) {
     debugPrint('处理登录成功失败：$e');
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('登录处理失败')),
-      );
-    }
-    return false;
-  }
-}
-
-/// 雨课堂登录成功处理
-Future<bool> handleRCLoginSuccess(BuildContext context) async {
-  try {
-    final userInfo = await RCLoginApi.getUserInfo();
-    if (userInfo == null) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('获取用户信息失败')),
-        );
-      }
-      return false;
-    }
-
-    final userProfile = userInfo['data']['user_profile'];
-    final user = User(
-      uid: userProfile['user_id']?.toString() ?? '',
-      name: userProfile['name'] ?? '未知用户',
-      avatar: userProfile['avatar'] ?? userProfile['avatar_96'] ?? '',
-      phone: userProfile['phone_number'] ?? '未知手机号',
-      school: userProfile['school'] ?? '未知学校',
-      platform: 'rainClassroom'
-    );
-
-    await AccountManager.addAccount(user);
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${user.name} 登录成功')),
-      );
-    }
-    return true;
-  } catch (e) {
-    debugPrint('处理雨课堂登录成功失败：$e');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('登录处理失败')),
@@ -243,7 +197,7 @@ class _LoginPageState extends State<LoginPage> {
 
     qrState.startPolling((bool success) async {
       if (success) {
-        final loginSuccess = await handleCXLoginSuccess(context);
+        final loginSuccess = await handleLoginSuccess(context);
         if (loginSuccess && mounted) {
           Navigator.pop(context, true);
         }
@@ -442,7 +396,7 @@ class _LoginPageState extends State<LoginPage> {
               await _showSecurityVerificationDialog();
             }
   
-            final success = await handleCXLoginSuccess(context);
+            final success = await handleLoginSuccess(context);
             if (success && mounted) {
               Navigator.pop(context, true);
             }
@@ -469,7 +423,7 @@ class _LoginPageState extends State<LoginPage> {
           late String errorMessage;
           if (result != null) {
             if (result['code'] == 0) {
-              final success = await handleRCLoginSuccess(context);
+              final success = await handleLoginSuccess(context);
               if (success && mounted) {
                 Navigator.pop(context, true);
               }

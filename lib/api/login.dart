@@ -5,6 +5,7 @@ import 'dart:convert';
 import '../api/api_service.dart';
 import '../utils/encrypt.dart';
 import '../session/cookie.dart';
+import '../models/user.dart';
 
 class CXLoginApi {
   /// Web登录
@@ -92,13 +93,24 @@ class CXLoginApi {
   }
 
   /// 获取用户信息
-  static Future<Map<String, dynamic>?> getUserInfo() async {
+  static Future<User?> getUserInfo() async {
     try {
       final url = 'https://sso.chaoxing.com/apis/login/userLogin4Uname.do';
 
       CookieManager.isLoggingIn = true;
       final response = await ApiService.sendRequest(url);
       return response.data;
+
+      final data = response.data['msg'];
+      final user = User(
+          uid: data['puid']?.toString() ?? '',
+          name: data['name'] ?? '未知用户',
+          avatar: data['pic'] ?? '',
+          phone: data['phone'] ?? '未知手机号',
+          school: data['schoolname'] ?? '未知学校',
+          platform: 'chaoxing'
+      );
+      return user;
     } catch (e) {
       debugPrint('getUserInfo error: $e');
     } finally {
@@ -263,13 +275,23 @@ class RCLoginApi {
   }
 
   /// 获取用户信息
-  static Future<Map<String, dynamic>?> getUserInfo() async {
+  static Future<User?> getUserInfo() async {
     try {
       final url = '/v/course_meta/user_info';
 
       CookieManager.isLoggingIn = true;
       final response = await ApiService.sendRequest(url);
-      return response.data;
+
+      final userProfile = response.data['data']['user_profile'];
+      final user = User(
+          uid: userProfile['user_id']?.toString() ?? '',
+          name: userProfile['name'] ?? '未知用户',
+          avatar: userProfile['avatar'] ?? userProfile['avatar_96'] ?? '',
+          phone: userProfile['phone_number'] ?? '未知手机号',
+          school: userProfile['school'] ?? '未知学校',
+          platform: 'rainClassroom'
+      );
+      return user;
     } catch (e) {
       debugPrint('getUserInfo error: $e');
     } finally {

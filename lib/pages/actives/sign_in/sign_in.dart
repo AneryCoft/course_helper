@@ -202,28 +202,27 @@ class SignInPageState extends State<SignInPage> {
       final activeInfo = results[0];
       final attendInfo = results[1];
   
-      if (activeInfo != null && activeInfo['result'] == 1){
+      if (activeInfo != null){
         // openPreventCheatFlag 1
-        final activeData = activeInfo['data'];
-        _needCaptcha = activeData['showVCode'] == 1;
+        _needCaptcha = activeInfo['showVCode'] == 1;
   
         switch (widget.active.signType) {
           case SignType.normal:
-            _needPhoto = activeData['ifphoto'] == 1;
+            _needPhoto = activeInfo['ifphoto'] == 1;
             break;
           case SignType.code:
-            _signParams.numberCount = activeData['numberCount'];
+            _signParams.numberCount = activeInfo['numberCount'];
             break;
           case SignType.qrCode:
           case SignType.location:
-            _locationRange = activeData['locationRange'];
-            _designatedPlace = activeData['locationText'];
+            _locationRange = activeInfo['locationRange'];
+            _designatedPlace = activeInfo['locationText'];
             break;
           case _:
         }
       }
-      if (attendInfo != null && attendInfo['result'] == 1){
-        if (attendInfo['data']['status'] == 1){
+      if (attendInfo != null){
+        if (attendInfo['status'] == 1){
           _showSuccessMessage('当前用户已签到');
           if (_currentUser != null) {
             setState(() {

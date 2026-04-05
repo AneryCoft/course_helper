@@ -147,7 +147,7 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
     }
 
     qrState.startPolling((bool success) async {
-      if (success && await handleCXLoginSuccess(context) && mounted) {
+      if (success && await handleLoginSuccess(context) && mounted) {
         Navigator.pop(context, true);
         await _loadAccounts();
       }

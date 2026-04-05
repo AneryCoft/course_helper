@@ -280,9 +280,11 @@ class SignInApi{
   static Future<Map<String, dynamic>?> getActiveInfoWeb(String activeId) async {
     try {
       final url = 'https://mobilelearn.chaoxing.com/v2/apis/active/getPPTActiveInfo?activeId=$activeId';
-
       final response = await ApiService.sendRequest(url);
-      return response.data;
+      final data = response.data;
+      if (data['result'] == 1){
+        return data['data'];
+      }
     } catch (e) {
       debugPrint('getActiveInfo error: $e');
     }
@@ -295,10 +297,15 @@ class SignInApi{
       final url = 'https://mobilelearn.chaoxing.com/v2/apis/sign/getAttendInfo?activeId=$activeId&moreClassAttendEnc=';
 
       final response = await ApiService.sendRequest(url);
-      return response.data;
+      final data = response.data;
+      if (data['result'] == 1){
+        return data['data'];
+      }
     } catch (e) {
       debugPrint('getActiveInfo error: $e');
     }
     return null;
   }
+  // https://mobilelearn.chaoxing.com/widget/sign/pcTeaSignController/getAttendList
+  // 存在权鉴
 }
