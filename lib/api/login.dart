@@ -96,10 +96,38 @@ class CXLoginApi {
   static Future<User?> getUserInfo() async {
     try {
       final url = 'https://sso.chaoxing.com/apis/login/userLogin4Uname.do';
+      // POST https://sso.chaoxing.com/apis/login/userLogin.do?puid=&hddInfo=&len=
+      // 用于在每次进入应用时刷新账号 hddInfo和data一致
+
+      /*
+      final deviceId = EncryptionUtil.getUniqueId();
+      final deviceInfo = {
+        "app_name": "com.chaoxing.mobile",
+        "app_ver": "6.7.4",
+        "board": "caiman",
+        "brand": "google",
+        "cdid": deviceId,
+        "cdtype": "Pixel 9 Pro",
+        "cpu_ar": "arm64-v8a,armeabi-v7a,armeabi",
+        "device_id": deviceId,
+        "dpi": "440",
+        "hardware": "caiman",
+        "mediaDrmId": "",
+        "oaid": "1004",
+        "os_lang": "",
+        "os_name": "REL",
+        "os_ver": "16",
+        "platform": "android",
+        "resolution": "1080*2243",
+        "time_stamp": DateTime.now().millisecondsSinceEpoch
+      };
+
+      final formData = {'data': EncryptionUtil.rsaEncrypt(jsonEncode(deviceInfo), Constant.rsaPublicKey)};
+      */
 
       CookieManager.isLoggingIn = true;
       final response = await ApiService.sendRequest(url);
-      return response.data;
+      // final response = await ApiService.sendRequest(url, method: "POST", body: formData);
 
       final data = response.data['msg'];
       final user = User(

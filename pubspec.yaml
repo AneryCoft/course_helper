@@ -41,6 +41,7 @@ dependencies:
   shared_preferences: ^2.2.2
   crypto: ^3.0.0
   encrypt: ^5.0.3
+  pointycastle: ^3.9.1
   uuid: ^4.5.1
   flutter_speed_dial: ^7.0.0
   camera: ^0.11.4
@@ -50,7 +51,6 @@ dependencies:
   http_parser: ^4.0.0
   path: ^1.9.0
   pattern_lock: ^2.0.0
-  geolocator: ^14.0.2
   flutter_baidu_mapapi_map: 3.9.9
   flutter_baidu_mapapi_base: 3.9.9
   flutter_baidu_mapapi_search: 3.9.9

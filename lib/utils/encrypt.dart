@@ -1,35 +1,42 @@
 import 'dart:convert';
 import 'package:encrypt/encrypt.dart' as encrypt;
-import 'package:uuid/uuid.dart';
 import 'package:crypto/crypto.dart';
+import 'package:pointycastle/pointycastle.dart';
+import 'package:pointycastle/asymmetric/rsa.dart';
+import 'package:pointycastle/asymmetric/pkcs1.dart';
+import 'package:uuid/uuid.dart';
+import 'dart:typed_data';
 import 'dart:io';
 
 /// 密钥常量
 class Constant {
   // schild的盐
-  static const String schildSalt = r"ipL$TkeiEmfy1gTXb2XHrdLN0a@7c^vu";
+  static const schildSalt = r"ipL$TkeiEmfy1gTXb2XHrdLN0a@7c^vu";
 
   // 网页登录
-  static const String webLoginKey = "u2oh6Vu^HWe4_AES";
+  static const webLoginKey = "u2oh6Vu^HWe4_AES";
 
   // 发送验证码
-  static const String sendCaptchaKey = "jsDyctOCnay7uotq";
+  static const sendCaptchaKey = "jsDyctOCnay7uotq";
 
   // APP登录
-  static const String appLoginKey = "z4ok6lu^oWp4_AES";
+  static const appLoginKey = "z4ok6lu^oWp4_AES";
   
   // 设备指纹
-  static const String deviceCodeKey = 'QrCbNY@MuK1X8HGw';
+  static const deviceCodeKey = 'QrCbNY@MuK1X8HGw';
+
+  // getDeviceInfo RSA公钥
+  static const rsaPublicKey = 'MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC79d8Ot0hCbxxSISC6x8SCwTBspFSzlLKHJUYqoFNu1TSRaw4hEYkOnvEaL1VyoxV6HXcDrzwYvaFZaZaPQPFnfCHZy5dQwxcmifgSHqS+oKXw40Ys4cVIqnU5d90S7EWSRdBglX489jlqVaNcQSkDx2TYmC+DbAq9FV/BU09ISQIDAQAB';
 
   // inf_enc
-  static const String infEncToken = "4faa8662c59590c6f43ae9fe5b002b42";
-  static const String infEncKey = "Z(AfY@XS";
+  static const infEncToken = "4faa8662c59590c6f43ae9fe5b002b42";
+  static const infEncKey = "Z(AfY@XS";
 
   // 学习通验证码
-  static const String cxCaptchaId = "Qt9FIw9o4pwRjOyqM6yizZBh682qN2TU";
+  static const cxCaptchaId = "Qt9FIw9o4pwRjOyqM6yizZBh682qN2TU";
 
   // 雨课堂腾讯验证码
-  static const String  tCaptchaAppId = '2091064951';
+  static const tCaptchaAppId = '2091064951';
 }
 
 class EncryptionUtil {
@@ -67,6 +74,57 @@ class EncryptionUtil {
     return encrypted.base64;
   }
 
+  /// RSA 公钥加密（PKCS#1 v1.5） 自动分段
+  static String rsaEncrypt(String text, String publicKeyBase64) {
+    // 解析公钥
+    final keyDer = base64.decode(publicKeyBase64);
+    final asn1Parser = ASN1Parser(Uint8List.fromList(keyDer));
+    final topLevelSeq = asn1Parser.nextObject() as ASN1Sequence;
+
+    final asn1Objects = topLevelSeq.elements!;
+    
+    // 第二个元素是 BIT STRING，包含实际的 RSA 公钥
+    final bitString = asn1Objects[1] as ASN1BitString;
+    final publicKeyBytes = bitString.valueBytes!.sublist(1);
+    
+    // 解析内部的 RSAPublicKey
+    final publicKeyParser = ASN1Parser(Uint8List.fromList(publicKeyBytes));
+    final publicKeySeq = publicKeyParser.nextObject() as ASN1Sequence;
+    final publicKeyElements = publicKeySeq.elements!;
+    
+    final modulusBigInt = (publicKeyElements[0] as ASN1Integer).integer!;
+    final exponentBigInt = (publicKeyElements[1] as ASN1Integer).integer!;
+    final publicKey = RSAPublicKey(modulusBigInt, exponentBigInt);
+
+    final keyLength = (publicKey.modulus!.bitLength + 7) ~/ 8; // 1024 位 => 128 字节
+    final maxChunkSize = keyLength - 11; // PKCS#1 填充最多 117 字节
+
+    final plainBytes = Uint8List.fromList(utf8.encode(text));
+
+    // 使用 PKCS#1 v1.5 填充进行分段加密
+    final encryptedChunks = <Uint8List>[];
+    for (int i = 0; i < plainBytes.length; i += maxChunkSize) {
+      final end = (i + maxChunkSize) < plainBytes.length ? i + maxChunkSize : plainBytes.length;
+      final chunk = plainBytes.sublist(i, end);
+      
+      final cipher = PKCS1Encoding(RSAEngine());
+      cipher.init(true, PublicKeyParameter<RSAPublicKey>(publicKey));
+      final encrypted = cipher.process(chunk);
+      encryptedChunks.add(encrypted);
+    }
+
+    // 拼接
+    final totalLen = encryptedChunks.fold(0, (sum, chunk) => sum + chunk.length);
+    final allEncrypted = Uint8List(totalLen);
+    int offset = 0;
+    for (final chunk in encryptedChunks) {
+      allEncrypted.setRange(offset, offset + chunk.length, chunk);
+      offset += chunk.length;
+    }
+
+    return base64.encode(allEncrypted);
+  }
+
   static String md5Hash(String text) {
     return md5.convert(utf8.encode(text)).toString();
   }
@@ -74,8 +132,7 @@ class EncryptionUtil {
   /// UID生成 用于登录识别设备
   /// 与'_c_0_'的生成方式一致
   static String getUniqueId() {
-    var uuid = Uuid();
-    return uuid.v4().replaceAll(r'-', '');
+    return getUuid().replaceAll(r'-', '');
   }
   
   /// 设备指纹生成
