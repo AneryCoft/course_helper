@@ -198,6 +198,7 @@ class Problem {
   final bool hasRemark;
   final List<ProblemOption>? options;
   final int? pollingCount;
+  final int? dt;
 
   Problem({
     required this.problemId,
@@ -209,6 +210,7 @@ class Problem {
     required this.hasRemark,
     this.options,
     this.pollingCount,
+    this.dt,
   });
 
   factory Problem.fromJson(Map<String, dynamic> json) {
@@ -222,6 +224,22 @@ class Problem {
       hasRemark: json['hasRemark'] ?? false,
       options: (json['options'] as List?)?.map((o) => ProblemOption.fromJson(o)).toList(),
       pollingCount: json['pollingCount'],
+      dt: json['dt'],
+    );
+  }
+
+  Problem copyWith({int? dt}) {
+    return Problem(
+      problemId: problemId,
+      problemType: problemType,
+      body: body,
+      score: score,
+      remark: remark,
+      answers: answers,
+      hasRemark: hasRemark,
+      options: options,
+      pollingCount: pollingCount,
+      dt: dt ?? this.dt,
     );
   }
 }

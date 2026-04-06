@@ -399,17 +399,21 @@ class RCCourseApi {
     return null;
   }
 
+  /// 提交答案
+  /// 在answer提交失败后会反复进行retry
   static Future<Map<String, dynamic>?> answer(String problemId, int problemType,
-      {List<String>? options, String? content, List<String>? imageUrls}) async {
+      {bool retry = false, int? time, List<String>? options, String? content, List<String>? imageUrls}) async {
     try {
-      final url = '/api/v3/lesson/problem/answer';
+      final url = retry ?
+      '/api/v3/lesson/problem/retry' : '/api/v3/lesson/problem/answer';
       final bearerToken = getBearerToken();
       if (bearerToken == null) {
         debugPrint('bearerToken 为空');
         return null;
       }
       final headers = {'authorization': 'Bearer $bearerToken'};
-      final timestampMS = DateTime.now().millisecondsSinceEpoch;
+      final timestampMS = (time == null) ?
+      DateTime.now().millisecondsSinceEpoch : time;
       late dynamic result;
       if (problemType == 5) { // 主观题
         var pics = [];
@@ -434,12 +438,16 @@ class RCCourseApi {
       } else {
         result = options;
       }
-      final jsonData = {
+      var jsonData = {
         'problemId': problemId,
         'dt': timestampMS,
         'problemType': problemType,
         'result': result
       };
+      if (retry) {
+        jsonData['retry_times'] = null;
+        jsonData = {'problems': [jsonData]};
+      }
       final response = await ApiService.sendRequest(url, method: 'POST', headers: headers, body: jsonData);
       return response.data;
     } catch (e) {

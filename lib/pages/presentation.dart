@@ -32,12 +32,14 @@ class _PresentationPageState extends State<PresentationPage> {
   int _totalCount = 0;
   List<Map<String, dynamic>> _slides = [];
   String? _currentPresentationId;
+  final List<String> _unlockedProblemIds = [];
 
   bool _isLoading = false;
   bool _isInitialized = false;
   final List<TimelineEvent> _timeline = [];
 
   Problem? _currentProblem;
+  String? _timelineProblemId; // 从timeline点击的题目
   List<String>? _answer;
   String? _textAnswer;
   bool _isProblemExpanded = true;
@@ -50,7 +52,6 @@ class _PresentationPageState extends State<PresentationPage> {
   // 倒计时相关
   int? _countdownSeconds;
   Timer? _countdownTimer;
-  bool _hasUnlockedProblem = false;
 
 
   @override
@@ -223,11 +224,18 @@ class _PresentationPageState extends State<PresentationPage> {
       } else if (op == 'unlockproblem') {
         final problemData = data['problem'];
         if (problemData != null) {
+          final problemId = problemData['problemId'];
           final limit = problemData['limit'];
+          final dt = problemData['dt'];
           if (limit != null && limit > 0) {
             setState(() {
               _countdownSeconds = limit;
-              _hasUnlockedProblem = true;
+              if (problemId != null && !_unlockedProblemIds.contains(problemId)) {
+                _unlockedProblemIds.add(problemId);
+              }
+              if (_currentProblem != null && dt != null) {
+                _currentProblem = _currentProblem!.copyWith(dt: dt);
+              }
             });
             _startCountdown(limit);
           }
@@ -344,6 +352,25 @@ class _PresentationPageState extends State<PresentationPage> {
             });
           }
         }
+      } else if (op == 'showfinished') {
+        // 处理幻灯片结束放映事件
+        final eventData = data['event'];
+        if (eventData != null) {
+          final code = eventData['code'];
+          final title = eventData['title'];
+          final dt = eventData['dt'];
+          
+          if (code == 'SHOW_FINISH') {
+            setState(() {
+              _timeline.add(TimelineEvent(
+                type: 'event',
+                code: code,
+                title: title ?? '幻灯片结束放映',
+                timestamp: DateTime.fromMillisecondsSinceEpoch(dt),
+              ));
+            });
+          }
+        }
       }
     } catch (e) {
       debugPrint('解析消息失败：$e');
@@ -359,6 +386,8 @@ class _PresentationPageState extends State<PresentationPage> {
       final si = event['si'];
       final total = event['total'];
       final limit = event['limit'];
+      final prob = event['prob'];
+      final pres = event['pres'];
       
       if (type != null) {
         // 处理特殊事件类型
@@ -385,8 +414,15 @@ class _PresentationPageState extends State<PresentationPage> {
             slideIndex: si,
             total: total,
             limit: limit,
-            timestamp: DateTime.fromMillisecondsSinceEpoch(dt)
+            timestamp: DateTime.fromMillisecondsSinceEpoch(dt),
+            problemId: prob,
+            presentationId: pres,
+            problemDt: dt
           ));
+
+          if (eventType == 'problem' && prob != null && !_unlockedProblemIds.contains(prob)) {
+            _unlockedProblemIds.add(prob);
+          }
         });
       }
     }
@@ -655,7 +691,7 @@ class _PresentationPageState extends State<PresentationPage> {
                                               ),
                                             ),
                                           const Spacer(),
-                                          if (_hasUnlockedProblem && _countdownSeconds != null)
+                                          if (_currentProblem != null && _unlockedProblemIds.contains(_currentProblem!.problemId) && _countdownSeconds != null)
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                               decoration: BoxDecoration(
@@ -704,21 +740,17 @@ class _PresentationPageState extends State<PresentationPage> {
                                       ),
                                       const SizedBox(height: 16),
                                       _buildAnswerOptions(),
-                                      if (_hasUnlockedProblem && _countdownSeconds != null) ...[
+                                      if ((_currentProblem != null && _unlockedProblemIds.contains(_currentProblem!.problemId)) || 
+                                          (_timelineProblemId != null && _unlockedProblemIds.contains(_timelineProblemId!))) ...[
                                         const SizedBox(height: 16),
                                         Row(
                                           mainAxisAlignment: MainAxisAlignment.end,
                                           children: [
                                             ElevatedButton(
-                                              onPressed: _countdownSeconds != null && _countdownSeconds! > 0
-                                                  ? () async {await _submitAnswer();} : null,
+                                              onPressed: () async {await _submitAnswer();},
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: _countdownSeconds != null && _countdownSeconds! > 0
-                                                    ? Theme.of(context).colorScheme.primary
-                                                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                                                foregroundColor: _countdownSeconds != null && _countdownSeconds! > 0
-                                                    ? Theme.of(context).colorScheme.onPrimary
-                                                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                                                backgroundColor: Theme.of(context).colorScheme.primary,
+                                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                                                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                                               ),
                                               child: const Text(
@@ -795,62 +827,77 @@ class _PresentationPageState extends State<PresentationPage> {
         icon = Icons.info;
     }
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: bgColor.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Icon(
-              icon,
-              color: bgColor,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    return GestureDetector(
+      onTap: event.type == 'problem' ? () => _handleTimelineProblemClick(event) : null,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                color: bgColor.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(20),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _getEventTitle(event),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatTime(event.timestamp),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+              child: Icon(
+                icon,
+                color: bgColor,
+                size: 20,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _getEventTitle(event),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                        if (event.type == 'problem')
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            size: 14,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatTime(event.timestamp),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -889,11 +936,54 @@ class _PresentationPageState extends State<PresentationPage> {
     return ProblemType.fromId(type).label;
   }
 
-  Future<void> _submitAnswer() async {
-    if (_currentProblem == null) return;
+  Future<void> _handleTimelineProblemClick(TimelineEvent event) async {
+    if (event.problemId == null || event.presentationId == null) return;
+    
+    // 如果当前不在对应的 presentation，先加载
+    if (event.presentationId != _currentPresentationId) {
+      await _loadPresentation(event.presentationId!);
+    }
+    
+    // 找到对应的 slide 索引
+    final slideIndex = event.slideIndex;
+    if (slideIndex != null && slideIndex > 0) {
+      final targetIndex = slideIndex;
+      
+      // 跳转到对应页面
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          targetIndex,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut
+        );
+      }
+      
+      setState(() {
+        _currentSlideIndex = targetIndex;
+        // 设置当前题目
+        if (targetIndex >= 0 && targetIndex < _slides.length) {
+          _currentProblem = _slides[targetIndex]['problem'];
+          if (_currentProblem != null && event.problemDt != null) {
+            _currentProblem = _currentProblem!.copyWith(dt: event.problemDt);
+          }
+        }
+        // 记录从 timeline 点击的 problemId
+        _timelineProblemId = event.problemId;
+        if (event.problemId != null && !_unlockedProblemIds.contains(event.problemId!)) {
+          _unlockedProblemIds.add(event.problemId!);
+        }
+        _countdownSeconds = 0;
+      });
+    }
+  }
 
-    final problemType = _currentProblem!.problemType;
-    final problemId = _currentProblem!.problemId;
+  Future<void> _submitAnswer() async {
+    // 优先使用 _currentProblem，如果为空则使用 _timelineProblemId
+    final problemId = _currentProblem?.problemId ?? _timelineProblemId;
+    if (problemId == null) return;
+
+    final problemType = _currentProblem?.problemType ?? 0;
+    final problemDt = _currentProblem?.dt;
 
     // 检查是否有答案或图片
     if (_answer == null && _textAnswer == null && _uploadedImageUrls.isEmpty) {
@@ -905,11 +995,14 @@ class _PresentationPageState extends State<PresentationPage> {
       return;
     }
 
+    // 判断是否超时（倒计时结束）
+    final isTimeout = _countdownSeconds != null && _countdownSeconds! <= 0;
+    
     // 为所有用户提交答案（带已上传的图片 URL）
-    await _submitForAllAccounts(problemId, problemType, _uploadedImageUrls);
+    await _submitForAllAccounts(problemId, problemType, _uploadedImageUrls, isTimeout, problemDt);
   }
 
-  Future<void> _submitForAllAccounts(String problemId, int problemType, List<String>? imageUrls) async {
+  Future<void> _submitForAllAccounts(String problemId, int problemType, List<String>? imageUrls, bool isTimeout, int? problemDt) async {
     final allAccounts = AccountManager.getAllAccounts();
     final currentUserId = AccountManager.currentSessionId;
     
@@ -933,6 +1026,8 @@ class _PresentationPageState extends State<PresentationPage> {
           final result = await RCCourseApi.answer(
             problemId,
             problemType,
+            retry: isTimeout,
+            time: isTimeout ? problemDt : null,
             options: _answer,
             content: _textAnswer,
             imageUrls: imageUrls
@@ -1316,6 +1411,10 @@ class TimelineEvent {
   final int? total;
   final int? limit;
   final DateTime timestamp;
+  // problem
+  final String? problemId;
+  final String? presentationId;
+  final int? problemDt;
 
   TimelineEvent({
     required this.type,
@@ -1324,6 +1423,9 @@ class TimelineEvent {
     this.slideIndex,
     this.total,
     this.limit,
-    required this.timestamp
+    required this.timestamp,
+    this.problemId,
+    this.presentationId,
+    this.problemDt,
   });
 }
