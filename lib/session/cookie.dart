@@ -1,33 +1,38 @@
-import 'package:course_helper/platform.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../api/login.dart';
 import 'account.dart';
+import '../platform.dart';
 
 class CookieInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
-    final uri = options.uri;
-    List<Cookie> cookies = [];
-    CookieJar? cookieJar= CookieManager.isLoggingIn ?
-    CookieManager.getTempCookieJar() : CookieManager.getCurrentUserCookieJar();
-    if (cookieJar != null) {
-      cookies = await cookieJar.loadForRequest(uri);
-    }
+    if (options.headers['Cookie'] == null){
+      final uri = options.uri;
+      List<Cookie> cookies = [];
+      CookieJar? cookieJar= CookieManager.isLoggingIn ?
+      CookieManager.getTempCookieJar() : CookieManager.getCurrentUserCookieJar();
+      if (cookieJar != null) {
+        cookies = await cookieJar.loadForRequest(uri);
+      }
 
-    if (cookies.isNotEmpty) {
-      final cookieStr = cookies.map((c) => '${c.name}=${c.value}').join('; ');
-      options.headers['Cookie'] = cookieStr;
+      if (cookies.isNotEmpty) {
+        final cookieStr = cookies.map((c) => '${c.name}=${c.value}').join('; ');
+        options.headers['Cookie'] = cookieStr;
 
-      if (PlatformManager().isRainClassroom){
-        final cookieMap = Map.fromEntries(cookies.map((c) => MapEntry(c.name, c.value)));
-        options.headers['x-csrftoken'] = cookieMap['x-csrftoken'];
-        options.headers['x-uid'] = cookieMap['x-uid'];
-        options.headers['sessionid'] = cookieMap['sessionid'];
+        if (PlatformManager().isRainClassroom){
+          final cookieMap = Map.fromEntries(cookies.map((c) => MapEntry(c.name, c.value)));
+          options.headers['x-csrftoken'] = cookieMap['x-csrftoken'];
+          options.headers['x-uid'] = cookieMap['x-uid'];
+          options.headers['sessionid'] = cookieMap['sessionid'];
+        }
       }
     }
+
     handler.next(options);
   }
 
@@ -59,6 +64,8 @@ class CookieManager {
   static CookieJar? _tempCookieJar; // 临时保存登录的 Cookie
   static late SharedPreferences _prefs;
 
+  static int refreshCounts = 0; // 只为每个平台刷新一次
+
   static Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
     await loadAllCookies();
@@ -77,6 +84,45 @@ class CookieManager {
       } catch (e) {
         debugPrint('预加载账号 ${user.uid} 的 CookieJar 失败：$e');
       }
+    }
+
+    if (refreshCounts < 2){
+      await _refreshAccounts();
+    }
+  }
+
+  /// 刷新所有账号的Cookie和用户信息
+  static Future<void> _refreshAccounts() async {
+    refreshCounts++;
+    final accounts = AccountManager.getAllAccounts();
+
+    int successCount = 0;
+    int failCount = 0;
+
+    final currentUserId = AccountManager.currentSessionId;
+    if (currentUserId == null) return;
+
+    final getUserInfoApi = PlatformManager().isChaoxing?
+    CXLoginApi.getUserInfo : RCLoginApi.getUserInfo;
+
+    for (final user in accounts) {
+      try {
+        AccountManager.setCurrentSessionTemp(user.uid);
+        final refreshedUser = await getUserInfoApi();
+
+        if (refreshedUser != null) {
+          await AccountManager.addAccount(refreshedUser);
+          successCount++;
+        }
+      } catch (e) {
+        failCount++;
+        debugPrint('刷新账号 ${user.name} 失败：$e');
+      }
+    }
+    AccountManager.setCurrentSessionTemp(currentUserId);
+
+    if (successCount > 0 || failCount > 0) {
+      debugPrint('账号刷新完成：成功 $successCount 个，失败 $failCount 个');
     }
   }
 

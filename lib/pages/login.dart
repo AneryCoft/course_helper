@@ -6,12 +6,14 @@ import 'dart:typed_data';
 import '../api/login.dart';
 import '../models/user.dart';
 import '../session/account.dart';
+import '../session/cookie.dart';
 import '../utils/encrypt.dart';
 import '../platform.dart';
 
 /// 登录成功处理
 Future<bool> handleLoginSuccess(BuildContext context) async {
   try {
+    CookieManager.isLoggingIn = true;
     late User? user;
     if (PlatformManager().isChaoxing) {
       user = await CXLoginApi.getUserInfo();
@@ -24,6 +26,7 @@ Future<bool> handleLoginSuccess(BuildContext context) async {
           const SnackBar(content: Text('获取用户信息失败')),
         );
       }
+      CookieManager.isLoggingIn = false;
       return false;
     }
 
@@ -34,6 +37,7 @@ Future<bool> handleLoginSuccess(BuildContext context) async {
         SnackBar(content: Text('${user.name} 登录成功')),
       );
     }
+    CookieManager.isLoggingIn = false;
     return true;
   } catch (e) {
     debugPrint('处理登录成功失败：$e');
@@ -42,6 +46,7 @@ Future<bool> handleLoginSuccess(BuildContext context) async {
         const SnackBar(content: Text('登录处理失败')),
       );
     }
+    CookieManager.isLoggingIn = false;
     return false;
   }
 }

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../platform.dart';
@@ -111,16 +110,15 @@ class AccountManager {
       accounts[index] = user;
     } else {
       accounts.add(user);
+      // 将临时Cookie迁移到该账号
+      await CookieManager.saveTempCookies(user.uid);
+
+      // 如果没有当前会话，自动设置为当前账户
+      if (!hasActiveSession()) {
+        await setCurrentSession(user.uid);
+      }
     }
     await _saveAccounts(accounts);
-
-    // 将临时Cookie迁移到该账号
-    await CookieManager.saveTempCookies(user.uid);
-
-    // 如果没有当前会话，自动设置为当前账户
-    if (!hasActiveSession()) {
-      await setCurrentSession(user.uid);
-    }
   }
 
   /// 批量删除账户

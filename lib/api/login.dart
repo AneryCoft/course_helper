@@ -24,14 +24,10 @@ class CXLoginApi {
         'forbidotherlogin': '0',
         'validate': ''
       };
-
-      CookieManager.isLoggingIn = true;
       final response = await ApiService.sendRequest(url, method: "POST", body: formData);
       return response.data;
     } catch (e) {
       debugPrint('Login error: $e');
-    } finally {
-      CookieManager.isLoggingIn = false;
     }
     return null;
   }
@@ -125,7 +121,6 @@ class CXLoginApi {
       final formData = {'data': EncryptionUtil.rsaEncrypt(jsonEncode(deviceInfo), Constant.rsaPublicKey)};
       */
 
-      CookieManager.isLoggingIn = true;
       final response = await ApiService.sendRequest(url);
       // final response = await ApiService.sendRequest(url, method: "POST", body: formData);
 
@@ -141,8 +136,6 @@ class CXLoginApi {
       return user;
     } catch (e) {
       debugPrint('getUserInfo error: $e');
-    } finally {
-      CookieManager.isLoggingIn = false;
     }
     return null;
   }
@@ -307,14 +300,14 @@ class RCLoginApi {
     try {
       final url = '/v/course_meta/user_info';
 
-      CookieManager.isLoggingIn = true;
       final response = await ApiService.sendRequest(url);
 
       final userProfile = response.data['data']['user_profile'];
       final user = User(
           uid: userProfile['user_id']?.toString() ?? '',
           name: userProfile['name'] ?? '未知用户',
-          avatar: userProfile['avatar'] ?? userProfile['avatar_96'] ?? '',
+          avatar: userProfile['avatar'].isNotEmpty ?
+          userProfile['avatar'] : (userProfile['avatar_96'] ?? ''), // avatar_96为默认头像
           phone: userProfile['phone_number'] ?? '未知手机号',
           school: userProfile['school'] ?? '未知学校',
           platform: 'rainClassroom'
@@ -322,8 +315,6 @@ class RCLoginApi {
       return user;
     } catch (e) {
       debugPrint('getUserInfo error: $e');
-    } finally {
-      CookieManager.isLoggingIn = false;
     }
     return null;
   }
