@@ -7,7 +7,6 @@ on:
   workflow_dispatch:
 
 env:
-  FLUTTER_VERSION: "3.35.4"
   JAVA_VERSION: "17"
 
 jobs:
@@ -33,16 +32,27 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+          cache-dependency-path: |
+            android/*.gradle*
+            android/**/gradle-wrapper.properties
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+          flutter-version-file: pubspec.yaml
+          cache: "true"
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d '[:space:]')
+          echo "APP_VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using app version: $VERSION"
 
       - name: Setup Android signing (Android only)
         if: matrix.platform == 'android'
@@ -57,6 +67,25 @@ jobs:
         if: matrix.platform == 'android'
         run: flutter build apk --release --split-per-abi
 
+      - name: Rename APKs
+        if: matrix.platform == 'android'
+        run: |
+          VERSION="${{ steps.version.outputs.APP_VERSION }}"
+          cd build/app/outputs/flutter-apk
+          for file in app-*-release.apk; do
+            abi=$(echo "$file" | sed -E 's/app-(.*)-release\.apk/\1/')
+            mv "$file" "CourseHelper_${VERSION}_${abi}.apk"
+          done
+          ls -l
+
+      - name: Upload Android artifacts
+        if: matrix.platform == 'android'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/CourseHelper_*.apk   # 匹配重命名后的文件
+          if-no-files-found: error
+
       # - name: Build iOS
       #   if: matrix.platform == 'ios'
       #   run: |
@@ -65,14 +94,6 @@ jobs:
       #     mkdir Payload
       #     cp -r Runner.app Payload/
       #     zip -r CourseHelper.ipa Payload
-
-      - name: Upload Android artifacts
-        if: matrix.platform == 'android'
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-apk
-          path: build/app/outputs/flutter-apk/*.apk
-          if-no-files-found: error
 
       # - name: Upload iOS artifacts
       #   if: matrix.platform == 'ios'
