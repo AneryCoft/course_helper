@@ -86,7 +86,7 @@ class _MainPageState extends State<MainPage> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          const CoursesPage(),
+          CoursesPage(key: coursesPageKey),
           const AccountsPage(),
         ]
       ),
@@ -106,8 +106,17 @@ class _MainPageState extends State<MainPage> {
           setState(() {
             _selectedIndex = index;
           });
+          (coursesPageKey.currentState as dynamic)?.onVisibilityChanged(index == 0);
         },
       ),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      (coursesPageKey.currentState as dynamic)?.onVisibilityChanged(true);
+    });
   }
 }

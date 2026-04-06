@@ -1,6 +1,7 @@
 import 'package:course_helper/session/cookie.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 
 import '../api/api_service.dart';
 import '../session/account.dart';
@@ -31,6 +32,10 @@ class PlatformManager {
   static const _serverKey = 'current_server';
   PlatformType _currentPlatform = PlatformType.chaoxing;
   RainClassroomServerType _currentServer = RainClassroomServerType.yuketang;
+  
+  // 平台变化通知流
+  final StreamController<PlatformType> _platformChangeController = StreamController<PlatformType>.broadcast();
+  Stream<PlatformType> get platformChanges => _platformChangeController.stream;
 
   /// 获取当前平台
   PlatformType get currentPlatform => _currentPlatform;
@@ -109,10 +114,11 @@ class PlatformManager {
       } catch (e) {
         debugPrint('保存平台失败：$e');
       }
+      ApiService.onPlatformChange?.call();
+      _platformChangeController.add(platform);
       await AccountManager.switchToPlatformAccount();
       await AccountManager.refreshAccounts();
       await CookieManager.loadAllCookies();
-      ApiService.onPlatformChange?.call();
       AccountChangeNotifier().notifyAccountChanged(AccountManager.currentSessionId);
     }
   }
@@ -134,5 +140,9 @@ class PlatformManager {
   String get currentPlatformName {
     return _currentPlatform == PlatformType.chaoxing ?
     'chaoxing' : 'rainClassroom';
+  }
+  
+  void dispose() {
+    _platformChangeController.close();
   }
 }

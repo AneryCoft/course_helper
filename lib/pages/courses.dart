@@ -224,58 +224,95 @@ class CoursesPage extends StatefulWidget {
   State<CoursesPage> createState() => _CoursesPageState();
 }
 
-class _CoursesPageState extends State<CoursesPage> {
+final GlobalKey coursesPageKey = GlobalKey();
+
+class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   List<Course> _courses = [];
   bool _isLoading = true;
   StreamSubscription? _accountChangeSubscription;
+  StreamSubscription? _platformChangeSubscription;
   Timer? _refreshTimer;
   Map<String, dynamic>? _lastOnLessonCourses;
+  bool _isVisible = false;
 
   void refreshCourses() {
     _loadCourses();
   }
 
-  /// 启动定时刷新
-  void _startPeriodicRefresh() {
-    _refreshTimer?.cancel();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      if (!mounted || !AccountManager.hasActiveSession()) return;
-      
-      if (!PlatformManager().isRainClassroom) return;
+  void onVisibilityChanged(bool visible) {
+    _isVisible = visible;
+    if (visible) {
+      _checkAndStartRefresh();
+    } else {
+      _refreshTimer?.cancel();
+    }
+  }
 
-      try {
-        final onLessonCourses = await RCCourseApi.getOnLessonAndUpcomingExam();
-        if (onLessonCourses != null && mounted) {
-          // 检查数据是否有变化
-          if (_lastOnLessonCourses == null || _lastOnLessonCourses.toString() != onLessonCourses.toString()) {
-            _lastOnLessonCourses = onLessonCourses;
-            await _loadCourses(onLessonCourses);
-          }
-        }
-      } catch (e) {
-        debugPrint('Periodic refresh error: $e');
-      }
-    });
+  /// 使用在线课堂数据更新课程列表
+  void updateWithOnLessonCourses(Map<String, dynamic> onLessonCourses) {
+    _loadCourses(onLessonCourses);
   }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _isVisible = true;
     _loadCourses();
 
     // 监听账户变更事件
     _accountChangeSubscription =
         AccountChangeNotifier().accountChanges.listen((accountId) {
           if (mounted) {
-            // 账户变更时自动刷新课程数据
             _loadCourses();
           }
         });
 
-    // 仅雨课堂每3秒刷新一次在线课堂
-    if (PlatformManager().isRainClassroom) {
+    // 监听平台变化
+    _platformChangeSubscription = PlatformManager().platformChanges.listen((_) {
+      if (mounted) {
+        _lastOnLessonCourses = null;
+        _loadCourses();
+      }
+      _checkAndStartRefresh();
+    });
+
+    _checkAndStartRefresh();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAndStartRefresh();
+    } else {
+      _refreshTimer?.cancel();
+    }
+  }
+
+  void _checkAndStartRefresh() {
+    _refreshTimer?.cancel();
+    if (_isVisible && PlatformManager().isRainClassroom) {
       _startPeriodicRefresh();
     }
+  }
+
+  void _startPeriodicRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (!mounted || !AccountManager.hasActiveSession()) return;
+
+      try {
+        final onLessonCourses = await RCCourseApi.getOnLessonAndUpcomingExam();
+        if (onLessonCourses != null && mounted) {
+          if (_lastOnLessonCourses == null || _lastOnLessonCourses.toString() != onLessonCourses.toString()) {
+            _lastOnLessonCourses = onLessonCourses;
+            _loadCourses(onLessonCourses);
+          }
+        }
+      } catch (e) {
+        debugPrint('Periodic refresh error: $e');
+      }
+    });
   }
 
   Future<void> _loadCourses([Map<String, dynamic>? onLessonCourses]) async {
@@ -305,6 +342,7 @@ class _CoursesPageState extends State<CoursesPage> {
         });
       } else {
         setState(() {
+          _courses =  [];
           _isLoading = false;
         });
       }
@@ -741,7 +779,9 @@ class _CoursesPageState extends State<CoursesPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _accountChangeSubscription?.cancel();
+    _platformChangeSubscription?.cancel();
     _refreshTimer?.cancel();
     super.dispose();
   }
