@@ -415,12 +415,13 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
           final activeId = params['id'];
           if (activeId != null) {
             final response = await ApiService.sendRequest(result, responseType: ResponseType.plain);
-            String? location = response.realUri.toString();
+            final locationUrl = response.headers['location']?.first;
+            // String? location = response.realUri.toString();
 
             // 重定向到 https://mobilelearn.chaoxing.com/newsign/preSign?
             // courseId=&classId=$classId&activePrimaryId=4000147729438&general=1&sys=1&ls=1&appType=15&uid=$uid&
             // rcode=SIGNIN%3Aaid%3D4000147729438%26source%3D15%26Code%3D4000147729438%26enc%3DE39EE73BB53907CC04850F4C6EE077B6
-            final uri = Uri.parse(location);
+            final uri = Uri.parse(locationUrl!);
             final params = uri.queryParameters;
 
             final classId = params['classId'] ?? '';

@@ -43,6 +43,13 @@ class AvatarCache {
   static Future<Uint8List?> _fetchImage(String url) async {
     try {
       var response = await ApiService.sendRequest(url, responseType: ResponseType.bytes);
+      final locationUrl = response.headers['location']?.first;
+      if (locationUrl != null) {
+        response = await ApiService.sendRequest(
+            response.headers['location']!.first,
+            responseType: ResponseType.bytes);
+      }
+      // 手动重定向一次
       debugPrint('头像请求成功: $url');
       return response.data;
     } catch (e) {

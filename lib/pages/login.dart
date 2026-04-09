@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tencent_captcha/flutter_tencent_captcha.dart';
 import 'dart:async';
-import 'dart:typed_data';
 
 import '../api/login.dart';
 import '../models/user.dart';
@@ -63,25 +62,37 @@ class LoginPage extends StatefulWidget {
 /// 二维码登录状态管理类
 class QRCodeLoginState {
   String? qrUuid;
-  String? qrEnc;
-  Uint8List? qrImageData;
+  String? qrEnc; // 学习通
+  String? qrState; // 雨课堂
+  String? qrImageUrl;
   bool isLoading = true;
   bool isRefreshing = false;
   bool isLoginActive = true;
 
   Timer? _pollingTimer;
+  final _isChaoxing = PlatformManager().isChaoxing;
 
   /// 初始化二维码数据
   Future<bool> initialize() async {
     try {
-      final qrData = await CXLoginApi.getQRCodeData();
-      if (qrData != null) {
-        qrUuid = qrData['uuid'];
-        qrEnc = qrData['enc'];
-        final imageData = await CXLoginApi.getQRCodeImage(qrUuid!);
-        qrImageData = imageData;
-        isLoading = false;
-        return true;
+      if (!_isChaoxing) {
+        final qrData = await RCLoginApi.getQRCodeUuid();
+        if (qrData != null && qrData.length == 2) {
+          qrUuid = qrData[0];
+          qrState = qrData[1];
+          qrImageUrl = 'https://open.weixin.qq.com/connect/qrcode/$qrUuid';
+          isLoading = false;
+          return true;
+        }
+      } else {
+        final qrData = await CXLoginApi.getQRCodeData();
+        if (qrData != null) {
+          qrUuid = qrData['uuid'];
+          qrEnc = qrData['enc'];
+          qrImageUrl = 'https://passport2.chaoxing.com/createqr?uuid=$qrUuid&fid=-1';
+          isLoading = false;
+          return true;
+        }
       }
       return false;
     } catch (e) {
@@ -94,6 +105,39 @@ class QRCodeLoginState {
   void startPolling(Function(bool success) onLoginComplete) {
     _pollingTimer?.cancel();
 
+    if (!_isChaoxing) {
+      // 雨课堂：使用 while 循环，每次等待 15 秒
+      _startRainClassroomPolling(onLoginComplete);
+    } else {
+      // 学习通：使用 Timer.periodic，每 3 秒检查一次
+      _startChaoxingPolling(onLoginComplete);
+    }
+  }
+
+  /// 雨课堂轮询逻辑
+  void _startRainClassroomPolling(Function(bool success) onLoginComplete) async {
+    while (isLoginActive && qrUuid != null && qrState != null) {
+      try {
+        final status = await RCLoginApi.checkQRAuthStatus(qrUuid!, qrState!);
+        if (status == '405') {
+          onLoginComplete(true);
+          return;
+        } else if (status == '402') {
+          // 二维码过期，刷新
+          await refreshQRCode();
+          if (!isLoginActive || qrUuid == null) return;
+        }
+      } catch (e) {
+        debugPrint('轮询失败: $e');
+      }
+      
+      // 如果不是活跃状态则退出
+      if (!isLoginActive) return;
+    }
+  }
+
+  /// 学习通轮询逻辑
+  void _startChaoxingPolling(Function(bool success) onLoginComplete) {
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       if (!isLoginActive || qrUuid == null || qrEnc == null) {
         timer.cancel();
@@ -123,12 +167,20 @@ class QRCodeLoginState {
 
     isRefreshing = true;
     try {
-      final qrData = await CXLoginApi.getQRCodeData();
-      if (qrData != null) {
-        qrUuid = qrData['uuid'];
-        qrEnc = qrData['enc'];
-        final imageData = await CXLoginApi.getQRCodeImage(qrUuid!);
-        qrImageData = imageData;
+      if (!_isChaoxing) {
+        final qrData = await RCLoginApi.getQRCodeUuid();
+        if (qrData != null && qrData.length == 2) {
+          qrUuid = qrData[0];
+          qrState = qrData[1];
+          qrImageUrl = 'https://open.weixin.qq.com/connect/qrcode/$qrUuid';
+        }
+      } else {
+        final qrData = await CXLoginApi.getQRCodeData();
+        if (qrData != null) {
+          qrUuid = qrData['uuid'];
+          qrEnc = qrData['enc'];
+          qrImageUrl = 'https://passport2.chaoxing.com/createqr?uuid=$qrUuid&fid=-1';
+        }
       }
     } catch (e) {
       debugPrint('刷新二维码失败: $e');
@@ -244,11 +296,11 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ],
                       ),
-                      child: qrState.qrImageData != null
+                      child: qrState.qrImageUrl != null
                           ? ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.memory(
-                          qrState.qrImageData!,
+                        child: Image.network(
+                          qrState.qrImageUrl!,
                           fit: BoxFit.contain,
                           gaplessPlayback: true,
                         ),

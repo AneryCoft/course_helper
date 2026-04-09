@@ -307,7 +307,6 @@ class RCCourseApi {
       Map<String, dynamic> coursesMap = {
         for (var courseItem in courses['data']) courseItem['course_id'].toString(): courseItem
       };
-      debugPrint('coursesMap: $coursesMap');
 
       List<Course> contentList = [];
 
@@ -325,8 +324,8 @@ class RCCourseApi {
       }
 
       return contentList;
-    } catch (e) {
-      debugPrint('getCoursesList error: $e');
+    } catch (e, stackTrace) {
+      debugPrint('getCoursesList error: $e\n$stackTrace');
       return null;
     }
   }

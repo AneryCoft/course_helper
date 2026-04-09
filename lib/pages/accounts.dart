@@ -188,11 +188,11 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                           ),
                         ],
                       ),
-                      child: qrState.qrImageData != null
+                      child: qrState.qrImageUrl != null
                           ? ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.memory(
-                          qrState.qrImageData!,
+                        child: Image.network(
+                          qrState.qrImageUrl!,
                           fit: BoxFit.contain,
                           gaplessPlayback: true,
                         ),
@@ -220,10 +220,11 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text(
-                      '使用学习通APP扫码登录',
+                    Text(
+                      PlatformManager().isChaoxing ?
+                      '使用学习通APP扫码登录' : '使用微信扫码登录',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                     ),
                     const SizedBox(height: 8),
                     const Text(

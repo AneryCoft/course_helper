@@ -170,24 +170,6 @@ class CXLoginApi {
     return null;
   }
   
-  /// 获取二维码图片
-  static Future<Uint8List?> getQRCodeImage(String uuid) async {
-    try {
-      final qrCodeUrl = 'https://passport2.chaoxing.com/createqr?uuid=$uuid&fid=-1';
-      final response = await ApiService.sendRequest(
-        qrCodeUrl, 
-        responseType: ResponseType.bytes
-      );
-      
-      if (response.data is List<int>) {
-        return Uint8List.fromList(response.data);
-      }
-    } catch (e) {
-      debugPrint('getQRCodeImage error: $e');
-    }
-    return null;
-  }
-  
   /// 检查二维码授权状态
   static Future<Map<String, dynamic>?> checkQRAuthStatus(String uuid, String enc) async {
     try {
@@ -315,6 +297,79 @@ class RCLoginApi {
       return user;
     } catch (e) {
       debugPrint('getUserInfo error: $e');
+    }
+    return null;
+  }
+
+  /// 获取微信登录二维码的UUID和state
+  static Future<List<String>?> getQRCodeUuid() async {
+    try {
+      final authParamUrl = '/api/v3/user/login/wechat-auth-param';
+      var response = await ApiService.sendRequest(authParamUrl, method: 'POST', body:{});
+      final data = response.data['data'];
+
+      final qrConnectUrl = 'https://open.weixin.qq.com/connect/qrconnect';
+      final String state = data['state'];
+      final params = {
+        'appid': data['appId'] as String,
+        'scope': 'snsapi_login',
+        'redirect_uri': '${data['redirectUri']}?path=%2Fauthorize%2Fwx-qrlogin%3Fsuccess%3D1',
+        'state': state,
+        'login_type': 'jssdk',
+        'self_redirect': 'true',
+        'f': 'xml' // 如果没有则输出html
+      };
+      response = await ApiService.sendRequest(qrConnectUrl, params: params, responseType: ResponseType.plain);
+
+      final xml = response.data;
+      final uuidRegex = RegExp(r'<uuid><!\[CDATA\[(.+?)\]\]></uuid>', dotAll: true);
+      final uuidMatch = uuidRegex.firstMatch(xml);
+      
+      if (uuidMatch != null) {
+        return [uuidMatch.group(1)!, state];
+      }
+    } catch (e) {
+      debugPrint('getQRCodeUuid error: $e');
+    }
+    return null;
+  }
+
+  /// 检查微信二维码授权状态
+  static Future<String?> checkQRAuthStatus(String uuid, String state) async {
+    try {
+      final connectUrl = 'https://lp.open.weixin.qq.com/connect/l/qrconnect?uuid=$uuid';
+      
+      var response = await ApiService.sendRequest(connectUrl, responseType: ResponseType.plain); // 服务端在15秒后响应
+
+      final html = response.data;
+      final errorCodeRegex = RegExp(r'window\.wx_errcode=(\d+)');
+      final codeRegex = RegExp(r"window\.wx_code='(.+?)'");
+      
+      final errorCodeMatch = errorCodeRegex.firstMatch(html);
+      final codeMatch = codeRegex.firstMatch(html);
+      
+      if (errorCodeMatch != null) {
+        final errorCode = errorCodeMatch.group(1);
+        
+        if (errorCode == '405') {
+          // 已授权
+          if (codeMatch != null) {
+            final callbackUrl = '/api/v3/user/login/wechat-web-callback';
+            final params = {
+              'path': '/authorize/wx-qrlogin?success=1',
+              'code': codeMatch.group(1)!,
+              'state': state
+            };
+            CookieManager.isLoggingIn = true;
+            await ApiService.sendRequest(callbackUrl, params: params, responseType: ResponseType.plain);
+            // 重定向到 authorize/wx-qrlogin?success=1
+            CookieManager.isLoggingIn = false;
+          }
+        }
+        return errorCode;
+      }
+    } catch (e) {
+      debugPrint('checkQRAuthStatus error: $e');
     }
     return null;
   }

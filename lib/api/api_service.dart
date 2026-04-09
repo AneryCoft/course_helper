@@ -108,11 +108,12 @@ class ApiService {
     
     _dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 20),
       sendTimeout: const Duration(seconds: 10),
+      followRedirects: false,
+      validateStatus: (status) => status! < 500
       // contentType: Headers.formUrlEncodedContentType, // application/x-www-form-urlencoded
       // headers: HeadersManager.chaoxingHeaders,
-      // validateStatus: (status) => status! < 500
     ));
 
     // 初始化平台变化回调
