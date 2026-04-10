@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:crypto/crypto.dart';
 import 'package:pointycastle/pointycastle.dart';
@@ -175,7 +176,7 @@ class EncryptionUtil {
         final last = await raf.read(524288);
         bytesToHash = [...first, ...last];
       } else {
-        bytesToHash = await raf.read(totalSize);
+        bytesToHash = List<int>.from(await raf.read(totalSize));
       }
 
       final sizeHex = totalSize.toRadixString(16);
