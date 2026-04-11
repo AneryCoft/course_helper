@@ -6,12 +6,14 @@ class AccountsSelector extends StatefulWidget {
   final ValueChanged<List<User>> onSelectionChanged;
   final String title;
   final bool initiallyExpanded;
+  final List<User>? initialSelected;
 
   const AccountsSelector({
     super.key,
     required this.onSelectionChanged,
     this.title = '选择参加的账号',
     this.initiallyExpanded = true,
+    this.initialSelected,
   });
 
   @override
@@ -41,7 +43,13 @@ class _AccountsSelectorState extends State<AccountsSelector> {
     try {
       // 获取所有账号
       _allAccounts = AccountManager.getAllAccounts();
-      _selectedAccounts = List.from(_allAccounts);
+      
+      // 使用外部传入的初始选中状态，否则默认全选
+      if (widget.initialSelected != null) {
+        _selectedAccounts = List.from(widget.initialSelected!);
+      } else {
+        _selectedAccounts = List.from(_allAccounts);
+      }
 
       final currentUserId = AccountManager.currentSessionId;
       _currentUser = AccountManager.getAccountById(currentUserId!);

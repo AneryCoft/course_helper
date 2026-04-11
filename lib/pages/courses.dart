@@ -13,6 +13,7 @@ import 'actives/sign_in/sign_in.dart';
 import 'actives/topic_discuss.dart';
 import 'actives/quiz.dart';
 import 'actives/evaluate.dart';
+import 'actives/vote.dart';
 import 'accounts.dart';
 import 'presentation.dart';
 
@@ -145,66 +146,81 @@ class _CourseContentPageState extends State<CourseContentPage> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   if (active.status) {
-                    if (active.activeType == ActiveType.signIn ||
-                        active.activeType == ActiveType.signOut ||
-                        active.activeType == ActiveType.scheduledSignIn) {
-                      // 跳转到签到页面
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SignInPage(
-                            active: active,
-                            courseId: widget.courseId,
-                            classId: widget.classId,
-                            cpi: widget.cpi,
+                    switch (active.activeType) {
+                      case ActiveType.signIn:
+                      case ActiveType.signOut:
+                      case ActiveType.scheduledSignIn:
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SignInPage(
+                              active: active,
+                              courseId: widget.courseId,
+                              classId: widget.classId,
+                              cpi: widget.cpi
+                            ),
                           ),
-                        ),
-                      );
-                    } else if (active.activeType ==
-                        ActiveType.topicDiscuss) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              TopicDiscussPage(active: active),
-                        ),
-                      );
-                    } else if (active.activeType == ActiveType.quiz) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              QuizPage(
-                                active: active,
-                                courseId: widget.courseId,
-                                classId: widget.classId,
-                              ),
-                        ),
-                      );
-                    } else if (active.activeType == ActiveType.evaluation) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              EvaluatePage(
-                                active: active,
-                                courseId: widget.courseId,
-                                classId: widget.classId,
-                              ),
-                        ),
-                      );
-                    }
-                    else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content:
-                            Text('该活动类型暂不支持')),
-                      );
+                        );
+                        break;
+                      
+                      case ActiveType.topicDiscuss:
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TopicDiscussPage(active: active),
+                          ),
+                        );
+                        break;
+                      
+                      case ActiveType.quiz:
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => QuizPage(
+                              active: active,
+                              courseId: widget.courseId,
+                              classId: widget.classId
+                            ),
+                          ),
+                        );
+                        break;
+                      
+                      case ActiveType.evaluation:
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EvaluatePage(
+                              active: active,
+                              courseId: widget.courseId,
+                              classId: widget.classId
+                            ),
+                          ),
+                        );
+                        break;
+                      
+                      case ActiveType.vote:
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => VotePage(
+                              active: active,
+                              courseId: widget.courseId,
+                              classId: widget.classId
+                            ),
+                          ),
+                        );
+                        break;
+                      
+                      default:
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('该活动类型暂不支持'),
+                          ),
+                        );
                     }
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('该活动已结束')),
+                      const SnackBar(content: Text('该活动已结束')),
                     );
                   }
                 },

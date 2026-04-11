@@ -71,4 +71,65 @@ class QuizApi {
     }
     return null;
   }
+
+  /// 获取测试详细（Web）
+  /// 投票 问卷 使用
+  static Future<Map<String, dynamic>?> getQuizDetail(String activeId, [bool v2 = false]) async {
+    try {
+      final url = v2 ?
+      'https://mobilelearn.chaoxing.com/v2/apis/quiz/quizDetail?activeId=$activeId' :
+      'https://mobilelearn.chaoxing.com/v2/apis/quiz/quizDetail2?activeId=$activeId&moreClassAttendEnc=&DB_STRATEGY=PRIMARY_KEY&STRATEGY_PARA=activeId';
+      // 两个接口返回内容相同 但是随堂练习用v2
+      // 该接口不会返回isAnswer
+      final response = await ApiService.sendRequest(url);
+      return response.data['data'];
+    } catch (e) {
+      debugPrint('getQuizDetail error: $e');
+    }
+    return null;
+  }
+
+  /// 投票提交
+  static Future<Map<String, dynamic>?> submitVote(String courseId, String classId, String activeId, String questionId, String answer) async {
+    try {
+      final url = 'https://mobilelearn.chaoxing.com/widget/quickvote/doQuestion';
+      // WebAPI: https://mobilelearn.chaoxing.com/v2/apis/qvote/doQuestion
+      // AppAPI返回内容更少 更高效
+      final formData = {
+        'courseId': courseId,
+        'classId': classId,
+        'activeId': activeId,
+        'questionId': questionId,
+        // 'answer': answer,
+        'option': answer
+      };
+      final response = await ApiService.sendRequest(url, method: 'POST', body: formData);
+      return response.data;
+    } catch (e) {
+      debugPrint('submitVote error: $e');
+    }
+    return null;
+  }
+
+  /// 问卷提交
+  static Future<Map<String, dynamic>?> submitQuestionnaire(String courseId, String classId, String activeId, String questionId, String answer) async {
+    try {
+      final url = 'https://mobilelearn.mohaoxing.com/v2/apis/studentQuestion/doQuestion';
+      // AppAPI: https://mobilelearn.mohaoxing.com/pptTestPaperStu/doQuestion
+      // AppAPI参数较多
+      final formData = {
+        'preventsubmit': '1',
+        'courseId': courseId,
+        'classId': classId,
+        'activeId': activeId,
+        'questionId': questionId,
+        'answer$questionId': answer
+      };
+      final response = await ApiService.sendRequest(url, method: 'POST', body: formData);
+      return response.data;
+    } catch (e) {
+      debugPrint('submitQuestionnaire error: $e');
+    }
+    return null;
+  }
 }
