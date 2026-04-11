@@ -283,7 +283,8 @@ class _PresentationPageState extends State<PresentationPage> {
       } else if (op == 'unlockproblem') {
         final problemData = data['problem'];
         if (problemData != null) {
-          final problemId = problemData['problemId'];
+          // WebSocket 消息中使用 'prob' 或 'sid' 作为题目ID
+          final problemId = problemData['prob'];
           final limit = problemData['limit'];
           final dt = problemData['dt'];
           if (limit != null && limit > 0) {
@@ -1153,17 +1154,15 @@ class _PresentationPageState extends State<PresentationPage> {
     if (_currentProblem == null) return const SizedBox.shrink();
     
     switch (_currentProblem!.problemType) {
-      case 1: // 单选题
-      case 2: // 多选题
-        return _buildChoiceOptions();
+      case 1: // 单选题 // 判断题在PPT是单选题
       case 3: // 投票题
-        return _buildPollingOptions();
+        return _buildChoiceOptions();
+      case 2: // 多选题
+        return _buildMultipleChoiceOptions();
       case 4: // 填空题
         return _buildFillBlankInputs();
       case 5: // 主观题
         return _buildShortAnswerInputs();
-      case 6: // 判断题
-        return _buildChoiceOptions();
       default:
         return const SizedBox.shrink();
     }
@@ -1366,8 +1365,6 @@ class _PresentationPageState extends State<PresentationPage> {
       return const SizedBox.shrink();
     }
       
-    final isMultiple = _currentProblem!.problemType == 2;
-      
     return RadioGroup<String>(
       groupValue: _answer?.firstOrNull,
       onChanged: (value) {
@@ -1383,14 +1380,14 @@ class _PresentationPageState extends State<PresentationPage> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 8),
             activeColor: Theme.of(context).colorScheme.primary,
             controlAffinity: ListTileControlAffinity.trailing,
-            toggleable: isMultiple,
+            toggleable: true,
           );
         }).toList(),
       ),
     );
   }
 
-  Widget _buildPollingOptions() {
+  Widget _buildMultipleChoiceOptions() {
     if (_currentProblem == null) return const SizedBox.shrink();
     
     final options = _currentProblem!.options;
@@ -1398,67 +1395,30 @@ class _PresentationPageState extends State<PresentationPage> {
       return const SizedBox.shrink();
     }
     
-    final pollingCount = _currentProblem!.pollingCount ?? 1;
-    final isMultiple = pollingCount > 1;
-    
-    if (isMultiple) {
-      // 多选投票题
-      return Column(
-        children: options.map((option) {
-          final key = option.key;
-          final isSelected = (_answer ?? []).contains(key);
-          return CheckboxListTile(
-            value: isSelected,
-            title: Text('$key. ${option.value}'),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-            activeColor: Theme.of(context).colorScheme.primary,
-            controlAffinity: ListTileControlAffinity.trailing,
-            onChanged: (value) {
-              setState(() {
-                final selectedKeys = _answer?.toSet() ?? <String>{};
-                if (value == true) {
-                  // 选中：添加选项，但不超过最大限制
-                  if (selectedKeys.length < pollingCount) {
-                    selectedKeys.add(key);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('最多只能选择$pollingCount项')),
-                    );
-                    return;
-                  }
-                } else {
-                  // 取消选中
-                  selectedKeys.remove(key);
-                }
-                _answer = selectedKeys.toList();
-              });
-            },
-          );
-        }).toList(),
-      );
-    } else {
-      // 单选投票题
-      return RadioGroup<String>(
-        groupValue: _answer?.firstOrNull,
-        onChanged: (value) {
-          setState(() {
-            _answer = value != null ? [value] : null;
-          });
-        },
-        child: Column(
-          children: options.map((option) {
-            return RadioListTile<String>(
-              value: option.key,
-              title: Text('${option.key}. ${option.value}'),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-              activeColor: Theme.of(context).colorScheme.primary,
-              controlAffinity: ListTileControlAffinity.trailing,
-              toggleable: true,
-            );
-          }).toList(),
-        ),
-      );
-    }
+    return Column(
+      children: options.map((option) {
+        final key = option.key;
+        final isSelected = (_answer ?? []).contains(key);
+        return CheckboxListTile(
+          value: isSelected,
+          title: Text('$key. ${option.value}'),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          activeColor: Theme.of(context).colorScheme.primary,
+          controlAffinity: ListTileControlAffinity.trailing,
+          onChanged: (value) {
+            setState(() {
+              final selectedKeys = _answer?.toSet() ?? <String>{};
+              if (value == true) {
+                selectedKeys.add(key);
+              } else {
+                selectedKeys.remove(key);
+              }
+              _answer = selectedKeys.toList();
+            });
+          },
+        );
+      }).toList(),
+    );
   }
 }
 
