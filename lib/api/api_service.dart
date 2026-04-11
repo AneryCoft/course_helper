@@ -1,7 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
@@ -116,6 +114,7 @@ class ApiService {
       // headers: HeadersManager.chaoxingHeaders,
     ));
 
+    /*
     // 初始化平台变化回调
     (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
       final client = HttpClient();
@@ -123,6 +122,7 @@ class ApiService {
       return client;
     }; // dio 自动重定向会使用默认的 User-Agent
     // 似乎无法在初始化结束后进行更改
+     */
     _setupPlatformChangeCallback();
 
     _dio.interceptors.add(CookieInterceptor());
@@ -145,7 +145,7 @@ class ApiService {
     ));
   }
 
-  // 发送 HTTP 请求
+  /// 发送 HTTP 请求
   static Future<Response> sendRequest(
       String url,
       {
@@ -153,30 +153,31 @@ class ApiService {
         Map<String, String>? params,
         Map<String, String>? headers,
         dynamic body,
-        ResponseType responseType = ResponseType.json
+        ResponseType responseType = ResponseType.json,
+        bool allowRedirects = true
       }
       ) async {
+    final options = Options(
+      method: method,
+      headers: headers,
+      responseType: responseType
+    );
 
-    Options options = Options(headers: headers, responseType: responseType);
-    
-    late Response response;
+    var response = await _dio.request(url, queryParameters: params, data: body, options: options);
 
-    switch (method.toUpperCase()) {
-      case 'GET':
-        response = await _dio.get(url, queryParameters: params, options: options);
-        break;
-      case 'POST':
-        response = await _dio.post(url, data: body, queryParameters: params, options: options);
-        break;
-      case 'PUT':
-        response = await _dio.put(url, data: body, queryParameters: params, options: options);
-        break;
-      case 'DELETE':
-        response = await _dio.delete(url, queryParameters: params, options: options);
-        break;
-      default:
-        throw Exception('Unsupported HTTP method: $method');
+    if (allowRedirects) {
+      var locationUrl = response.headers['location']?.first;
+      if (locationUrl != null) {
+        // 只有路径
+        if (!locationUrl.startsWith('http')){
+          final uri = response.realUri;
+          final baseUri = '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}';
+          locationUrl = baseUri + locationUrl;
+        }
+        response = await _dio.get(locationUrl, options: options);
+      }
     }
+    // 暂时只重定向一次
 
     if (options.responseType == ResponseType.json) {
       if (response.data is String) {

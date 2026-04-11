@@ -414,7 +414,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   
           final activeId = params['id'];
           if (activeId != null) {
-            final response = await ApiService.sendRequest(result, responseType: ResponseType.plain);
+            final response = await ApiService.sendRequest(result, responseType: ResponseType.plain, allowRedirects: false);
             final locationUrl = response.headers['location']?.first;
             // String? location = response.realUri.toString();
 
