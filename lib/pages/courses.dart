@@ -14,6 +14,7 @@ import 'actives/topic_discuss.dart';
 import 'actives/quiz.dart';
 import 'actives/evaluate.dart';
 import 'actives/vote.dart';
+import 'actives/questionnaire.dart';
 import 'accounts.dart';
 import 'presentation.dart';
 
@@ -203,6 +204,19 @@ class _CourseContentPageState extends State<CourseContentPage> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => VotePage(
+                              active: active,
+                              courseId: widget.courseId,
+                              classId: widget.classId
+                            ),
+                          ),
+                        );
+                        break;
+
+                        case ActiveType.questionnaire:
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => QuestionnairePage(
                               active: active,
                               courseId: widget.courseId,
                               classId: widget.classId

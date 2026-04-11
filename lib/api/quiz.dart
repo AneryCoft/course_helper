@@ -112,19 +112,18 @@ class QuizApi {
   }
 
   /// 问卷提交
-  static Future<Map<String, dynamic>?> submitQuestionnaire(String courseId, String classId, String activeId, String questionId, String answer) async {
+  static Future<Map<String, dynamic>?> submitQuestionnaire(String courseId, String classId, String activeId, Map<String, List<String>> answers) async {
     try {
-      final url = 'https://mobilelearn.mohaoxing.com/v2/apis/studentQuestion/doQuestion';
-      // AppAPI: https://mobilelearn.mohaoxing.com/pptTestPaperStu/doQuestion
+      final url = 'https://mobilelearn.chaoxing.com/v2/apis/studentQuestion/doQuestion';
+      // AppAPI: https://mobilelearn.chaoxing.com/pptTestPaperStu/doQuestion
       // AppAPI参数较多
-      final formData = {
-        'preventsubmit': '1',
-        'courseId': courseId,
-        'classId': classId,
-        'activeId': activeId,
-        'questionId': questionId,
-        'answer$questionId': answer
-      };
+      var formData = 'preventsubmit=1&courseId=$courseId&classId=$classId&activeId=$activeId';
+      for (var entry in answers.entries) {
+        formData += '&questionId=${entry.key}';
+        for (var answer in entry.value) {
+          formData += '&answer${entry.key}=$answer';
+        }
+      }
       final response = await ApiService.sendRequest(url, method: 'POST', body: formData);
       return response.data;
     } catch (e) {
