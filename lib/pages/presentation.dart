@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show WebSocket, File;
@@ -7,6 +8,22 @@ import 'dart:io' show WebSocket, File;
 import '../api/course.dart';
 import '../models/presentation.dart';
 import '../session/account.dart';
+
+@pragma('vm:entry-point')
+void _startForegroundCallback() {
+  FlutterForegroundTask.setTaskHandler(_WebSocketKeepAliveHandler());
+}
+
+class _WebSocketKeepAliveHandler extends TaskHandler {
+  @override
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {}
+
+  @override
+  void onRepeatEvent(DateTime timestamp) {}
+
+  @override
+  Future<void> onDestroy(DateTime timestamp) async {}
+}
 
 class PresentationPage extends StatefulWidget {
   final String lessonId;
@@ -58,6 +75,7 @@ class _PresentationPageState extends State<PresentationPage> {
   void initState() {
     super.initState();
     _initialize();
+    _startForegroundService();
   }
 
   @override
@@ -75,6 +93,7 @@ class _PresentationPageState extends State<PresentationPage> {
     _ws?.close();
     _pageController.dispose();
     _scrollController.dispose();
+    _stopForegroundService();
     super.dispose();
   }
 
@@ -125,6 +144,46 @@ class _PresentationPageState extends State<PresentationPage> {
     }
   }
 
+  Future<void> _startForegroundService() async {
+    // 请求忽略电池优化
+    if (!await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
+      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+    }
+
+    // 初始化前台服务
+    FlutterForegroundTask.init(
+      androidNotificationOptions: AndroidNotificationOptions(
+        channelId: 'websocket_service',
+        channelName: 'WebSocket Background Service',
+        channelDescription: 'Keep WebSocket connection alive'
+      ),
+      iosNotificationOptions: const IOSNotificationOptions(
+        showNotification: false
+      ),
+      foregroundTaskOptions: ForegroundTaskOptions(
+        eventAction: ForegroundTaskEventAction.repeat(5000),
+        allowWifiLock: true
+      ),
+    );
+
+    // 启动前台服务
+    if (await FlutterForegroundTask.isRunningService) {
+      await FlutterForegroundTask.restartService();
+    } else {
+      await FlutterForegroundTask.startService(
+        notificationTitle: '课堂助手',
+        notificationText: '正在保持 WebSocket 连接...',
+        callback: _startForegroundCallback,
+      );
+    }
+  }
+
+  Future<void> _stopForegroundService() async {
+    if (await FlutterForegroundTask.isRunningService) {
+      await FlutterForegroundTask.stopService();
+    }
+  }
+
   Future<void> _connectWebSocket() async {
     try {
       final ws = await WebSocket.connect('wss://www.yuketang.cn/wsapp/');
@@ -140,11 +199,11 @@ class _PresentationPageState extends State<PresentationPage> {
 
       ws.add(jsonEncode(helloData));
 
-      ws.listen((message) {_handleMessage(message);});
-
-      ws.done.then((value) {
-        debugPrint('连接已关闭');
-      });
+      ws.listen(
+        (message) {
+          _handleMessage(message);
+        },
+      );
     } catch (e) {
       debugPrint('WebSocket 连接失败：$e');
     }
