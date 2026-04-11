@@ -7,6 +7,7 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import '../utils/encrypt.dart';
 import '../session/cookie.dart';
 import '../platform.dart';
+import '../models/user.dart';
 
 class HeadersManager {
   static const _brand = 'google';
@@ -186,5 +187,61 @@ class ApiService {
     } // dio 的 json 解析有问题
 
     return response;
+  }
+
+  /// 为指定用户列表并发发送请求
+  /// [users] 用户列表
+  /// [requestBuilder] 用于构建每个用户的请求参数
+  /// 返回每个用户的响应结果列表（顺序与用户列表一致）
+  static Future<List<Response?>> sendForEachUser(
+    List<User> users,
+    String url, {
+    required Map<String, dynamic> Function(User user) requestBuilder,
+    String method = 'POST',
+    ResponseType responseType = ResponseType.json,
+  }) async {
+    if (users.isEmpty) {
+      return [];
+    }
+
+    final futures = users.map((user) async {
+      try {
+        final cookieJar = await CookieManager.getCookieJarForUser(user.uid);
+        final domainUri = CookieManager.getDomainUri();
+        final cookies = await cookieJar.loadForRequest(domainUri);
+        
+        final requestData = requestBuilder(user);
+        Map<String, String>? headers = requestData['headers'];
+        
+        if (cookies.isNotEmpty) {
+          final cookieStr = cookies.map((c) => '${c.name}=${c.value}').join('; ');
+          headers ??= {};
+          headers['Cookie'] = cookieStr;
+          
+          if (PlatformManager().isRainClassroom) {
+            final cookieMap = Map.fromEntries(cookies.map((c) => MapEntry(c.name, c.value)));
+            headers['x-csrftoken'] = cookieMap['x-csrftoken'] ?? '';
+            headers['x-uid'] = cookieMap['x-uid'] ?? '';
+            headers['sessionid'] = cookieMap['sessionid'] ?? '';
+          }
+        }
+        
+        final response = await sendRequest(
+          url,
+          method: method,
+          body: requestData['body'],
+          params: requestData['params'],
+          headers: headers,
+          responseType: responseType
+        );
+
+        return response;
+      } catch (e) {
+        debugPrint('用户 ${user.name} 请求失败: $e');
+        return null;
+      }
+    }).toList();
+
+    return await Future.wait(futures);
   }
 }
