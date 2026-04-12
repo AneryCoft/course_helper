@@ -9,6 +9,7 @@ import '../session/account.dart';
 import '../models/course.dart';
 import '../models/active.dart';
 import 'widget/scan.dart';
+import 'widget/avatar.dart';
 import 'actives/sign_in/sign_in.dart';
 import 'actives/topic_discuss.dart';
 import 'actives/quiz.dart';
@@ -702,16 +703,11 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     if (course.image.isNotEmpty)
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Image.network(
-                                          course.image,
-                                          width: 50,
-                                          height: 50,
-                                          fit: BoxFit.cover,
-                                          headers: PlatformManager().isChaoxing ? HeadersManager.chaoxingHeaders : null,
-                                          // FIXME 部分图片由 star3/origin/ 重定向到 star4/
-                                        ),
+                                      AvatarWidget(
+                                        imageUrl: course.image,
+                                        size: 50,
+                                        borderRadius: 6,
+                                        iconSize: 25,
                                       )
                                     else
                                       Container(

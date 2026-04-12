@@ -166,18 +166,24 @@ class ApiService {
     var response = await _dio.request(url, queryParameters: params, data: body, options: options);
 
     if (allowRedirects) {
-      var locationUrl = response.headers['location']?.first;
-      if (locationUrl != null) {
+      int redirectCount = 0;
+      const maxRedirects = 3;
+      
+      while (redirectCount < maxRedirects) {
+        var locationUrl = response.headers['location']?.first;
+        if (locationUrl == null) break;
+        
         // 只有路径
         if (!locationUrl.startsWith('http')){
           final uri = response.realUri;
           final baseUri = '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}';
           locationUrl = baseUri + locationUrl;
         }
+        
         response = await _dio.get(locationUrl, options: options);
+        redirectCount++;
       }
     }
-    // 暂时只重定向一次
 
     if (options.responseType == ResponseType.json) {
       if (response.data is String) {

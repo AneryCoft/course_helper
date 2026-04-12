@@ -39,7 +39,7 @@ class AvatarCache {
     return future;
   }
   
-  /// 实际获取图片的私有方法
+  /// 获取图片
   static Future<Uint8List?> _fetchImage(String url) async {
     try {
       final response = await ApiService.sendRequest(url, responseType: ResponseType.bytes);
