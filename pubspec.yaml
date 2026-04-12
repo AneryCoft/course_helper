@@ -67,6 +67,8 @@ dependencies:
       url: https://github.com/AneryCoft/flutter_tencent_captcha.git
       ref: master
   flutter_html: ^3.0.0
+  flutter_localizations:
+    sdk: flutter
 
 
 dev_dependencies:

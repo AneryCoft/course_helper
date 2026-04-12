@@ -1,4 +1,5 @@
 import'package:flutter/material.dart';
+import'package:flutter_localizations/flutter_localizations.dart';
 import'package:dynamic_color/dynamic_color.dart';
 import'package:package_info_plus/package_info_plus.dart';
 import'package:url_launcher/url_launcher.dart';
@@ -36,6 +37,16 @@ class MyApp extends StatelessWidget {
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
         return MaterialApp(
           title: '课程助手',
+          locale: const Locale('zh', 'CN'),
+          supportedLocales: const [
+            Locale('zh', 'CN'),
+            Locale('en', 'US')
+          ],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate
+          ],
           theme: ThemeData(
             // Material You
             useMaterial3: true,
