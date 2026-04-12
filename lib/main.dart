@@ -4,7 +4,6 @@ import'package:dynamic_color/dynamic_color.dart';
 import'package:package_info_plus/package_info_plus.dart';
 import'package:url_launcher/url_launcher.dart';
 import'package:dio/dio.dart';
-import'dart:convert';
 
 import'./pages/accounts.dart';
 import'./pages/courses.dart';
@@ -111,7 +110,7 @@ class _MainPageState extends State<MainPage> {
 
       final dio = Dio();
       final response = await dio.get('https://api.github.com/repos/AneryCoft/course_helper/releases/latest');
-      final data = json.decode(response.data);
+      final data = response.data;
       final latestVersion = data['tag_name']?.toString().replaceAll('v', '') ?? '';
 
       if (_isNewerVersion(latestVersion, currentVersion)) {
