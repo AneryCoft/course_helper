@@ -37,9 +37,9 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
       _animationController = null;
     }
     
-    // 再安全地停止相机
-    unawaited(_subscription?.cancel());
-    _controller?.stop();
+    // 安全地停止相机和清理资源
+    _subscription?.cancel();
+    _controller?.dispose();
     _controller = null;
     
     isScan = false;
@@ -116,8 +116,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     
     if (_animationController != null) {
       _animationController?.stop();
-      _animationController?.dispose();
-      _animationController = null;
+      _animationController?.reset();
     }
   }
 
@@ -131,6 +130,8 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
         if (code != null) {
           _handleScanResult(code);
         }
+      } else {
+        await _controller?.start();
       }
     } catch (e) {
       debugPrint('Failed to analyze image: $e');
