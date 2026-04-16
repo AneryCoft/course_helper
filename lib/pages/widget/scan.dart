@@ -52,7 +52,7 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     try {
       _controller = MobileScannerController(
         autoStart: false,
-        detectionSpeed: DetectionSpeed.normal,
+        detectionSpeed: DetectionSpeed.unrestricted,
         facing: CameraFacing.back,
         formats: [BarcodeFormat.qrCode],
         autoZoom: true
