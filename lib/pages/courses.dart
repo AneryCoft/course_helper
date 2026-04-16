@@ -493,7 +493,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
               );
             }
           }
-        } else if (baseUrl == 'https://www.yuketang.cn/api/v3/lesson/check-in/dynamic-qr-code'){
+        } else if (baseUrl.contains('.yuketang.cn/api/v3/lesson/check-in/dynamic-qr-code')){
           if (!PlatformManager().isRainClassroom) {
             await PlatformManager().setPlatform(PlatformType.rainClassroom);
             if (!mounted) return;
