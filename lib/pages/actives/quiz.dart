@@ -467,13 +467,13 @@ class _QuizPageState extends State<QuizPage> {
       final quizData = Map<String, dynamic>.from(quiz);
       
       // 检查并自动填充未作答的题目
-      _autoFillUnansweredQuestions(quizData);
+      _autoFillAnswers(quizData);
 
       return quizData;
     }).toList();
   }
   
-  void _autoFillUnansweredQuestions(Map<String, dynamic> quizData) {
+  void _autoFillAnswers(Map<String, dynamic> quizData) {
     final quizType = quizData['type'];
     final answers = quizData['answer'] as List?;
     
@@ -502,9 +502,7 @@ class _QuizPageState extends State<QuizPage> {
               .where((option) => option['isanswer'] == true)
               .map((option) => option['name'] as String)
               .toList();
-          
-          // 按字母顺序排序后拼接
-          correctOptions.sort();
+
           quizData['personAnswer']['myoption'] = correctOptions.join('');
         }
         break;
@@ -515,10 +513,12 @@ class _QuizPageState extends State<QuizPage> {
           for (int i = 0; i < blankAnswers.length; i++) {
             final blank = blankAnswers[i];
             if (blank['content'] == null || blank['content'] == '') {
-              // 使用对应位置的正确答案
+              // 使用对应位置的正确答案（提取纯文本，分号分隔取第一个）
               if (i < answers.length) {
                 final correctAnswer = answers[i];
-                blank['content'] = correctAnswer['content'] ?? '';
+                final htmlContent = correctAnswer['content'] ?? '';
+                final textContent = _extractTextFromHtml(htmlContent);
+                blank['content'] = textContent.split(';').first.trim();
               }
             }
           }
@@ -528,10 +528,15 @@ class _QuizPageState extends State<QuizPage> {
       case 4: // 简答题
         if (quizData['personAnswer']['content'] == null || 
             quizData['personAnswer']['content'] == '') {
-          // 使用第一个答案作为简答题答案
           if (answers.isNotEmpty) {
+            // 使用第一个答案
             final correctAnswer = answers[0];
-            quizData['personAnswer']['content'] = correctAnswer['answer'] ?? '';
+            final htmlAnswer = correctAnswer['answer'] ?? '';
+            // 如果有多个答案用分号分隔，只取第一个
+            // 不分割其实也算分
+            final textAnswer = _extractTextFromHtml(htmlAnswer);
+            final firstAnswer = textAnswer.split(';').first.trim();
+            quizData['personAnswer']['content'] = firstAnswer;
           }
         }
         break;
@@ -629,8 +634,6 @@ class _QuizPageState extends State<QuizPage> {
                 ),
               ],
             ),
-            
-            const SizedBox(height: 12),
             
             // 题目选项或输入框
             _buildQuizContent(quiz, index),
@@ -800,6 +803,63 @@ class _QuizPageState extends State<QuizPage> {
     );
   }
 
+  /// 从HTML中提取纯文本
+  String _extractTextFromHtml(String html) {
+    try {
+      String text = html.replaceAll(RegExp(r'<[^>]*>'), ' ');
+      text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+      return text;
+    } catch (e) {
+      return html;
+    }
+  }
+
+  /// 从HTML中提取图片URL列表
+  List<String> _extractImageUrls(String html) {
+    final urls = <String>[];
+    try {
+      final regex = RegExp("<img[^>]+src=[\"']([^\"']+)[\"']");
+      final matches = regex.allMatches(html);
+      for (final match in matches) {
+        if (match.groupCount >= 1) {
+          final url = match.group(1);
+          if (url != null && url.isNotEmpty) {
+            urls.add(toNewImageUrl(url));
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('提取图片URL失败: $e');
+    }
+    return urls;
+  }
+
+  /// 放大图片对话框
+  void _showImageDialog(String url, String heroTag) {
+    showDialog(
+      context: context,
+      builder: (context) => GestureDetector(
+        onTap: () => Navigator.of(context).pop(),
+        child: Container(
+          color: Colors.black12,
+          child: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4.0,
+            child: Center(
+              child: Hero(
+                tag: heroTag,
+                child: Image.network(
+                    url,
+                    fit: BoxFit.contain
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBlankAnswerInputs(dynamic quiz, int quizIndex) {
     final blankAnswers = quiz['personAnswer']['blankAnswer'] as List?;
     final correctAnswers = quiz['answer'] as List?;
@@ -814,7 +874,13 @@ class _QuizPageState extends State<QuizPage> {
         final correctAnswer = correctAnswers != null && index < correctAnswers.length 
             ? correctAnswers[index]['content'] ?? ''
             : '';
-          
+        
+        // 提取纯文本并处理分号分隔
+        final hintText = correctAnswer.isNotEmpty ?
+        _extractTextFromHtml(correctAnswer).split(';').first.trim() : '请输入答案';
+        // 提取图片
+        final imageUrls = correctAnswer.isNotEmpty ? _extractImageUrls(correctAnswer) : <String>[];
+        
         // 为每个输入框创建唯一的 key
         final controllerKey = 'blank_${quizIndex}_$index';
         final controller = _controllers.putIfAbsent(controllerKey, 
@@ -826,25 +892,60 @@ class _QuizPageState extends State<QuizPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('第${index + 1}空：', style: const TextStyle(color: Colors.grey)),
-              TextField(
-                key: ValueKey(controllerKey), // 添加 key 确保 widget 唯一性
-                maxLines: null,
-                decoration: InputDecoration(
-                  hintText: correctAnswer.isNotEmpty ? correctAnswer : '请输入答案',
-                  border: const OutlineInputBorder(),
-                  hintStyle: TextStyle(
-                    color: correctAnswer.isNotEmpty 
-                        ? Theme.of(context).colorScheme.primary 
-                        : Colors.grey[400],
-                    fontWeight: correctAnswer.isNotEmpty ? FontWeight.bold : FontWeight.normal,
+              Stack(
+                children: [
+                  TextField(
+                    key: ValueKey(controllerKey),
+                    maxLines: imageUrls.isNotEmpty ? 2 : 1,
+                    decoration: InputDecoration(
+                      hintText: hintText,
+                      border: const OutlineInputBorder(),
+                      contentPadding: imageUrls.isNotEmpty ?
+                      const EdgeInsets.fromLTRB(12, 12, 12, 60) : const EdgeInsets.all(12),
+                    ),
+                    controller: controller,
+                    onChanged: (value) {
+                      setState(() {
+                        blank['content'] = value;
+                      });
+                    },
                   ),
-                ),
-                controller: controller,
-                onChanged: (value) {
-                  setState(() {
-                    blank['content'] = value;
-                  });
-                },
+                  if (imageUrls.isNotEmpty)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        constraints: const BoxConstraints(maxHeight: 50),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: imageUrls.asMap().entries.map((imgEntry) {
+                              final imgIndex = imgEntry.key;
+                              final url = imgEntry.value;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: GestureDetector(
+                                  onTap: () => _showImageDialog(url, 'blank_image_${quizIndex}_${index}_$imgIndex'),
+                                  child: Hero(
+                                    tag: 'blank_image_${quizIndex}_${index}_$imgIndex',
+                                    child: Image.network(
+                                      url,
+                                      headers: HeadersManager.chaoxingHeaders,
+                                      width: 50,
+                                      height: 50,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
@@ -865,26 +966,66 @@ class _QuizPageState extends State<QuizPage> {
     // 获取或创建 controller
     final controller = _controllers.putIfAbsent(controllerKey,
       () => TextEditingController(text: quiz['personAnswer']['content'] ?? ''));
+    
+    // 分离HTML中的文本和图片
+    final hintText = correctAnswer.isNotEmpty ? _extractTextFromHtml(correctAnswer) : '请输入答案';
+    final imageUrls = correctAnswer.isNotEmpty ? _extractImageUrls(correctAnswer) : <String>[];
       
-    return TextField(
-      key: ValueKey(controllerKey), // 添加 key 确保 widget 唯一性
-      maxLines: 5,
-      decoration: InputDecoration(
-        hintText: correctAnswer.isNotEmpty ? correctAnswer : '请输入答案',
-        border: const OutlineInputBorder(),
-        hintStyle: TextStyle(
-          color: correctAnswer.isNotEmpty 
-              ? Theme.of(context).colorScheme.primary 
-              : Colors.grey[400],
-          fontWeight: correctAnswer.isNotEmpty ? FontWeight.bold : FontWeight.normal,
-        ),
+    return SizedBox(
+      height: 150,
+      child: Stack(
+        children: [
+          TextField(
+            key: ValueKey(controllerKey),
+            maxLines: 5,
+            decoration: InputDecoration(
+              hintText: hintText,
+              border: const OutlineInputBorder(),
+            ),
+            controller: controller,
+            onChanged: (value) {
+              setState(() {
+                quiz['personAnswer']['content'] = value;
+              });
+            },
+          ),
+          if (imageUrls.isNotEmpty)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                constraints: const BoxConstraints(maxHeight: 60),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: imageUrls.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final url = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: GestureDetector(
+                          onTap: () => _showImageDialog(url, 'quiz_image_${quizIndex}_$index'),
+                          child: Hero(
+                            tag: 'quiz_image_${quizIndex}_$index',
+                            child: Image.network(
+                              url,
+                              headers: HeadersManager.chaoxingHeaders,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
-      controller: controller,
-      onChanged: (value) {
-        setState(() {
-          quiz['personAnswer']['content'] = value;
-        });
-      },
     );
   }
 
