@@ -5,6 +5,7 @@ class User {
   final String uid;
   final String school;
   final String platform;
+  Map<String, String>? imAccount;
 
   User({
     required this.name,
@@ -12,7 +13,8 @@ class User {
     required this.phone,
     required this.uid,
     required this.school,
-    this.platform = 'chaoxing'
+    this.platform = 'chaoxing',
+    this.imAccount,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {

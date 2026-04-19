@@ -116,8 +116,8 @@ class PlatformManager {
       }
       ApiService.onPlatformChange?.call();
       _platformChangeController.add(platform);
-      await AccountManager.switchToPlatformAccount();
       await AccountManager.refreshAccounts();
+      await AccountManager.switchToPlatformAccount();
       await CookieManager.loadAllCookies();
       AccountChangeNotifier().notifyAccountChanged(AccountManager.currentSessionId);
     }

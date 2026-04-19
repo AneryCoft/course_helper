@@ -132,7 +132,25 @@ class SignInPageState extends State<SignInPage> {
   SignStrategy? _currentStrategy;
   late SignParams _signParams;
 
+  int _signTypeId = 0;
   bool _needCaptcha = false;
+  int? _attendNum;
+  int _status = 0;
+  /*
+  status:
+    0: unsign // 未签
+    1: signed // 已签
+    1: SignSuccessfully // 签到成功
+    2: signedbyteacher // 教师代签
+    4: PersonalLeave2 // 请假
+    5: Absence // 缺勤
+    7: SickLeave // 病假
+    8: PersonalLeave // 事假
+    9: Late // 迟到
+    10: LeaveEarly // 早退
+    11: SignExpiredy // 签到已过期
+    12: PublicLeave // 公假
+  */
 
   // 签到状态管理
   bool _isLoading = false;
@@ -204,6 +222,8 @@ class SignInPageState extends State<SignInPage> {
       final attendInfo = results[1];
   
       if (activeInfo != null){
+        _signTypeId = activeInfo['otherId'];
+        _attendNum = activeInfo['attendNum'];
         // openPreventCheatFlag 1
         _needCaptcha = activeInfo['showVCode'] == 1;
   
@@ -223,7 +243,9 @@ class SignInPageState extends State<SignInPage> {
         }
       }
       if (attendInfo != null){
-        if (attendInfo['status'] == 1){
+        _status = attendInfo['status'];
+        // TODO 支持其他状态
+        if (_status == 1){
           _showSuccessMessage('当前用户已签到');
           if (_currentUser != null) {
             setState(() {
@@ -233,13 +255,16 @@ class SignInPageState extends State<SignInPage> {
         }
       }
       if (mounted) setState(() {});
-    } catch (e) {
-      debugPrint('签到信息解析失败：$e');
+    } catch (e, stackTrace) {
+      debugPrint('签到信息解析失败：$e \n$stackTrace');
     }
   }
 
   Future<void> _initSignStrategy() async {
     await _parseSignInfo();
+    if (widget.active.signType == null) {
+      widget.active.signType = getSignTypeFromIndex(_signTypeId);
+    }
     _currentStrategy = SignStrategyFactory.create(widget.active.signType);
     if (_currentStrategy != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

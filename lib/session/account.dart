@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../platform.dart';
 import 'cookie.dart';
+import '../push/easemob.dart';
 
 
 /// 统一的账户管理器
@@ -67,9 +68,17 @@ class AccountManager {
     _currentSessionId = userId;
     final sessionKey = PlatformManager().isChaoxing ?
     _chaoxingSessionKey : _rainClassroomSessionKey;
-    
+
     if (userId != null) {
       await _prefs.setString(sessionKey, userId);
+      final user = getAccountById(userId)!;
+      if (user.imAccount != null) {
+        EasemobIM().logout().then((_) {
+          EasemobIM().loginCurrentUser();
+        });
+      }
+    } else {
+      EasemobIM().logout();
     }
   }
 
@@ -116,6 +125,9 @@ class AccountManager {
       // 如果没有当前会话，自动设置为当前账户
       if (!hasActiveSession()) {
         await setCurrentSession(user.uid);
+        if (user.imAccount != null) {
+          EasemobIM().login(user.imAccount!['userName']!, user.imAccount!['password']!);
+        }
       }
     }
     await _saveAccounts(accounts);

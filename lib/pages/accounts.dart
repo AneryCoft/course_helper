@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../session/account.dart';
 import '../models/user.dart';
 import '../platform.dart';
+import '../push/easemob.dart';
 import 'widget/avatar.dart';
 import 'login.dart';
 
@@ -55,6 +56,13 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
             _loadAccounts();
           }
         });
+
+    // 监听环信连接状态变化
+    EasemobIM().setConnectionCallback((connected) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   @override
@@ -289,14 +297,37 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
       leading: AvatarWidget(key: ValueKey(user.avatar), imageUrl: user.avatar),
       title: _buildTitle(user.name, isCurrentAccount),
       subtitle: Text('ID: ${user.uid}\n手机号: ${user.phone}'),
-      trailing: Visibility(
-        visible: _isMultiSelectMode,
-        child: Checkbox(
-          value: isSelected,
-          onChanged: (bool? value) {
-            if (value != null) _toggleSelection(user.uid);
-          },
-        ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isCurrentAccount && PlatformManager().isChaoxing)
+            IconButton(
+              icon: Icon(
+                EasemobIM().isLoggedIn ?
+                Icons.notifications : Icons.notifications_off,
+                color: EasemobIM().isLoggedIn ?
+                Theme.of(context).colorScheme.primary : Colors.grey
+              ),
+              iconSize: 30,
+              tooltip: '消息推送',
+              onPressed: () async {
+                if (EasemobIM().isLoggedIn) {
+                  await EasemobIM().logout();
+                } else {
+                  await EasemobIM().loginCurrentUser();
+                }
+              },
+            ),
+          Visibility(
+            visible: _isMultiSelectMode,
+            child: Checkbox(
+              value: isSelected,
+              onChanged: (bool? value) {
+                if (value != null) _toggleSelection(user.uid);
+              },
+            ),
+          ),
+        ],
       ),
       onTap: _isMultiSelectMode ? null : () => _switchToAccount(user),
       onLongPress: () {

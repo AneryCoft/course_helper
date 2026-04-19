@@ -57,9 +57,8 @@ const Map<int, SignType> signTypeIndexMap = {
 };
 
 SignType getSignTypeFromIndex(int index) {
-  return signTypeIndexMap[index] ?? SignType.normal;
+  return signTypeIndexMap[index]!;
 }
-
 
 class Active {
   final int type;
@@ -69,7 +68,7 @@ class Active {
   final int startTime;
   final String url;
   final bool status;
-  final Map<String, dynamic> extras;
+  final Map<String, dynamic>? extras;
   final ActiveType activeType;
   late SignType? signType;
 
@@ -81,7 +80,7 @@ class Active {
     required this.startTime,
     required this.url,
     required this.status,
-    required this.extras,
+    this.extras,
     this.signType
   }) : activeType = ActiveType.fromValue(type) ?? ActiveType.signIn;
 
@@ -97,7 +96,7 @@ class Active {
       startTime: json['startTime'] ?? 0,
       url: json['url'] ?? '',
       status: json['status'] == 1,
-      extras: json['extraInfo'] ?? {}
+      extras: json['extraInfo']
     );
   }
 

@@ -283,7 +283,7 @@ class QRCodeSign implements SignStrategy {
                   state.signParams.enc = queryParams['enc']!;
 
                   final signDetail = await SignInApi.getSignDetail(state.widget.active.id, code);
-                  if (code == signDetail?['signCode'] || code == state.widget.active.id) {
+                  if (code == signDetail?['signCode']) {
                     if (state.mounted) {
                       (state.context as Element).markNeedsBuild();
                       WidgetsBinding.instance.addPostFrameCallback((_) {

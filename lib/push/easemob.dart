@@ -1,0 +1,213 @@
+import 'package:course_helper/session/account.dart';
+import 'package:flutter/material.dart';
+import 'package:im_flutter_sdk/im_flutter_sdk.dart';
+
+import '../main.dart';
+import '../pages/courses.dart';
+import '../models/active.dart';
+
+/// 环信即时通讯
+class EasemobIM {
+  static final EasemobIM _instance = EasemobIM._internal();
+  factory EasemobIM() => _instance;
+  EasemobIM._internal();
+
+  static const _appKey = 'cx-dev#cxstudy';
+
+  bool _isLoggedIn = false;
+  bool get isLoggedIn => _isLoggedIn;
+
+  Function(bool)? _onConnectionChanged;
+
+  void setConnectionCallback(Function(bool)? callback) {
+    _onConnectionChanged = callback;
+  }
+
+  Future<void> initialize({
+    Function(bool)? onConnectionChanged,
+    Function(EMMessage)? onMessageReceived
+  }) async {
+    try {
+      final options = EMOptions.withAppKey(_appKey);
+      await EMClient.getInstance.init(options);
+
+      EMClient.getInstance.addConnectionEventHandler(
+        'easemob_conn_handler',
+        EMConnectionEventHandler(
+          onConnected: () {
+            _isLoggedIn = true;
+            debugPrint('已连接到环信服务器');
+            _onConnectionChanged?.call(true);
+          },
+          onDisconnected: () {
+            debugPrint('断开连接');
+            _onConnectionChanged?.call(false);
+          },
+          // 用户从其他设备登录
+          onUserDidLoginFromOtherDevice: (info) {
+            _isLoggedIn = false;
+            _onConnectionChanged?.call(false);
+            _showKickedDialog(info);
+          },
+          // Token过期
+          onTokenDidExpire: () {
+            debugPrint('Token已过期');
+            _isLoggedIn = false;
+            _onConnectionChanged?.call(false);
+          },
+        ),
+      );
+
+      // 添加消息监听
+      EMClient.getInstance.chatManager.addEventHandler(
+        'easemob_msg_handler',
+        EMChatEventHandler(
+          onMessagesReceived: (List<EMMessage> messages) {
+            debugPrint('收到 ${messages.length} 条新消息');
+            for (var message in messages) {
+              onMessageReceived?.call(message);
+              _handleMessage(message);
+            }
+          },
+          onCmdMessagesReceived: (List<EMMessage> messages) {
+            debugPrint('收到 ${messages.length} 条命令消息');
+          },
+          onMessagesRead: (List<EMMessage> messages) {
+            debugPrint('消息已读回执: ${messages.length} 条');
+          },
+          onGroupMessageRead: (List<EMGroupMessageAck> acks) {
+            debugPrint('群组消息已读: ${acks.length} 条');
+          },
+          onMessagesDelivered: (List<EMMessage> messages) {
+            debugPrint('消息送达回执: ${messages.length} 条');
+          },
+        ),
+      );
+
+      _isLoggedIn = await EMClient.getInstance.isLoginBefore();
+    } catch (e) {
+      debugPrint('初始化错误: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> login(String userName, String password) async {
+    try {
+      await EMClient.getInstance.loginWithPassword(userName, password);
+      _isLoggedIn = true;
+    } catch (e) {
+      debugPrint('Easemob登录失败: $e');
+      // code: 200 desc: The user is already logged in
+      // code: 218 desc: Another user is already logged in
+    }
+  }
+
+  Future<void> loginCurrentUser() async {
+    final user = AccountManager.getAccountById(AccountManager.currentSessionId!)!;
+    await login(user.imAccount!['userName']!, user.imAccount!['password']!);
+  }
+
+  Future<void> logout() async {
+    try {
+      await EMClient.getInstance.logout(true);
+      _isLoggedIn = false;
+    } catch (e) {
+      debugPrint('Easemob退出失败: $e');
+    }
+  }
+
+  void _handleMessage(EMMessage message) {
+    if (message.attributes != null) {
+      final attachment = message.attributes!['attachment'];
+      final activeInfo = attachment['att_chat_course'];
+
+      final String activeTypeName = activeInfo['atypeName'];
+      Active active = Active(
+        type: activeInfo['atype'],
+        id: activeInfo['aid'].toString(),
+        name: activeInfo['title'],
+        description: activeInfo['subTitle'],
+        startTime: 0,
+        url: activeInfo['url'],
+        status: true
+      );
+
+      final courseInfo = activeInfo['courseInfo'];
+      final courseId = courseInfo?['courseid'] ?? '';
+      final classId = courseInfo?['classid'].toString() ?? '';
+      final courseName = courseInfo?['coursename'] ??
+          message.attributes!['em_apns_ext']['em_push_title'];
+      // late String? groupName;
+
+      // FIXME 群聊签到无法直接用课程签到处理
+
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        showDialog(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text('课程活动'),
+            content: SingleChildScrollView(
+              child: Text(
+                '收到来自$courseName的$activeTypeName活动',
+                style: const TextStyle(fontSize: 15)
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(dialogContext);
+                  CoursesPage.navigateToActive(context, active, courseId, classId, '');
+                },
+                child: const Text('查看'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+
+    debugPrint('消息: ${message.toJson()}');
+  }
+
+  void _showKickedDialog(LoginExtensionInfo info) {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        content: SingleChildScrollView(
+          // User-Agent: ${info.ext}
+          child: Text(
+              '当前学习通IM账号在${info.deviceName}登录',
+              style: const TextStyle(fontSize: 15)
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              loginCurrentUser();
+              Navigator.pop(dialogContext);
+            },
+            child: const Text('重新登录'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void dispose() {
+    EMClient.getInstance.chatManager.removeEventHandler('easemob_msg_handler');
+    EMClient.getInstance.removeConnectionEventHandler('easemob_conn_handler');
+    _isLoggedIn = false;
+  }
+}

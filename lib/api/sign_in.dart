@@ -240,4 +240,38 @@ class SignInApi{
   }
   // https://mobilelearn.chaoxing.com/widget/sign/pcTeaSignController/getAttendList
   // 存在权鉴
+
+  /// 群聊签到
+  /// 群聊签到没有验证码 没有签到码
+  /// 且相对于课程签到漏洞较多 没有严格权鉴
+  static Future<String?> groupSign(String activeId) async {
+    try {
+      final url = 'https://mobilelearn.chaoxing.com/sign/stuSignajax';
+      final params = {
+        'activeId': activeId,
+        'uid': userId,
+        'clientip': '10.0.85.108', // 幽默之使用内网IP
+        'useragent': HeadersManager.chaoxingHeaders['user-agent'] as String
+      };
+
+      final response = await ApiService.sendRequest(url, params: params, responseType: ResponseType.plain);
+      return response.data;
+    } catch (e) {
+      debugPrint('groupSign error: $e');
+    }
+    return null;
+  }
+
+  /// 签到回执
+  static Future<Map<String, dynamic>?> getSignReceipt(String activeId) async {
+    try {
+      final url = 'https://mobilelearn.chaoxing.com/sign/signReceipt2?activeId=$activeId';
+
+      final response = await ApiService.sendRequest(url);
+      return response.data;
+    } catch (e) {
+      debugPrint('getSignReceipt error: $e');
+    }
+    return null;
+  }
 }

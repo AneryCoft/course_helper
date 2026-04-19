@@ -43,6 +43,7 @@ dependencies:
   crypto: ^3.0.0
   encrypt: ^5.0.3
   pointycastle: ^3.9.1
+  convert: ^3.1.2
   uuid: ^4.5.1
   flutter_speed_dial: ^7.0.0
   camera: ^0.11.4
@@ -69,6 +70,7 @@ dependencies:
   flutter_html: ^3.0.0
   flutter_localizations:
     sdk: flutter
+  im_flutter_sdk: ^4.19.1
 
 
 dev_dependencies:

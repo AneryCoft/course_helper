@@ -12,6 +12,10 @@ import'./api/api_service.dart';
 import'./session/cookie.dart';
 import'./session/account.dart';
 import'./platform.dart';
+import 'push/easemob.dart';
+
+// 全局Navigator Key,用于在无context时显示dialog
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +28,8 @@ void main() async {
 
   await CookieManager.initialize();
 
+  await EasemobIM().initialize();
+
   runApp(const MyApp());
 }
 
@@ -35,6 +41,7 @@ class MyApp extends StatelessWidget {
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
         return MaterialApp(
+          navigatorKey: navigatorKey,
           title: '课程助手',
           locale: const Locale('zh', 'CN'),
           supportedLocales: const [

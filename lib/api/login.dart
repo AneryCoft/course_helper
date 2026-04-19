@@ -133,6 +133,16 @@ class CXLoginApi {
           school: data['schoolname'] ?? '未知学校',
           platform: 'chaoxing'
       );
+
+      final imAccount = data['accountInfo']['imAccount'];
+      final userName = imAccount['username'];
+      final passwordCipher = imAccount['password'];
+      final password = EncryptionUtil.desEcbDecrypt(passwordCipher, Constant.imKey);
+      user.imAccount = {
+        'userName': userName,
+        'password': password
+      };
+
       return user;
     } catch (e) {
       debugPrint('getUserInfo error: $e');

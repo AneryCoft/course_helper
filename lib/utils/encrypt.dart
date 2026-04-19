@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:crypto/crypto.dart';
 import 'package:pointycastle/pointycastle.dart';
-import 'package:pointycastle/asymmetric/rsa.dart';
-import 'package:pointycastle/asymmetric/pkcs1.dart';
+import 'package:pointycastle/export.dart';
+import 'package:convert/convert.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:typed_data';
 import 'dart:io';
@@ -32,6 +32,9 @@ class Constant {
   // inf_enc
   static const infEncToken = "4faa8662c59590c6f43ae9fe5b002b42";
   static const infEncKey = "Z(AfY@XS";
+
+  // IM密码解密
+  static const imKey = "SL2(M/eD";
 
   // 学习通验证码
   static const cxCaptchaId = "Qt9FIw9o4pwRjOyqM6yizZBh682qN2TU";
@@ -73,6 +76,38 @@ class EncryptionUtil {
 
     final encrypted = encrypter.encrypt(text, iv: iv);
     return encrypted.base64;
+  }
+
+  /// DES ECB解密 (DES/ECB/PKCS5Padding)
+  static String desEcbDecrypt(String hexCipher, String key) {
+    final cipherBytes = Uint8List.fromList(hex.decode(hexCipher));
+    
+    // DESede 模拟单 DES：将 8 字节密钥扩展为 24 字节 (K1||K2||K3, K1=K2=K3)
+    final keyBytes = utf8.encode(key);
+    final extendedKey = Uint8List(24);
+    for (int i = 0; i < 3; i++) {
+      extendedKey.setRange(i * 8, i * 8 + 8, keyBytes);
+    }
+
+    final desEngine = DESedeEngine();
+    final ecbCipher = ECBBlockCipher(desEngine);
+
+    final keyParams = KeyParameter(extendedKey);
+    ecbCipher.init(false, keyParams);
+
+    final decrypted = Uint8List(cipherBytes.length);
+    var offset = 0;
+    while (offset < cipherBytes.length) {
+      final processed = ecbCipher.processBlock(cipherBytes, offset, decrypted, offset);
+      offset += processed;
+    }
+    
+    // PKCS5/PKCS7 去填充
+    final paddedLength = decrypted.length;
+    final padValue = decrypted[paddedLength - 1];
+    final actualLength = paddedLength - padValue;
+    
+    return utf8.decode(decrypted.sublist(0, actualLength));
   }
 
   /// RSA 公钥加密（PKCS#1 v1.5） 自动分段

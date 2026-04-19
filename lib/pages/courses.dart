@@ -147,97 +147,7 @@ class _CourseContentPageState extends State<CourseContentPage> {
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
-                  if (active.status) {
-                    switch (active.activeType) {
-                      case ActiveType.signIn:
-                      case ActiveType.signOut:
-                      case ActiveType.scheduledSignIn:
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SignInPage(
-                              active: active,
-                              courseId: widget.courseId,
-                              classId: widget.classId,
-                              cpi: widget.cpi
-                            ),
-                          ),
-                        );
-                        break;
-                      
-                      case ActiveType.topicDiscuss:
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => TopicDiscussPage(active: active),
-                          ),
-                        );
-                        break;
-                      
-                      case ActiveType.quiz:
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => QuizPage(
-                              active: active,
-                              courseId: widget.courseId,
-                              classId: widget.classId
-                            ),
-                          ),
-                        );
-                        break;
-                      
-                      case ActiveType.evaluation:
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EvaluatePage(
-                              active: active,
-                              courseId: widget.courseId,
-                              classId: widget.classId
-                            ),
-                          ),
-                        );
-                        break;
-                      
-                      case ActiveType.vote:
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => VotePage(
-                              active: active,
-                              courseId: widget.courseId,
-                              classId: widget.classId
-                            ),
-                          ),
-                        );
-                        break;
-
-                        case ActiveType.questionnaire:
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => QuestionnairePage(
-                              active: active,
-                              courseId: widget.courseId,
-                              classId: widget.classId
-                            ),
-                          ),
-                        );
-                        break;
-                      
-                      default:
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('该活动类型暂不支持'),
-                          ),
-                        );
-                    }
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('该活动已结束')),
-                    );
-                  }
+                  CoursesPage.navigateToActive(context, active, widget.courseId, widget.classId, widget.cpi);
                 },
               ),
             );
@@ -253,6 +163,101 @@ class CoursesPage extends StatefulWidget {
 
   @override
   State<CoursesPage> createState() => _CoursesPageState();
+
+  static void navigateToActive(BuildContext context, Active active, String courseId, String classId, String cpi) {
+    if (!active.status) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('该活动已结束')),
+      );
+      return;
+    }
+
+    switch (active.activeType) {
+      case ActiveType.signIn:
+      case ActiveType.signOut:
+      case ActiveType.scheduledSignIn:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SignInPage(
+              active: active,
+              courseId: courseId,
+              classId: classId,
+              cpi: cpi
+            ),
+          ),
+        );
+        break;
+      
+      case ActiveType.topicDiscuss:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TopicDiscussPage(active: active),
+          ),
+        );
+        break;
+      
+      case ActiveType.quiz:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => QuizPage(
+              active: active,
+              courseId: courseId,
+              classId: classId
+            ),
+          ),
+        );
+        break;
+      
+      case ActiveType.evaluation:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EvaluatePage(
+              active: active,
+              courseId: courseId,
+              classId: classId
+            ),
+          ),
+        );
+        break;
+      
+      case ActiveType.vote:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VotePage(
+              active: active,
+              courseId: courseId,
+              classId: classId
+            ),
+          ),
+        );
+        break;
+
+      case ActiveType.questionnaire:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => QuestionnairePage(
+              active: active,
+              courseId: courseId,
+              classId: classId
+            ),
+          ),
+        );
+        break;
+      
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('该活动类型暂不支持'),
+          ),
+        );
+    }
+  }
 }
 
 final GlobalKey coursesPageKey = GlobalKey();
@@ -476,7 +481,6 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                         startTime: 0,
                         url: '',
                         status: true,
-                        extras: {},
                         signType: SignType.qrCode
                     ),
                     courseId: '',
