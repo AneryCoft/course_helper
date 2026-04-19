@@ -432,6 +432,25 @@ class _PresentationPageState extends State<PresentationPage> {
             });
           }
         }
+      } else if (op == 'lessonfinished') {
+        // 处理下课事件
+        final eventData = data['event'];
+        if (eventData != null) {
+          final code = eventData['code'];
+          final title = eventData['title'];
+          final dt = eventData['dt'];
+          
+          if (code == 'LESSON_FINISH') {
+            setState(() {
+              _timeline.add(TimelineEvent(
+                type: 'event',
+                code: code,
+                title: title ?? '下课啦！',
+                timestamp: DateTime.fromMillisecondsSinceEpoch(dt),
+              ));
+            });
+          }
+        }
       }
     } catch (e) {
       debugPrint('解析消息失败：$e');
