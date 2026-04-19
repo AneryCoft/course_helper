@@ -75,6 +75,9 @@ class _PresentationPageState extends State<PresentationPage> {
   
   // 菜单位置
   Offset _menuPosition = Offset.zero;
+  
+  // 全屏状态
+  bool _isFullScreen = false;
 
 
   @override
@@ -578,10 +581,145 @@ class _PresentationPageState extends State<PresentationPage> {
     });
   }
 
+  Widget _buildFullScreenPPT() {
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _pageController,
+          itemCount: _slides.length,
+          onPageChanged: (index) {
+            setState(() {
+              _currentSlideIndex = index;
+              _currentProblem = _slides[index]['problem'];
+            });
+          },
+          itemBuilder: (context, index) {
+            final slide = _slides[index];
+            final cover = slide['coverAlt'] as String?;
+            return Center(
+              child: cover != null
+                  ? GestureDetector(
+                      onLongPressDown: (details) {
+                        setState(() {
+                          _menuPosition = details.globalPosition;
+                        });
+                      },
+                      onLongPress: () async {
+                        final RenderBox? overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+                        if (overlay == null) return;
+                        
+                        final result = await showMenu<String>(
+                          context: context,
+                          position: RelativeRect.fromLTRB(
+                            _menuPosition.dx,
+                            _menuPosition.dy,
+                            _menuPosition.dx + 1,
+                            _menuPosition.dy + 1,
+                          ),
+                          items: [
+                            const PopupMenuItem<String>(
+                              value: 'save',
+                              child: Text('保存图片'),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'fullscreen',
+                              child: Text('退出全屏'),
+                            ),
+                          ],
+                        );
+                        
+                        if (result == 'save') {
+                          await _saveImageToGallery(cover);
+                        } else if (result == 'fullscreen') {
+                          setState(() {
+                            _isFullScreen = false;
+                          });
+                        }
+                      },
+                      child: Image.network(
+                        cover,
+                        fit: BoxFit.contain,
+                        width: double.infinity,
+                        height: double.infinity,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Center(
+                            child: Icon(
+                              Icons.error_outline,
+                              size: 48,
+                              color: Colors.grey,
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                  : const Center(
+                      child: Text(
+                        '暂无 PPT',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+            );
+          },
+        ),
+        Positioned(
+          right: 16,
+          top: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 6,
+            ),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: _currentSlideIndex == _currentLessonSlideIndex
+                ? RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: '当前 ',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        TextSpan(
+                          text: '${_currentSlideIndex + 1}/$_totalCount',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Text(
+                    '${_currentSlideIndex + 1}/$_totalCount',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: _isFullScreen ? null : AppBar(
         title: Text(widget.title),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
@@ -614,7 +752,9 @@ class _PresentationPageState extends State<PresentationPage> {
                     ],
                   ),
                 )
-              : Column(
+              : _isFullScreen
+                  ? _buildFullScreenPPT()
+                  : Column(
                   children: [
                     // PPT 区域 - 根据屏幕宽度自动计算高度（保持幻灯片比例）
                     AspectRatio(
@@ -656,13 +796,21 @@ class _PresentationPageState extends State<PresentationPage> {
                                             items: [
                                               const PopupMenuItem<String>(
                                                 value: 'save',
-                                                child: Text('保存图片'),
+                                                child: Text('保存图片')
+                                              ),
+                                              PopupMenuItem<String>(
+                                                value: 'fullscreen',
+                                                child: Text('全屏')
                                               ),
                                             ],
                                           );
                                           
                                           if (result == 'save') {
                                             await _saveImageToGallery(cover);
+                                          } else if (result == 'fullscreen') {
+                                            setState(() {
+                                              _isFullScreen = !_isFullScreen;
+                                            });
                                           }
                                         },
                                         child: Image.network(
