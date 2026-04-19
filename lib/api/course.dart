@@ -1,6 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'dart:io';
-import 'package:dio/dio.dart';
 
 import 'api_service.dart';
 import '../session/account.dart';
@@ -212,53 +210,6 @@ class RCCourseApi {
 
   static void _setToken(String bearerToken, String lessonToken) {
     _tokens[_currentSessionId] = [bearerToken, lessonToken];
-  }
-
-  /// 上传图片到七牛云
-  static Future<String?> uploadImageToQiniu(File imageFile) async {
-    try {
-      final tokenUrl = '/pc/generate_qiniu_token';
-      final jsonData = {
-        'bucket_name': 'cms-attachment',
-        'expired_time': 3600
-      };
-      final tokenResponse = await ApiService.sendRequest(tokenUrl, method: 'POST', body: jsonData);
-
-      if (tokenResponse.data == null || 
-          tokenResponse.data['success'] != true ||
-          tokenResponse.data['data'] == null) {
-        debugPrint('Failed to get qiniu token');
-        return null;
-      }
-      
-      final token = tokenResponse.data['data']['token'];
-
-      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      final originalFileName = imageFile.path.split('/').last;
-      final fileName = '$timestamp$originalFileName';
-
-      final uploadUrl = 'https://upload.qiniup.com/';
-      FormData formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(imageFile.path, filename: fileName),
-        'token': token,
-        'key': fileName,
-        'fname': originalFileName
-      });
-      final uploadResponse = await ApiService.sendRequest(uploadUrl, method: 'POST', body: formData);
-
-      if (uploadResponse.data == null || 
-          uploadResponse.data['success'] != true) {
-        debugPrint('Failed to upload to qiniu');
-        return null;
-      }
-
-      final key = uploadResponse.data['key'];
-      final imageUrl = 'https://qn-scd1.yuketang.cn/$key';
-      return imageUrl;
-    } catch (e) {
-      debugPrint('uploadImageToQiniu error: $e');
-    }
-    return null;
   }
 
   static Future<Map<String, dynamic>?> getCourses() async {

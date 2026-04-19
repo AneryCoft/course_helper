@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 
+import '../../../../api/active.dart';
 import '../../../../api/sign_in.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
@@ -195,7 +196,7 @@ class SignInPageState extends State<SignInPage> {
   Future<void> _parseSignInfo() async {
     try {
       final results = await Future.wait([
-        SignInApi.getActiveInfoWeb(widget.active.id),
+        ActiveApi.getActiveInfoWeb(widget.active.id),
         SignInApi.getAttendInfoWeb(widget.active.id)
       ]);
   
@@ -400,6 +401,7 @@ class SignInPageState extends State<SignInPage> {
 
   Future<void> _performMultiSign() async {
     if (_selectedAccounts.isEmpty || _currentStrategy == null) return;
+    if (_isMultiSigning) return;
 
     setState(() {
       _isLoading = true;
@@ -469,6 +471,8 @@ class SignInPageState extends State<SignInPage> {
     } else if (result == 'success2') {
       _addFailedAccount(user, '已过截止时间');
     } else {
+      // 签到失败，请重新签到 -> 二维码过期
+
       _addFailedAccount(user, result);
     }
   }

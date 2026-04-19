@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'dart:io';
 import 'package:dio/dio.dart';
 
 import 'api_service.dart';
@@ -29,58 +28,6 @@ class SignInApi{
         _userId = currentUser.uid;
       }
     }
-  }
-
-  /// 上传图片
-  static Future<String?> uploadImage(File imageFile) async {
-    try {
-      final tokenUrl = 'https://pan-yz.chaoxing.com/api/token/uservalid';
-      final tokenResponse = await ApiService.sendRequest(tokenUrl, method: "GET");
-
-      if (tokenResponse.data == null) {
-        debugPrint('Failed to get token');
-        return null;
-      }
-      String token = tokenResponse.data['_token'];
-
-      final crcUrl = 'https://pan-yz.chaoxing.com/api/crcStorageStatus';
-
-      final crc = await EncryptionUtil.getCRC(imageFile);
-      final crcParams = {
-        'puid': userId,
-        'crc': crc,
-        '_token': token
-      };
-
-      await ApiService.sendRequest(crcUrl, method: "GET", params: crcParams);
-
-      DateTime now = DateTime.now();
-      String timestamp = "${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}";
-      final milliseconds = DateTime.now().millisecond.toString().padLeft(3, '0');
-      String formattedTime = '$timestamp$milliseconds';
-      String fileName = "$formattedTime.jpg";
-      // 20260205191805009.jpg
-
-      FormData formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(imageFile.path, filename: fileName),
-        'puid': userId
-      });
-
-      String uploadUrl = 'https://pan-yz.chaoxing.com/upload?_from=mobilelearn&_token=$token';
-
-      final uploadResponse = await ApiService.sendRequest(
-        uploadUrl,
-        method: "POST",
-        body: formData,
-      );
-
-      Map<String, dynamic> responseData = uploadResponse.data;
-      String? objectId = responseData['data']['objectId'];
-      return objectId;
-    } catch (e) {
-      debugPrint('uploadImage error: $e');
-    }
-    return null;
   }
 
   /// 普通签到（可带照片）
@@ -276,22 +223,7 @@ class SignInApi{
     return null;
   }
 
-  /// 获取活动详细
-  static Future<Map<String, dynamic>?> getActiveInfoWeb(String activeId) async {
-    try {
-      final url = 'https://mobilelearn.chaoxing.com/v2/apis/active/getPPTActiveInfo?activeId=$activeId';
-      final response = await ApiService.sendRequest(url);
-      final data = response.data;
-      if (data['result'] == 1){
-        return data['data'];
-      }
-    } catch (e) {
-      debugPrint('getActiveInfo error: $e');
-    }
-    return null;
-  }
-
-  /// 获取签到详细
+  /// 获取参与详细
   static Future<Map<String, dynamic>?> getAttendInfoWeb(String activeId) async {
     try {
       final url = 'https://mobilelearn.chaoxing.com/v2/apis/sign/getAttendInfo?activeId=$activeId&moreClassAttendEnc=';

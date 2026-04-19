@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io' show WebSocket, File;
 
 import '../api/course.dart';
+import '../api/upload.dart';
 import '../models/presentation.dart';
 import '../session/account.dart';
 
@@ -1184,7 +1185,7 @@ class _PresentationPageState extends State<PresentationPage> {
         final uploadFutures = images.map((image) async {
           try {
             final file = File(image.path);
-            final imageUrl = await RCCourseApi.uploadImageToQiniu(file);
+            final imageUrl = await RCUploadApi.uploadImage(file);
             return {'image': image, 'url': imageUrl};
           } catch (e) {
             if (mounted) {

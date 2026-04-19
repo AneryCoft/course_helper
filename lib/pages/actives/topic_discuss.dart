@@ -28,7 +28,7 @@ class _TopicDiscussPageState extends State<TopicDiscussPage> {
   final List<String> _failedAccounts = [];
   
   // 主题数据
-  late final String _topicId = widget.active.extras['topicId'] ?? '';
+  late final String _topicId = widget.active.extras!['topicId'] ?? '';
   Map<String, dynamic>? _topicData;
   late String _topicUuid;
   bool _canAnonymous = false;

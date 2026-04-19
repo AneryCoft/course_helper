@@ -44,18 +44,6 @@ class TopicDiscussApi {
     return null;
   }
 
-  static Future<Map<String, dynamic>?> getActiveInfo(String activeId) async {
-    try {
-      final url = 'https://mobilelearn.chaoxing.com/widget/active/getActiveInfo?id=$activeId';
-
-      final response = await ApiService.sendRequest(url);
-      return response.data;
-    } catch (e) {
-      debugPrint('getActiveInfo error: $e');
-    }
-    return null;
-  }
-
   /// 获取回复
   static Future<Map<String, dynamic>?> getReplies(String uuid) async {
     try {

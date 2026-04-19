@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../api/sign_in.dart';
+import '../../../api/active.dart';
 import '../../../api/evaluate.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
@@ -53,7 +53,7 @@ class _EvaluatePageState extends State<EvaluatePage> {
   
   Future<void> _initialize() async {
     try {
-      final data = await SignInApi.getActiveInfoWeb(widget.active.id);
+      final data = await ActiveApi.getActiveInfoWeb(widget.active.id);
       if (data != null) {
         setState(() {
           if (data['normList'] != null && data['normList'].isNotEmpty) {
