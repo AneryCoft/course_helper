@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:photo_manager/photo_manager.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show WebSocket, File;
@@ -70,6 +72,9 @@ class _PresentationPageState extends State<PresentationPage> {
   // 倒计时相关
   int? _countdownSeconds;
   Timer? _countdownTimer;
+  
+  // 菜单位置
+  Offset _menuPosition = Offset.zero;
 
 
   @override
@@ -630,26 +635,57 @@ class _PresentationPageState extends State<PresentationPage> {
                               final cover = slide['coverAlt'] as String?;
                               return Center(
                                 child: cover != null
-                                    ? Image.network(
-                                        cover,
-                                        fit: BoxFit.contain,
-                                        width: double.infinity,
-                                        height: double.infinity,
-                                        loadingBuilder: (context, child, progress) {
-                                          if (progress == null) return child;
-                                          return const Center(
-                                            child: CircularProgressIndicator(),
-                                          );
+                                    ? GestureDetector(
+                                        onLongPressDown: (details) {
+                                          setState(() {
+                                            _menuPosition = details.globalPosition;
+                                          });
                                         },
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return const Center(
-                                            child: Icon(
-                                              Icons.error_outline,
-                                              size: 48,
-                                              color: Colors.grey,
+                                        onLongPress: () async {
+                                          final RenderBox? overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+                                          if (overlay == null) return;
+                                          
+                                          final result = await showMenu<String>(
+                                            context: context,
+                                            position: RelativeRect.fromLTRB(
+                                              _menuPosition.dx,
+                                              _menuPosition.dy,
+                                              _menuPosition.dx + 1,
+                                              _menuPosition.dy + 1,
                                             ),
+                                            items: [
+                                              const PopupMenuItem<String>(
+                                                value: 'save',
+                                                child: Text('保存图片'),
+                                              ),
+                                            ],
                                           );
+                                          
+                                          if (result == 'save') {
+                                            await _saveImageToGallery(cover);
+                                          }
                                         },
+                                        child: Image.network(
+                                          cover,
+                                          fit: BoxFit.contain,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                          loadingBuilder: (context, child, progress) {
+                                            if (progress == null) return child;
+                                            return const Center(
+                                              child: CircularProgressIndicator(),
+                                            );
+                                          },
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return const Center(
+                                              child: Icon(
+                                                Icons.error_outline,
+                                                size: 48,
+                                                color: Colors.grey,
+                                              ),
+                                            );
+                                          },
+                                        ),
                                       )
                                     : const Center(
                                         child: Text(
@@ -1439,6 +1475,32 @@ class _PresentationPageState extends State<PresentationPage> {
         );
       }).toList(),
     );
+  }
+
+  Future<void> _saveImageToGallery(String imageUrl) async {
+    try {
+      // 从缓存中获取图片文件
+      final file = await DefaultCacheManager().getSingleFile(imageUrl);
+      final bytes = await file.readAsBytes();
+            
+      await PhotoManager.editor.saveImage(
+        bytes,
+        filename: 'RainClassroom_${DateTime.now().millisecondsSinceEpoch}.jpg'
+        // 不会被使用
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('图片已保存到相册')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失败: $e')),
+        );
+      }
+    }
   }
 }
 
