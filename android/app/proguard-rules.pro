@@ -19,8 +19,6 @@
 -keep class com.google.gson.reflect.** {*;}
 -keepattributes Signature
 -keepattributes *Annotation*
--keep class * extends com.google.gson.reflect.TypeToken
--keep class * extends com.google.gson.TypeAdapter
 
 # 保持所有构造函数和方法不被混淆
 -keepclassmembers class * {
@@ -31,10 +29,26 @@
 
 # Flutter插件保护
 -keep class io.flutter.plugin.** {*;}
--keep class com.baidu.mapapi.base.** {*;}
--keep class com.baidu.bmfmap.** {*;}
--keep class com.baidu.mapapi.search.** {*;}
+
+# 小米推送
+-keep class com.xiaomi.** { *; }
+-dontwarn com.xiaomi.push.**
+
+# VIVO推送
+-keep class com.vivo.** { *; }
+-dontwarn com.vivo.push.**
+
+# OPPO推送
+-keep class com.heytap.** { *; }
+-dontwarn com.heytap.**
+
+# 魅族推送
+-dontwarn com.meizu.cloud.pushsdk.**
+-keep class com.meizu.cloud.** {*;}
+
+# 环信推送
+-dontwarn com.hyphenate.push.**
+-keep class com.hyphenate.push.** {*;}
 
 # 特定类忽略
--dontwarn com.baidu.mapsdkplatform.comapi.util.MapSDKAdvancedPermission
 -dontwarn com.google.gson.**
