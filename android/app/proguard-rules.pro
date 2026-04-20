@@ -47,8 +47,8 @@
 -keep class com.meizu.cloud.** {*;}
 
 # 环信推送
--dontwarn com.hyphenate.push.**
--keep class com.hyphenate.push.** {*;}
+-keep class com.hyphenate.** {*;}
+-dontwarn  com.hyphenate.**
 
 # 特定类忽略
 -dontwarn com.google.gson.**
