@@ -118,6 +118,8 @@ class CookieManager {
         if (refreshedUser != null) {
           await AccountManager.addAccount(refreshedUser);
           successCount++;
+        } else {
+          user.setStatus(false);
         }
       } catch (e) {
         failCount++;

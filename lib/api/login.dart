@@ -123,27 +123,29 @@ class CXLoginApi {
 
       final response = await ApiService.sendRequest(url);
       // final response = await ApiService.sendRequest(url, method: "POST", body: formData);
+      final result = response.data['result'];
+      if (result == 1) {
+        final data = response.data['msg'];
+        final user = User(
+            uid: data['puid']?.toString() ?? '',
+            name: data['name'] ?? '未知用户',
+            avatar: data['pic'] ?? '',
+            phone: data['phone'] ?? '未知手机号',
+            school: data['schoolname'] ?? '未知学校',
+            platform: 'chaoxing'
+        );
 
-      final data = response.data['msg'];
-      final user = User(
-          uid: data['puid']?.toString() ?? '',
-          name: data['name'] ?? '未知用户',
-          avatar: data['pic'] ?? '',
-          phone: data['phone'] ?? '未知手机号',
-          school: data['schoolname'] ?? '未知学校',
-          platform: 'chaoxing'
-      );
+        final imAccount = data['accountInfo']['imAccount'];
+        final userName = imAccount['username'];
+        final passwordCipher = imAccount['password'];
+        final password = EncryptionUtil.desEcbDecrypt(passwordCipher, Constant.imKey);
+        user.imAccount = {
+          'userName': userName,
+          'password': password
+        };
 
-      final imAccount = data['accountInfo']['imAccount'];
-      final userName = imAccount['username'];
-      final passwordCipher = imAccount['password'];
-      final password = EncryptionUtil.desEcbDecrypt(passwordCipher, Constant.imKey);
-      user.imAccount = {
-        'userName': userName,
-        'password': password
-      };
-
-      return user;
+        return user;
+      }
     } catch (e) {
       debugPrint('getUserInfo error: $e');
     }
@@ -295,16 +297,18 @@ class RCLoginApi {
       final response = await ApiService.sendRequest(url);
 
       final userProfile = response.data['data']['user_profile'];
-      final user = User(
-          uid: userProfile['user_id']?.toString() ?? '',
-          name: userProfile['name'] ?? '未知用户',
-          avatar: userProfile['avatar'].isNotEmpty ?
-          userProfile['avatar'] : (userProfile['avatar_96'] ?? ''), // avatar_96为默认头像
-          phone: userProfile['phone_number'] ?? '未知手机号',
-          school: userProfile['school'] ?? '未知学校',
-          platform: 'rainClassroom'
-      );
-      return user;
+      if (userProfile != null) {
+        final user = User(
+            uid: userProfile['user_id'].toString(),
+            name: userProfile['name'] ?? '未知用户',
+            avatar: userProfile['avatar'].isNotEmpty ?
+            userProfile['avatar'] : (userProfile['avatar_96'] ?? ''), // avatar_96为默认头像
+            phone: userProfile['phone_number'] ?? '未知手机号',
+            school: userProfile['school'] ?? '未知学校',
+            platform: 'rainClassroom'
+        );
+        return user;
+      }
     } catch (e) {
       debugPrint('getUserInfo error: $e');
     }

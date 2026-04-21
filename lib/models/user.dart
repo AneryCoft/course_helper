@@ -6,6 +6,7 @@ class User {
   final String school;
   final String platform;
   Map<String, String>? imAccount;
+  bool status;
 
   User({
     required this.name,
@@ -15,6 +16,7 @@ class User {
     required this.school,
     this.platform = 'chaoxing',
     this.imAccount,
+    this.status = true,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -35,8 +37,13 @@ class User {
       'phone': phone,
       'uid': uid,
       'school': school,
-      'platform': platform
+      'platform': platform,
+      'status': status
     };
+  }
+
+  void setStatus(bool newStatus) {
+    status = newStatus;
   }
 
   bool get isChaoxing => platform == 'chaoxing';
