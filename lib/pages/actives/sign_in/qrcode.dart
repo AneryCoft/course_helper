@@ -25,16 +25,21 @@ class QRCodeSign implements SignStrategy {
   }
 
   @override
-  Future<String?> signForAccount(User user, SignParams params) async {
+  Future<String?> signForAccount(User user, SignParams params, SignInPageState state) async {
+    final userValidate = state.getUserCaptchaValidate(user.uid);
+    final validate = userValidate?['validate'];
+    final enc2 = userValidate?['enc2'];
+    
     return await SignInApi.qrCodeSign(
       params.courseId,
       params.active.id,
       params.enc!,
+      user,
       address: params.address,
       latitude: params.latitude,
       longitude: params.longitude,
-      enc2: params.enc2,
-      validate: params.validate,
+      enc2: enc2,
+      validate: validate
     );
   }
 

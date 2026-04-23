@@ -3,64 +3,64 @@ import 'package:dio/dio.dart';
 
 import 'api_service.dart';
 import '../utils/encrypt.dart';
+import '../session/cookie.dart';
 import '../models/user.dart';
-import '../session/account.dart';
 
 
 class SignInApi{
   static const String _signUrl = 'https://mobilelearn.chaoxing.com/pptSign/stuSignajax';
   static String get _deviceCode => EncryptionUtil.getDeviceCode();
 
-  static String _userId = '';
-  static User? _user;
-
-  static String get userId => _userId;
-  static User? get user => _user;
-  static String get userName => _user?.name ?? '';
-
-  /// 更新当前用户信息（从会话管理器获取）
-  static void updateUser() {
-    String? currentUid = AccountManager.currentSessionId;
-    if (currentUid != null) {
-      User? currentUser = AccountManager.getAccountById(currentUid);
-      if (currentUser != null) {
-        _user = currentUser;
-        _userId = currentUser.uid;
+  /// 获取用户的Cookie字符串
+  static Future<String?> _getUserCookie(String userId) async {
+    try {
+      final cookieJar = await CookieManager.getCookieJarForUser(userId);
+      final domainUri = CookieManager.getDomainUri();
+      final cookies = await cookieJar.loadForRequest(domainUri);
+      
+      if (cookies.isNotEmpty) {
+        return cookies.map((c) => '${c.name}=${c.value}').join('; ');
       }
+    } catch (e) {
+      debugPrint('获取用户 $userId 的Cookie失败: $e');
     }
+    return null;
   }
 
   /// 普通签到（可带照片）
-  static Future<String?> normalSign(String courseId, String activeId,
+  static Future<String?> normalSign(String courseId, String activeId, User user,
       {String? objectId, String? validate}) async {
     try {
       Map<String, String> params = {
         'activeId': activeId,
         'courseId': courseId,
-        'uid': userId,
+        'uid': user.uid,
         'clientip': '',
         'latitude': '-1',
         'longitude': '-1',
         'appType': '15',
         'fid': '0',
         'objectId': '',
-        'name': userName,
+        'name': user.name,
         'validate': '',
         'deviceCode': _deviceCode
       };
       if (objectId == null) {
-        params.remove(objectId);
+        params.remove('objectId');
       } else {
         params['objectId'] = objectId;
       }
 
       if (validate == null) {
-        params.remove(validate);
+        params.remove('validate');
       } else {
         params['validate'] = validate;
       }
 
-      final response = await ApiService.sendRequest(_signUrl, params: params, responseType: ResponseType.plain);
+      final cookieStr = await _getUserCookie(user.uid) ?? '';
+      final headers = {'Cookie': cookieStr};
+
+      final response = await ApiService.sendRequest(_signUrl, params: params, headers: headers, responseType: ResponseType.plain);
       return response.data;
     } catch (e) {
       debugPrint('normalSign error: $e');
@@ -90,29 +90,32 @@ class SignInApi{
 
   /// 手势 签到码签到
   static Future<String?> codeSign(String courseId, String activeId, String signCode,
-      {String? validate}) async {
+  User user, {String? validate}) async {
     try {
       final params = {
         'activeId': activeId,
         'courseId': courseId,
-        'uid': userId,
+        'uid': user.uid,
         'clientip': '',
         'latitude': '-1',
         'longitude': '-1',
         'appType': '15',
         'fid': '0',
-        'name': userName,
+        'name': user.name,
         'signCode': signCode,
         'validate': '',
         'deviceCode': _deviceCode
       };
       if (validate == null) {
-        params.remove(validate);
+        params.remove('validate');
       } else {
         params['validate'] = validate;
       }
 
-      final response = await ApiService.sendRequest(_signUrl, params: params, responseType: ResponseType.plain);
+      final cookieStr = await _getUserCookie(user.uid) ?? '';
+      final headers = {'Cookie': cookieStr};
+
+      final response = await ApiService.sendRequest(_signUrl, params: params, headers: headers, responseType: ResponseType.plain);
       return response.data;
     } catch (e) {
       debugPrint('codeSign error: $e');
@@ -122,14 +125,14 @@ class SignInApi{
 
   /// 位置签到
   static Future<String?> locationSign(String courseId, String activeId, String address,
-      double latitude, double longitude, {String? validate}) async {
+      double latitude, double longitude, User user, {String? validate, String? faceId}) async {
     try {
       Map<String, String> params = {
-        'name': userName,
+        'name': user.name,
         'address': address,
         'activeId': activeId,
         'courseId': courseId,
-        'uid': userId,
+        'uid': user.uid,
         'clientip': '',
         'latitude': latitude.toStringAsFixed(6),
         'longitude': longitude.toStringAsFixed(6),
@@ -150,7 +153,14 @@ class SignInApi{
         params['validate'] = validate;
       }
 
-      final response = await ApiService.sendRequest(_signUrl, params: params, responseType: ResponseType.plain);
+      if (faceId != null){
+        params['currentFaceId'] = faceId;
+      }
+
+      final cookieStr = await _getUserCookie(user.uid) ?? '';
+      final headers = {'Cookie': cookieStr};
+
+      final response = await ApiService.sendRequest(_signUrl, params: params, headers: headers, responseType: ResponseType.plain);
       return response.data;
     } catch (e) {
       debugPrint('locationSign error: $e');
@@ -178,14 +188,14 @@ class SignInApi{
   /// 二维码签到（可带定位）
   /// 需要验证码时第一次发送会返回validate_${enc2}
   /// enc2用于固定enc
-  static Future<String?> qrCodeSign(String courseId, String activeId, String enc,
-      {String? address, double? latitude, double? longitude, String? enc2, String? validate}) async {
+  static Future<String?> qrCodeSign(String courseId, String activeId, String enc, User user,
+      {String? address, double? latitude, double? longitude, String? enc2, String? validate, String? faceId}) async {
     try {
       Map<String, String> params = {
         'enc': enc,
-        'name': userName,
+        'name': user.name,
         'activeId': activeId,
-        'uid': userId,
+        'uid': user.uid,
         'clientip': '',
         'location': '',
         'latitude': '-1',
@@ -215,7 +225,14 @@ class SignInApi{
         params['validate'] = validate;
       }
 
-      final response = await ApiService.sendRequest(_signUrl, params: params, responseType: ResponseType.plain);
+      if (faceId != null){
+        params['currentFaceId'] = faceId;
+      }
+
+      final cookieStr = await _getUserCookie(user.uid) ?? '';
+      final headers = {'Cookie': cookieStr};
+
+      final response = await ApiService.sendRequest(_signUrl, params: params, headers: headers, responseType: ResponseType.plain);
       return response.data;
     } catch (e) {
       debugPrint('qrCodeSign error: $e');
@@ -244,17 +261,20 @@ class SignInApi{
   /// 群聊签到
   /// 群聊签到没有验证码 没有签到码
   /// 且相对于课程签到漏洞较多 没有严格权鉴
-  static Future<String?> groupSign(String activeId) async {
+  static Future<String?> groupSign(String activeId, User user) async {
     try {
       final url = 'https://mobilelearn.chaoxing.com/sign/stuSignajax';
       final params = {
         'activeId': activeId,
-        'uid': userId,
+        'uid': user.uid,
         'clientip': '10.0.85.108', // 幽默之使用内网IP
         'useragent': HeadersManager.chaoxingHeaders['user-agent'] as String
       };
 
-      final response = await ApiService.sendRequest(url, params: params, responseType: ResponseType.plain);
+      final cookieStr = await _getUserCookie(user.uid) ?? '';
+      final headers = {'Cookie': cookieStr};
+
+      final response = await ApiService.sendRequest(url, params: params, headers: headers, responseType: ResponseType.plain);
       return response.data;
     } catch (e) {
       debugPrint('groupSign error: $e');

@@ -7,6 +7,7 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import '../utils/encrypt.dart';
 import '../session/cookie.dart';
 import '../platform.dart';
+import '../models/user.dart';
 
 class HeadersManager {
   static const _brand = 'google';
@@ -217,5 +218,26 @@ class ApiService {
       debugPrint('URL转换失败: $e');
     }
     return url;
+  }
+
+  /// 并发用户请求
+  static Future<List<dynamic>> sendForEachUser(
+      List<User> users,
+      Future<dynamic> Function(User user) apiFunction,
+      ) async {
+    if (users.isEmpty) {
+      return [];
+    }
+
+    final futures = users.map((user) async {
+      try {
+        return await apiFunction(user);
+      } catch (e) {
+        debugPrint('用户 ${user.name} 请求失败: $e');
+        return null;
+      }
+    }).toList();
+
+    return await Future.wait(futures);
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import '../../../../api/active.dart';
+import '../../../../api/api_service.dart';
 import '../../../../api/sign_in.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
@@ -21,8 +22,6 @@ class SignParams {
   final String classId;
   final String cpi;
 
-  String? validate;
-
   // 普通签到（拍照）
   final Map<String, String> _userObjectIds = {}; // userId -> objectId
 
@@ -35,7 +34,6 @@ class SignParams {
 
   // 二维码签到
   String? enc;
-  String? enc2;
   String? qrCodeData;
 
   // 位置签到
@@ -82,6 +80,7 @@ abstract class SignStrategy {
   Future<String?> signForAccount(
       User user,
       SignParams params,
+      SignInPageState state,
   );
 
   /// 获取签到类型名称
@@ -174,6 +173,9 @@ class SignInPageState extends State<SignInPage> {
   int _totalCount = 0;
   final List<String> _failedAccounts = [];
 
+  // UserId -> {Validate, enc2}
+  final Map<String, Map<String, String>> _userCaptchaValidate = {};
+
   // Getter
   bool get needPhoto => _needPhoto;
   String? get designatedPlace => _designatedPlace;
@@ -182,6 +184,10 @@ class SignInPageState extends State<SignInPage> {
   User? get currentUser => _currentUser;
   SignStrategy? get currentStrategy => _currentStrategy;
   SignParams get signParams => _signParams;
+  
+  Map<String, String>? getUserCaptchaValidate(String userId) {
+    return _userCaptchaValidate[userId];
+  }
 
   @override
   void initState() {
@@ -427,7 +433,7 @@ class SignInPageState extends State<SignInPage> {
   Future<void> _performMultiSign() async {
     if (_selectedAccounts.isEmpty || _currentStrategy == null) return;
     if (_isMultiSigning) return;
-
+  
     setState(() {
       _isLoading = true;
       _isMultiSigning = true;
@@ -435,32 +441,51 @@ class SignInPageState extends State<SignInPage> {
       _totalCount = _selectedAccounts.length;
       _failedAccounts.clear();
     });
-    for (var user in _selectedAccounts) {
-      AccountManager.setCurrentSessionTemp(user.uid);
-      SignInApi.updateUser();
-    
-      try {
-        final result = await _currentStrategy!.signForAccount(user, _signParams);
-        await _handleSignResult(result, user);
-      } catch (e) {
-        _addFailedAccount(user, '异常：$e');
-      } finally {
-        if (mounted) {
-          setState(() => _signedCount++);
+
+    // 除二维码签到以外 其他签到预先处理验证码
+    if (_needCaptcha && widget.active.signType != SignType.qrCode) {
+      for (var user in _selectedAccounts) {
+        AccountManager.setCurrentSessionTemp(user.uid);
+
+        if (!await _handleCaptcha(user.uid)) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _isMultiSigning = false;
+            });
+          }
+          _showErrorMessage('验证码取消或失败');
+          return;
         }
       }
-    }
-    if (_currentUser != null) {
       AccountManager.setCurrentSessionTemp(_currentUser!.uid);
     }
 
+    final results = await ApiService.sendForEachUser(
+      _selectedAccounts,
+      (user) async {
+        return await _currentStrategy!.signForAccount(user, _signParams, this);
+      }
+    );
+    
+    // 统一处理所有签到结果
+    for (int i = 0; i < _selectedAccounts.length; i++) {
+      final user = _selectedAccounts[i];
+      final result = results[i];
+      await _handleSignResult(result, user);
+    }
+    // 恢复当前用户会话
+    if (_currentUser != null) {
+      AccountManager.setCurrentSessionTemp(_currentUser!.uid);
+    }
+  
     if (mounted) {
       setState(() {
         _isLoading = false;
         _isMultiSigning = false;
       });
     }
-
+  
     _showMultiSignResult();
   }
 
@@ -472,27 +497,22 @@ class SignInPageState extends State<SignInPage> {
 
     if (result.startsWith('validate')) {
       if (result.contains('_')) {
-        _signParams.enc2 = result.split('_')[1];
-      }
-
-      if (_signParams.validate == null) {
-        bool captchaSuccess = await _handleCaptcha();
-        if (!captchaSuccess) {
-          // 用户取消验证码或验证码失败，标记为失败
-          _addFailedAccount(user, '验证码取消或失败');
-          return; // 直接返回，不再继续签到
+        final enc2 = result.split('_')[1];
+        (_userCaptchaValidate[user.uid] ??= {})['enc2'] = enc2;
+        if (!await _handleCaptcha(user.uid)) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _isMultiSigning = false;
+            });
+          }
+          _showErrorMessage('验证码取消或失败');
+          return;
         }
-      }
-
-      // 验证码成功，继续签到
-      try {
-        await _currentStrategy!.signForAccount(user, _signParams);
-      } catch (e) {
-        _addFailedAccount(user, '验证码重试失败: $e');
       }
     } else if (result == 'success') {
       // 签到成功
-      debugPrint('账号 ${user.name} 签到成功');
+      debugPrint('${user.name} 签到成功');
     } else if (result == 'success2') {
       _addFailedAccount(user, '已过截止时间');
     } else {
@@ -508,17 +528,15 @@ class SignInPageState extends State<SignInPage> {
     });
   }
 
-  Future<bool> _handleCaptcha() async {
+  Future<bool> _handleCaptcha(String userId) async {
     try {
       final validate = await CaptchaPage.showSlideCaptchaDialog(
         context,
-        referer: widget.active.url,
+        referer: widget.active.url
       );
 
       if (validate != null) {
-        setState(() {
-          _signParams.validate = validate;
-        });
+        (_userCaptchaValidate[userId] ??= {})['validate'] = validate;
         return true; // 验证码成功
       } else {
         return false; // 用户取消或验证码失败

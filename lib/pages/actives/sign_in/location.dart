@@ -20,14 +20,18 @@ class LocationSign implements SignStrategy {
   }
 
   @override
-  Future<String?> signForAccount(User user, SignParams params) async {
+  Future<String?> signForAccount(User user, SignParams params, SignInPageState state) async {
+    final userValidate = state.getUserCaptchaValidate(user.uid);
+    final validate = userValidate?['validate'];
+    
     return await SignInApi.locationSign(
       params.courseId,
       params.active.id,
       params.address ?? '未知位置',
       params.latitude ?? 0,
       params.longitude ?? 0,
-      validate: params.validate,
+      user,
+      validate: validate,
     );
   }
 
