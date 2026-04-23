@@ -132,8 +132,9 @@ class SignInPageState extends State<SignInPage> {
   late SignParams _signParams;
 
   int _signTypeId = 0;
-  bool _needCaptcha = false;
+
   int? _attendNum;
+
   int _status = 0;
   /*
   status:
@@ -157,6 +158,8 @@ class SignInPageState extends State<SignInPage> {
 
   // 签到数据
   // late bool _needPhoto;
+  bool _needCaptcha = false;
+  bool _needFace = false;
   bool _needPhoto = false;
   String? _locationRange;
   String? _designatedPlace;
@@ -178,6 +181,7 @@ class SignInPageState extends State<SignInPage> {
 
   // Getter
   bool get needPhoto => _needPhoto;
+  bool get needFace => _needFace;
   String? get designatedPlace => _designatedPlace;
   String? get locationRange => _locationRange;
   List<User> get selectedAccounts => _selectedAccounts;
@@ -244,6 +248,7 @@ class SignInPageState extends State<SignInPage> {
           case SignType.location:
             _locationRange = activeInfo['locationRange'];
             _designatedPlace = activeInfo['locationText'];
+            _needFace = activeInfo['openCheckFaceFlag'] == 1;
             break;
           case _:
         }

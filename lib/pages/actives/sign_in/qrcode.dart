@@ -30,6 +30,11 @@ class QRCodeSign implements SignStrategy {
     final validate = userValidate?['validate'];
     final enc2 = userValidate?['enc2'];
     
+    String? faceId;
+    if (state.needFace) {
+      faceId = await SignInApi.getFaceId(user);
+    }
+    
     return await SignInApi.qrCodeSign(
       params.courseId,
       params.active.id,
@@ -39,7 +44,8 @@ class QRCodeSign implements SignStrategy {
       latitude: params.latitude,
       longitude: params.longitude,
       enc2: enc2,
-      validate: validate
+      validate: validate,
+      faceId: faceId,
     );
   }
 
@@ -288,7 +294,8 @@ class QRCodeSign implements SignStrategy {
                   state.signParams.enc = queryParams['enc']!;
 
                   final signDetail = await SignInApi.getSignDetail(state.widget.active.id, code);
-                  if (code == signDetail?['signCode']) {
+                  final String signCode = signDetail?['signCode'];
+                  if (signCode.isEmpty || code == signDetail?['signCode']) {
                     if (state.mounted) {
                       (state.context as Element).markNeedsBuild();
                       WidgetsBinding.instance.addPostFrameCallback((_) {

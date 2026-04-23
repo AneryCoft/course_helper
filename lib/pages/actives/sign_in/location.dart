@@ -24,6 +24,11 @@ class LocationSign implements SignStrategy {
     final userValidate = state.getUserCaptchaValidate(user.uid);
     final validate = userValidate?['validate'];
     
+    String? faceId;
+    if (state.needFace) {
+      faceId = await SignInApi.getFaceId(user);
+    }
+    
     return await SignInApi.locationSign(
       params.courseId,
       params.active.id,
@@ -32,6 +37,7 @@ class LocationSign implements SignStrategy {
       params.longitude ?? 0,
       user,
       validate: validate,
+      faceId: faceId,
     );
   }
 

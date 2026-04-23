@@ -123,6 +123,28 @@ class SignInApi{
     return null;
   }
 
+  /// 获取首次采集的人脸图片ID
+  static Future<String?> getFaceId(User user) async {
+    try {
+      final enc = EncryptionUtil.md5Hash(user.uid + Constant.getFaceSalt);
+      final url = 'https://passport2-api.chaoxing.com/api/getUserFaceid?enc=$enc';
+
+      final cookieStr = await _getUserCookie(user.uid) ?? '';
+      final headers = {'Cookie': cookieStr};
+
+      final response = await ApiService.sendRequest(url, headers: headers);
+      final data = response.data;
+      // {"result":1,"msg":"获取成功","data":{"http":"http://p.ananas.chaoxing.com/star3/origin/$objectid.jpg","objectid":objectid},"errorMsg":""}
+      // 如果没有采集过人脸则为空字符串
+      if (data['result'] == 1) {
+        return data['data']['objectid'];
+      }
+    } catch (e) {
+      debugPrint('getFace error: $e');
+    }
+    return null;
+  }
+
   /// 位置签到
   static Future<String?> locationSign(String courseId, String activeId, String address,
       double latitude, double longitude, User user, {String? validate, String? faceId}) async {

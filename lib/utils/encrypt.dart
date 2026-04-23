@@ -14,6 +14,9 @@ class Constant {
   // schild的盐
   static const schildSalt = r"ipL$TkeiEmfy1gTXb2XHrdLN0a@7c^vu";
 
+  // 学习通人脸获取
+  static const getFaceSalt = 'uWwjeEKsri';
+
   // 网页登录
   static const webLoginKey = "u2oh6Vu^HWe4_AES";
 
