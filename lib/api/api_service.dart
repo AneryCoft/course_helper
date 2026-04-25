@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import '../utils/encrypt.dart';
+import '../utils/storage.dart';
 import '../session/cookie.dart';
 import '../platform.dart';
 import '../models/user.dart';
@@ -46,7 +46,7 @@ class HeadersManager {
   };
 
   static Future<void> updateChaoxingHeaders() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final prefs = StorageManager.prefs;
     if (prefs.containsKey(_uniqueIdKey)){
       _uniqueId = prefs.getString(_uniqueIdKey)!;
     } else {
@@ -196,7 +196,7 @@ class ApiService {
   }
 
   /// 将学习通的Star3图片转换为Star4 减少一次重定向
-  String toNewImageUrl(String url) {
+  static String toNewImageUrl(String url) {
     try {
       final uri = Uri.parse(url);
       final pathSegments = uri.pathSegments;

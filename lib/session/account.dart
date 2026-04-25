@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../platform.dart';
 import 'cookie.dart';
 import '../push/easemob.dart';
+import '../utils/storage.dart';
 
 
 /// 统一的账户管理器
@@ -14,8 +14,6 @@ class AccountManager {
   static const _chaoxingAccountsKey = 'chaoxing_accounts';
   static const _rainClassroomAccountsKey = 'rainclassroom_accounts';
 
-  static late SharedPreferences _prefs;
-
   static List<User> _accounts = [];
   static String? _currentSessionId;
 
@@ -24,7 +22,7 @@ class AccountManager {
     final accountsKey = PlatformManager().isChaoxing ?
     _chaoxingAccountsKey : _rainClassroomAccountsKey;
     
-    final String? accountsJson = _prefs.getString(accountsKey);
+    final String? accountsJson = StorageManager.prefs.getString(accountsKey);
     if (accountsJson != null) {
       final List<dynamic> accountsData = json.decode(accountsJson);
       return accountsData.map((data) => User.fromJson(data)).toList();
@@ -38,7 +36,7 @@ class AccountManager {
     _chaoxingAccountsKey : _rainClassroomAccountsKey;
     
     final accountsJson = json.encode(accounts.map((u) => u.toJson()).toList());
-    await _prefs.setString(accountsKey, accountsJson);
+    await StorageManager.prefs.setString(accountsKey, accountsJson);
     // 同步更新缓存
     _accounts = accounts;
   }
@@ -47,7 +45,6 @@ class AccountManager {
 
   /// 初始化账户管理器
   static Future<void> initialize() async {
-    _prefs = await SharedPreferences.getInstance();
     _accounts = await _getAllAccountsFromStorage();
     _currentSessionId = await getCurrentSession();
   }
@@ -59,7 +56,7 @@ class AccountManager {
   static Future<String?> getCurrentSession() async {
     final sessionKey = PlatformManager().isChaoxing ?
     _chaoxingSessionKey : _rainClassroomSessionKey;
-    _currentSessionId = _prefs.getString(sessionKey);
+    _currentSessionId = StorageManager.prefs.getString(sessionKey);
     return _currentSessionId;
   }
 
@@ -70,7 +67,7 @@ class AccountManager {
     _chaoxingSessionKey : _rainClassroomSessionKey;
 
     if (userId != null) {
-      await _prefs.setString(sessionKey, userId);
+      await StorageManager.prefs.setString(sessionKey, userId);
       final user = getAccountById(userId)!;
       if (user.imAccount != null) {
         EasemobIM().logout().then((_) {
@@ -157,7 +154,7 @@ class AccountManager {
   static Future<void> clearCurrentSession() async {
     final sessionKey = PlatformManager().isChaoxing ?
     _chaoxingSessionKey : _rainClassroomSessionKey;
-    await _prefs.remove(sessionKey);
+    await StorageManager.prefs.remove(sessionKey);
     final currentUserId = _currentSessionId;
     _currentSessionId = null;
     if (currentUserId != null) {

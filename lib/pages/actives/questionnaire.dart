@@ -278,7 +278,7 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
                         extensions: [
                           ImageExtension(
                             builder: (context) {
-                              final imageUrl = ApiService().toNewImageUrl(context.attributes['src'] ?? '');
+                              final imageUrl = ApiService.toNewImageUrl(context.attributes['src'] ?? '');
                               return Image.network(
                                 imageUrl,
                                 headers: HeadersManager.chaoxingHeaders,
@@ -341,7 +341,7 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
               extensions: [
                 ImageExtension(
                   builder: (context) {
-                    final imageUrl = ApiService().toNewImageUrl(context.attributes['src'] ?? '');
+                    final imageUrl = ApiService.toNewImageUrl(context.attributes['src'] ?? '');
                     return Image.network(
                       imageUrl,
                       headers: HeadersManager.chaoxingHeaders,
@@ -400,7 +400,7 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
             extensions: [
               ImageExtension(
                 builder: (context) {
-                  final imageUrl = ApiService().toNewImageUrl(context.attributes['src'] ?? '');
+                  final imageUrl = ApiService.toNewImageUrl(context.attributes['src'] ?? '');
                   return Image.network(
                     imageUrl,
                     headers: HeadersManager.chaoxingHeaders,

@@ -101,38 +101,6 @@ class _QuizPageState extends State<QuizPage> {
   // 账号选择
   List<User> _selectedAccounts = [];
   User? _currentUser;
-
-  /// 将Star3图片转换为Star4 减少一次重定向
-  String toNewImageUrl(String url) {
-    // https://p.cldisk.com/star3/100_100c/{fileName}.png
-    // -> https://p.cldisk.com/star4/{fileName}/100_100c.png
-      
-    // https://p.cldisk.com/star3/origin/{fileName}
-    // -> https://p.cldisk.com/star4/{fileName}/origin.png
-    try {
-      final uri = Uri.parse(url);
-      final pathSegments = uri.pathSegments;
-        
-      if (pathSegments.length >= 3) {
-        final size = pathSegments[1];
-        final fileNameWithExt = pathSegments[2];
-  
-        final lastDotIndex = fileNameWithExt.lastIndexOf('.');
-        if (lastDotIndex != -1) {
-          // 有扩展名: 100_100c/fileName.png
-          final filename = fileNameWithExt.substring(0, lastDotIndex);
-          final extension = fileNameWithExt.substring(lastDotIndex);
-          return '${uri.scheme}://${uri.host}/star4/$filename/$size$extension';
-        } else {
-          // 无扩展名: origin/fileName
-          return '${uri.scheme}://${uri.host}/star4/$fileNameWithExt/$size.png';
-        }
-      }
-    } catch (e) {
-      debugPrint('URL转换失败: $e');
-    }
-    return url;
-  }
   
   @override
   void initState() {
@@ -618,7 +586,7 @@ class _QuizPageState extends State<QuizPage> {
                         extensions: [
                           ImageExtension(
                             builder: (context) {
-                              final imageUrl = toNewImageUrl(context.attributes['src'] ?? '');
+                              final imageUrl = ApiService.toNewImageUrl(context.attributes['src'] ?? '');
                               return Image.network(
                                 imageUrl,
                                 headers: HeadersManager.chaoxingHeaders,
@@ -691,7 +659,7 @@ class _QuizPageState extends State<QuizPage> {
               extensions: [
                 ImageExtension(
                   builder: (context) {
-                    final imageUrl = toNewImageUrl(context.attributes['src'] ?? '');
+                    final imageUrl = ApiService.toNewImageUrl(context.attributes['src'] ?? '');
                     return Image.network(
                       imageUrl,
                       headers: HeadersManager.chaoxingHeaders,
@@ -752,7 +720,7 @@ class _QuizPageState extends State<QuizPage> {
             extensions: [
               ImageExtension(
                 builder: (context) {
-                  final imageUrl = toNewImageUrl(context.attributes['src'] ?? '');
+                  final imageUrl = ApiService.toNewImageUrl(context.attributes['src'] ?? '');
                   return Image.network(
                     imageUrl,
                     headers: HeadersManager.chaoxingHeaders,
@@ -824,7 +792,7 @@ class _QuizPageState extends State<QuizPage> {
         if (match.groupCount >= 1) {
           final url = match.group(1);
           if (url != null && url.isNotEmpty) {
-            urls.add(toNewImageUrl(url));
+            urls.add(ApiService.toNewImageUrl(url));
           }
         }
       }

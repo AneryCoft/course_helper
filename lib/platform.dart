@@ -1,10 +1,10 @@
 import 'package:course_helper/session/cookie.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
 import '../api/api_service.dart';
 import '../session/account.dart';
+import '../utils/storage.dart';
 import 'pages/accounts.dart';
 
 /// 平台类型枚举
@@ -27,7 +27,6 @@ class PlatformManager {
   factory PlatformManager() => _instance;
   PlatformManager._internal();
 
-  late SharedPreferences _prefs;
   static const _platformKey = 'current_platform';
   static const _serverKey = 'current_server';
   PlatformType _currentPlatform = PlatformType.chaoxing;
@@ -63,8 +62,7 @@ class PlatformManager {
   /// 初始化平台
   Future<void> initialize() async {
     try {
-      _prefs = await SharedPreferences.getInstance();
-      final platformStr = _prefs.getString(_platformKey);
+      final platformStr = StorageManager.prefs.getString(_platformKey);
 
       if (platformStr != null && platformStr.isNotEmpty) {
         switch (platformStr.toLowerCase()) {
@@ -78,7 +76,7 @@ class PlatformManager {
       }
       
       // 加载雨课堂服务器设置
-      final serverStr = _prefs.getString(_serverKey);
+      final serverStr = StorageManager.prefs.getString(_serverKey);
       if (serverStr != null && serverStr.isNotEmpty) {
         switch (serverStr.toLowerCase()) {
           case 'yuketang':
@@ -110,7 +108,7 @@ class PlatformManager {
     if (oldPlatform != platform) {
       _currentPlatform = platform;
       try {
-        await _prefs.setString(_platformKey, currentPlatformName);
+        await StorageManager.prefs.setString(_platformKey, currentPlatformName);
       } catch (e) {
         debugPrint('保存平台失败：$e');
       }
@@ -128,7 +126,7 @@ class PlatformManager {
     if (_currentServer != server) {
       _currentServer = server;
       try {
-        await _prefs.setString(_serverKey, serverName);
+        await StorageManager.prefs.setString(_serverKey, serverName);
       } catch (e) {
         debugPrint('保存服务器失败：$e');
       }

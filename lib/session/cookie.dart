@@ -2,11 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:cookie_jar/cookie_jar.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/login.dart';
 import 'account.dart';
 import '../platform.dart';
+import '../utils/storage.dart';
 
 class CookieInterceptor extends Interceptor {
   @override
@@ -67,12 +67,10 @@ class CookieManager {
   static bool isLoggingIn = false;
   static final Map<String, CookieJar> _userCookieJars = {};
   static CookieJar? _tempCookieJar; // 临时保存登录的 Cookie
-  static late SharedPreferences _prefs;
 
   static int refreshCounts = 0; // 只为每个平台刷新一次
 
   static Future<void> initialize() async {
-    _prefs = await SharedPreferences.getInstance();
     await loadAllCookies();
   }
 
@@ -173,7 +171,7 @@ class CookieManager {
 
   /// 加载用户的 Cookie
   static Future<void> _loadCookiesForUser(String userId, CookieJar cookieJar) async {
-    final String? cookiesJson = _prefs.getString('cookies_$userId');
+    final String? cookiesJson = StorageManager.prefs.getString('cookies_$userId');
     if (cookiesJson == null) return;
 
     try {
@@ -223,7 +221,7 @@ class CookieManager {
       });
     }
 
-    await _prefs.setString('cookies_$userId', json.encode(cookiesData));
+    await StorageManager.prefs.setString('cookies_$userId', json.encode(cookiesData));
   }
 
   /// 保存当前用户的 Cookie
@@ -247,7 +245,7 @@ class CookieManager {
   /// 清除指定用户的所有 Cookie
   static Future<void> clearCookiesForUser(String userId) async {
     _userCookieJars.remove(userId);
-    await _prefs.remove('cookies_$userId');
+    await StorageManager.prefs.remove('cookies_$userId');
   }
 
   /// 清除当前用户的 Cookie

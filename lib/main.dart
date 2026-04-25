@@ -12,6 +12,7 @@ import'./api/api_service.dart';
 import'./session/cookie.dart';
 import'./session/account.dart';
 import'./platform.dart';
+import './utils/storage.dart';
 import 'push/easemob.dart';
 
 // 全局Navigator Key,用于在无context时显示dialog
@@ -19,6 +20,8 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await StorageManager.initialize();
 
   await ApiService.initialize();
 
