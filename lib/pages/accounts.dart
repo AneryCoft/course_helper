@@ -301,10 +301,13 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
         mainAxisSize: MainAxisSize.min,
         children: [
           if (!user.status)
-            Icon(
-              Icons.error_outline,
-              color: Colors.red,
-              size: 30
+            Tooltip(
+              message: '账号失效',
+              child: Icon(
+                Icons.error_outline,
+                color: Colors.red,
+                size: 30
+              )
             ),
           if (isCurrentAccount && PlatformManager().isChaoxing)
             IconButton(
