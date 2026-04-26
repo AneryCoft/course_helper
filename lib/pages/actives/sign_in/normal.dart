@@ -41,7 +41,11 @@ class NormalSign implements SignStrategy {
 
   static Widget buildSignArea(SignInPageState state) {
     final needPhoto = state.needPhoto;
-    final allPhotoTaken = state.signParams.photoCount == state.selectedAccounts.length;
+    // 检查所有选中的账号是否都有objectId
+    final allPhotoTaken = state.selectedAccounts.every((user) {
+      final objectId = state.signParams.getUserObjectId(user.uid);
+      return objectId != null && objectId.isNotEmpty;
+    });
     final canSign = state.selectedAccounts.isNotEmpty && (!needPhoto || allPhotoTaken);
 
     return Builder(
@@ -53,63 +57,34 @@ class NormalSign implements SignStrategy {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (needPhoto) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '拍照进度: ${state.signParams.photoCount}/${state.selectedAccounts.length}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: allPhotoTaken 
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context).colorScheme.secondary,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            LinearProgressIndicator(
-                              value: state.selectedAccounts.isEmpty
-                                  ? 0
-                                  : state.signParams.photoCount / state.selectedAccounts.length,
-                              backgroundColor: Theme.of(context).dividerColor,
-                              valueColor: AlwaysStoppedAnimation(
-                                allPhotoTaken 
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context).colorScheme.secondary,
-                              ),
-                            ),
-                          ],
+                  // 拍照和相册按钮
+                  Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: state.selectedAccounts.isEmpty || allPhotoTaken ?
+                          null : () => _takeBatchPhotoDirect(state, ImageSource.camera, context),
+                          icon: const Icon(Icons.camera_alt),
+                          label: const Text('拍照'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            foregroundColor: Colors.white
+                          )
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      // 拍照按钮
-                      ElevatedButton.icon(
-                        onPressed: state.selectedAccounts.isEmpty || allPhotoTaken
-                            ? null
-                            : () => _takeBatchPhotoDirect(state, ImageSource.camera),
-                        icon: const Icon(Icons.camera_alt),
-                        label: const Text('拍照'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
+                        const SizedBox(width: 32),
+                        ElevatedButton.icon(
+                          onPressed: state.selectedAccounts.isEmpty || allPhotoTaken ?
+                          null : () => _takeBatchPhotoDirect(state, ImageSource.gallery, context),
+                          icon: const Icon(Icons.photo_library),
+                          label: const Text('相册'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            foregroundColor: Colors.white
+                          )
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      // 相册按钮
-                      ElevatedButton.icon(
-                        onPressed: state.selectedAccounts.isEmpty || allPhotoTaken
-                            ? null
-                            : () => _takeBatchPhotoDirect(state, ImageSource.gallery),
-                        icon: const Icon(Icons.photo_library),
-                        label: const Text('相册'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -118,7 +93,18 @@ class NormalSign implements SignStrategy {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: canSign ? () => state.performMultiSign() : null,
+                    onPressed: canSign ? () {
+                      if (needPhoto && state.signParams.photoCount < state.selectedAccounts.length) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('请为所有账号上传照片（已上传 ${state.signParams.photoCount}/${state.selectedAccounts.length}）'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                        return;
+                      }
+                      state.performMultiSign();
+                    } : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,
@@ -126,7 +112,7 @@ class NormalSign implements SignStrategy {
                     ),
                     child: const Text(
                       '立即签到',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
                     ),
                   ),
                 ),
@@ -138,16 +124,14 @@ class NormalSign implements SignStrategy {
     );
   }
 
-  static Future<void> _takeBatchPhotoDirect(SignInPageState state, ImageSource source) async {
+  static Future<void> _takeBatchPhotoDirect(SignInPageState state, ImageSource source, BuildContext context) async {
     final BuildContext context = state.context;
     final selectedAccounts = state.selectedAccounts;
     
     if (selectedAccounts.isEmpty) return;
-    
-    // 请求相应权限
-    PermissionStatus status;
+
     if (source == ImageSource.camera) {
-      status = await Permission.camera.request();
+      final status = await Permission.camera.request();
       if (status != PermissionStatus.granted) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -156,66 +140,82 @@ class NormalSign implements SignStrategy {
         }
         return;
       }
-    } else {
-      status = await Permission.photos.request();
-      if (status != PermissionStatus.granted) {
-        if (context.mounted) {
-          // 显示详细的权限说明
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('请为应用开启相册访问权限'),
-              duration: Duration(seconds: 4),
-            ),
-          );
-        }
-        return;
-      }
     }
-    
-    state.updateMultiSignStatus(true, selectedAccounts.length);
-    state.showProgressSnackBar('开始为 ${selectedAccounts.length} 个账号${source == ImageSource.camera ? '拍照' : '选择图片'}...');
     
     final picker = ImagePicker();
+    List<XFile> pickedFiles = [];
     
-    for (int i = 0; i < selectedAccounts.length; i++) {
-      final user = selectedAccounts[i];
-      
-      AccountManager.setCurrentSessionTemp(user.uid);
-      state.showProgressSnackBar('正在为账号 ${user.name} ${source == ImageSource.camera ? '拍照' : '选择图片'} (${i + 1}/${selectedAccounts.length})');
-      
-      try {
-        XFile? pickedFile;
-        if (source == ImageSource.camera) {
-          pickedFile = await picker.pickImage(source: ImageSource.camera);
-        } else {
-          pickedFile = await picker.pickImage(source: ImageSource.gallery);
-        }
-        
-        if (pickedFile != null) {
-          final File imageFile = File(pickedFile.path);
-          final String? objectId = await CXUploadApi.uploadImage(imageFile, user.uid);
-          if (objectId != null) {
-            state.signParams.setUserObjectId(user.uid, objectId);
-            state.updatePhotoProgress(i + 1);
-          } else {
-            state.addFailedAccount('${user.name} (上传失败)');
+    // 计算起始索引（从已上传的数量开始）
+    final startIndex = state.signParams.photoCount;
+    final neededCount = selectedAccounts.length;
+    
+    try {
+      if (source == ImageSource.gallery) {
+        final photoCount = neededCount - startIndex;
+        // pickMultiImage 的 limit 不能小于 2
+        if (photoCount <= 1) {
+          final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+          if (pickedFile != null) {
+            pickedFiles = [pickedFile];
           }
         } else {
-          state.addFailedAccount('${user.name} (未选择图片)');
+          pickedFiles = await picker.pickMultiImage(limit: photoCount);
+        }
+      } else {
+        final pickedFile = await picker.pickImage(source: ImageSource.camera);
+        if (pickedFile != null) {
+          pickedFiles = [pickedFile];
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('选择图片错误：$e')),
+        );
+      }
+      return;
+    }
+    
+    if (pickedFiles.isEmpty) {
+      return;
+    }
+
+    final int remainingCount = neededCount - startIndex;
+    if (pickedFiles.length > remainingCount) {
+      pickedFiles = pickedFiles.sublist(0, remainingCount);
+    }
+    
+    final failedAccounts = <String>[];
+    
+    // 串行上传图片（避免token冲突）
+    for (int i = 0; i < pickedFiles.length; i++) {
+      final int index = startIndex + i;
+      final user = selectedAccounts[index];
+      final pickedFile = pickedFiles[i];
+      
+      AccountManager.setCurrentSessionTemp(user.uid);
+      
+      // 设置图片和上传状态
+      state.setUserImage(user.uid, File(pickedFile.path));
+      state.setUserUploadingStatus(user.uid, true);
+      
+      try {
+        final objectId = await CXUploadApi.uploadImage(File(pickedFile.path), user.uid);
+        
+        if (objectId != null) {
+          state.signParams.setUserObjectId(user.uid, objectId);
+          state.setUserUploadingStatus(user.uid, false);
+          state.refresh();
+        } else {
+          failedAccounts.add('${user.name} (上传失败)');
+          state.signParams.setUserObjectId(user.uid, '');
+          state.setUserUploadFailed(user.uid);
         }
       } catch (e) {
-        state.addFailedAccount('${user.name} (处理异常: $e)');
+        failedAccounts.add('${user.name} (处理异常: $e)');
+        state.setUserUploadFailed(user.uid);
       }
-      
-      await Future.delayed(const Duration(milliseconds: 500));
     }
-    
-    // 恢复原账号
-    if (state.currentUser != null) {
-      AccountManager.setCurrentSessionTemp(state.currentUser!.uid);
-    }
-    
-    state.updateMultiSignStatus(false);
-    state.showPhotoResult(state.signParams.photoCount, selectedAccounts.length);
+    AccountManager.setCurrentSessionTemp(state.currentUser!.uid);
   }
 }

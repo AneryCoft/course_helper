@@ -10,52 +10,50 @@ class CXUploadApi {
   static Future<String?> uploadImage(File imageFile, String userId) async {
     try {
       final tokenUrl = 'https://pan-yz.chaoxing.com/api/token/uservalid';
-      final tokenResponse = await ApiService.sendRequest(tokenUrl, method: "GET");
+      final tokenResponse = await ApiService.sendRequest(tokenUrl);
 
       if (tokenResponse.data == null) {
         debugPrint('Failed to get token');
         return null;
       }
-      String token = tokenResponse.data['_token'];
+      final String token = tokenResponse.data['_token'];
 
       final crcUrl = 'https://pan-yz.chaoxing.com/api/crcStorageStatus';
-
       final crc = await EncryptionUtil.getCRC(imageFile);
       final crcParams = {
         'puid': userId,
         'crc': crc,
         '_token': token
       };
-
-      await ApiService.sendRequest(crcUrl, method: "GET", params: crcParams);
+      await ApiService.sendRequest(crcUrl, params: crcParams);
 
       DateTime now = DateTime.now();
-      String timestamp = "${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}";
+      final timestamp = "${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}";
       final milliseconds = DateTime.now().millisecond.toString().padLeft(3, '0');
-      String formattedTime = '$timestamp$milliseconds';
-      String fileName = "$formattedTime.jpg";
+      final formattedTime = '$timestamp$milliseconds';
+      final fileName = "$formattedTime.jpg";
       // 20260205191805009.jpg
 
-      FormData formData = FormData.fromMap({
+      final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(imageFile.path, filename: fileName),
         'puid': userId
       });
 
-      String uploadUrl = 'https://pan-yz.chaoxing.com/upload?_from=mobilelearn&_token=$token';
+      final uploadUrl = 'https://pan-yz.chaoxing.com/upload?_from=mobilelearn&_token=$token';
 
-      final uploadResponse = await ApiService.sendRequest(
-        uploadUrl,
-        method: "POST",
-        body: formData,
-      );
+      final uploadResponse = await ApiService.sendRequest(uploadUrl, method: "POST", body: formData);
+      final objectId = uploadResponse.data['data']['objectId'];
 
-      Map<String, dynamic> responseData = uploadResponse.data;
-      String? objectId = responseData['data']['objectId'];
       return objectId;
     } catch (e) {
       debugPrint('uploadImage error: $e');
     }
     return null;
+  }
+
+  /// 通过objectId获取图片Url
+  static String getImageUrl(String objectId) {
+    return 'https://p.ananas.chaoxing.com/star4/$objectId/origin.jpg';
   }
 }
 

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:io';
 
 import '../../../../api/active.dart';
 import '../../../../api/api_service.dart';
 import '../../../../api/sign_in.dart';
+import '../../../../setting/course_setting.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
 import '../../../session/account.dart';
@@ -170,11 +172,9 @@ class SignInPageState extends State<SignInPage> {
   // 账号选择
   List<User> _selectedAccounts = [];
   User? _currentUser;
+  final GlobalKey<AccountsSelectorState> _accountsSelectorKey = GlobalKey<AccountsSelectorState>();
 
-  // 批量签到进度
-  int _signedCount = 0;
-  int _totalCount = 0;
-  final List<String> _failedAccounts = [];
+
 
   // UserId -> {Validate, enc2}
   final Map<String, Map<String, String>> _userCaptchaValidate = {};
@@ -191,6 +191,22 @@ class SignInPageState extends State<SignInPage> {
   
   Map<String, String>? getUserCaptchaValidate(String userId) {
     return _userCaptchaValidate[userId];
+  }
+
+  void setUserImage(String uid, File imageFile) {
+    _accountsSelectorKey.currentState?.setImageForUser(uid, imageFile);
+  }
+
+  void setUserUploadingStatus(String uid, bool isUploading) {
+    _accountsSelectorKey.currentState?.setUploadingStatus(uid, isUploading);
+  }
+
+  void setUserUploadFailed(String uid) {
+    _accountsSelectorKey.currentState?.setUploadFailed(uid);
+  }
+
+  void refresh() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -266,6 +282,11 @@ class SignInPageState extends State<SignInPage> {
         }
       }
       if (mounted) setState(() {});
+
+      // 为已选中的账号分配图片
+      if (widget.active.signType == SignType.normal && _needPhoto && _selectedAccounts.isNotEmpty) {
+        _assignImages();
+      }
     } catch (e, stackTrace) {
       debugPrint('签到信息解析失败：$e \n$stackTrace');
     }
@@ -286,28 +307,7 @@ class SignInPageState extends State<SignInPage> {
     }
   }
 
-  void updateMultiSignStatus(bool isMultiSigning, [int? totalCount]) {
-    setState(() {
-      _isMultiSigning = isMultiSigning;
-      if (totalCount != null) {
-        _totalCount = totalCount;
-        _signedCount = 0;
-        _failedAccounts.clear();
-      }
-    });
-  }
 
-  void updatePhotoProgress(int count) {
-    setState(() {
-      _signedCount = count;
-    });
-  }
-
-  void addFailedAccount(String account) {
-    setState(() {
-      _failedAccounts.add(account);
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -325,11 +325,7 @@ class SignInPageState extends State<SignInPage> {
               children: [
                 const SizedBox(height: 20),
 
-                // 批量签到进度显示
-                if (_isMultiSigning)
-                  _buildProgressCard(),
 
-                const SizedBox(height: 20),
 
                 // 签到操作区域 - 根据策略动态显示
                 if (_currentStrategy != null)
@@ -339,10 +335,15 @@ class SignInPageState extends State<SignInPage> {
 
                 // 账号选择
                 AccountsSelector(
+                  key: _accountsSelectorKey,
                   onSelectionChanged: (selected) {
                     setState(() {
                       _selectedAccounts = selected;
                     });
+                    // 普通签到需要照片时，自动分配课程配置的图片
+                    if (widget.active.signType == SignType.normal && _needPhoto) {
+                      _assignImages();
+                    }
                   },
                   title: '选择签到账号',
                 ),
@@ -360,39 +361,7 @@ class SignInPageState extends State<SignInPage> {
     );
   }
 
-  Widget _buildProgressCard() {
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            LinearProgressIndicator(
-              value: _totalCount > 0 ? _signedCount / _totalCount : 0,
-              backgroundColor: Theme.of(context).dividerColor,
-              valueColor: AlwaysStoppedAnimation(Theme.of(context).colorScheme.primary),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '签到进度: $_signedCount/$_totalCount',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            if (_failedAccounts.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  '失败: ${_failedAccounts.length}',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildLoadingOverlay() {
     return Container(
@@ -442,13 +411,15 @@ class SignInPageState extends State<SignInPage> {
     setState(() {
       _isLoading = true;
       _isMultiSigning = true;
-      _signedCount = 0;
-      _totalCount = _selectedAccounts.length;
-      _failedAccounts.clear();
     });
 
+    final failedAccounts = <String>[];
+    final totalCount = _selectedAccounts.length;
+
+    final isQrCodeSign = widget.active.signType == SignType.qrCode;
+
     // 除二维码签到以外 其他签到预先处理验证码
-    if (_needCaptcha && widget.active.signType != SignType.qrCode) {
+    if (_needCaptcha && !isQrCodeSign) {
       for (var user in _selectedAccounts) {
         AccountManager.setCurrentSessionTemp(user.uid);
 
@@ -477,11 +448,7 @@ class SignInPageState extends State<SignInPage> {
     for (int i = 0; i < _selectedAccounts.length; i++) {
       final user = _selectedAccounts[i];
       final result = results[i];
-      await _handleSignResult(result, user);
-    }
-    // 恢复当前用户会话
-    if (_currentUser != null) {
-      AccountManager.setCurrentSessionTemp(_currentUser!.uid);
+      await _handleSignResult(result, user, failedAccounts);
     }
   
     if (mounted) {
@@ -491,12 +458,12 @@ class SignInPageState extends State<SignInPage> {
       });
     }
   
-    _showMultiSignResult();
+    _showMultiSignResult(totalCount, failedAccounts);
   }
 
-  Future<void> _handleSignResult(String? result, User user) async {
+  Future<void> _handleSignResult(String? result, User user, List<String> failedAccounts) async {
     if (result == null) {
-      _addFailedAccount(user, '无响应');
+      failedAccounts.add('${user.name} (无响应)');
       return;
     }
 
@@ -514,23 +481,18 @@ class SignInPageState extends State<SignInPage> {
           _showErrorMessage('验证码取消或失败');
           return;
         }
+        final resignResult = await _currentStrategy!.signForAccount(user, _signParams, this);
+        await _handleSignResult(resignResult, user, failedAccounts);
       }
     } else if (result == 'success') {
       // 签到成功
       debugPrint('${user.name} 签到成功');
     } else if (result == 'success2') {
-      _addFailedAccount(user, '已过截止时间');
+      failedAccounts.add('${user.name} (已过截止时间)');
     } else {
       // 签到失败，请重新签到 -> 二维码过期
-
-      _addFailedAccount(user, result);
+      failedAccounts.add('${user.name} ($result)');
     }
-  }
-
-  void _addFailedAccount(User user, String reason) {
-    setState(() {
-      _failedAccounts.add('${user.name} ($reason)');
-    });
   }
 
   Future<bool> _handleCaptcha(String userId) async {
@@ -552,45 +514,22 @@ class SignInPageState extends State<SignInPage> {
     }
   }
 
-  void showPhotoResult(int successCount, int totalCount) {
+  void _showMultiSignResult(int totalCount, List<String> failedAccounts) {
     if (!mounted) return;
 
-    String message = '拍照完成: $successCount/$totalCount 成功';
-    if (_failedAccounts.isNotEmpty) {
-      message += '\n\n失败:\n${_failedAccounts.join('\n')}';
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('拍照完成'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showMultiSignResult() {
-    if (!mounted) return;
-
-    final successCount = _totalCount - _failedAccounts.length;
-    String message = '签到完成！\n成功: $successCount/$_totalCount';
-    if (_failedAccounts.isNotEmpty) {
-      message += '\n\n失败账号:\n${_failedAccounts.join('\n')}';
+    final successCount = totalCount - failedAccounts.length;
+    String message = '签到完成！\n成功: $successCount/$totalCount';
+    if (failedAccounts.isNotEmpty) {
+      message += '\n\n失败账号:\n${failedAccounts.join('\n')}';
     }
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          successCount == _totalCount ? '全部签到成功' : '部分失败',
+          successCount == totalCount ? '全部签到成功' : '部分失败',
           style: TextStyle(
-            color: successCount == _totalCount ? Colors.green : Colors.orange,
+            color: successCount == totalCount ? Colors.green : Colors.orange,
           ),
         ),
         content: Text(message),
@@ -602,17 +541,6 @@ class SignInPageState extends State<SignInPage> {
             child: const Text('确定'),
           ),
         ],
-      ),
-    );
-  }
-
-  void showProgressSnackBar(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -645,5 +573,30 @@ class SignInPageState extends State<SignInPage> {
     if (code.length == _signParams.numberCount) {
       _signParams.code = code;
     }
+  }
+
+  /// 为选中的账号分配课程配置的图片objectId
+  Future<void> _assignImages() async {
+    if (_selectedAccounts.isEmpty) return;
+    
+    final settings = await CourseSetting.getSettings(_signParams.courseId);
+    if (settings?.imageObjectIds == null || settings!.imageObjectIds!.isEmpty) return;
+    
+    final imageObjectIds = settings.imageObjectIds!;
+    
+    // 为每个选中的账号分配图片objectId
+    for (int i = 0; i < _selectedAccounts.length && i < imageObjectIds.length; i++) {
+      final user = _selectedAccounts[i];
+      final existingObjectId = _signParams.getUserObjectId(user.uid);
+      
+      // 只在没有objectId时才分配
+      if (existingObjectId == null || existingObjectId.isEmpty) {
+        _signParams.setUserObjectId(user.uid, imageObjectIds[i]);
+        // 通知账号选择器显示网络图片
+        _accountsSelectorKey.currentState?.setObjectIdForUser(user.uid, imageObjectIds[i]);
+      }
+    }
+    
+    if (mounted) setState(() {});
   }
 }

@@ -13,6 +13,8 @@ class Course {
   final String? endDate;
 
   final String? lessonId;
+  
+  CourseSettings? settings;
 
 
   Course({
@@ -27,7 +29,8 @@ class Course {
     required this.state,
     this.beginDate,
     this.endDate,
-    this.lessonId
+    this.lessonId,
+    this.settings,
   });
 
   factory Course.fromCXJson(Map<String, dynamic> json) {
@@ -75,4 +78,92 @@ class Course {
     'beginDate': beginDate ?? '',
     'endDate': endDate ?? '',
   };
+
+  Course withSettings(CourseSettings? settings) {
+    return Course(
+      courseId: courseId,
+      classId: classId,
+      cpi: cpi,
+      image: image,
+      name: name,
+      teacher: teacher,
+      schools: schools,
+      note: note,
+      state: state,
+      beginDate: beginDate,
+      endDate: endDate,
+      lessonId: lessonId,
+      settings: settings,
+    );
+  }
+}
+
+class CourseLocation {
+  final String? classroom;
+  final String address;
+  final String latitude;
+  final String longitude;
+
+  CourseLocation({
+    this.classroom,
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  factory CourseLocation.fromJson(Map<String, dynamic> json) {
+    return CourseLocation(
+      classroom: json['classroom'],
+      address: json['address'],
+      latitude: json['latitude'],
+      longitude: json['longitude']
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'classroom': classroom,
+      'address': address,
+      'latitude': latitude,
+      'longitude': longitude
+    };
+  }
+}
+
+class CourseSettings {
+  final CourseLocation? location;
+  final List<String>? imageObjectIds;
+
+  CourseSettings({
+    this.location,
+    this.imageObjectIds,
+  });
+
+  factory CourseSettings.fromJson(Map<String, dynamic> json) {
+    return CourseSettings(
+      location: json['location'] != null
+          ? CourseLocation.fromJson(json['location'])
+          : null,
+      imageObjectIds: json['imageObjectIds'] != null
+          ? List<String>.from(json['imageObjectIds'])
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'location': location?.toJson(),
+      'imageObjectIds': imageObjectIds,
+    };
+  }
+
+  CourseSettings copyWith({
+    CourseLocation? location,
+    List<String>? imageObjectIds,
+  }) {
+    return CourseSettings(
+      location: location ?? this.location,
+      imageObjectIds: imageObjectIds ?? this.imageObjectIds
+    );
+  }
 }
