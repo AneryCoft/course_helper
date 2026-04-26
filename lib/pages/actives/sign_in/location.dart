@@ -3,6 +3,8 @@ import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 
 import '../../../../models/user.dart';
 import '../../../../api/sign_in.dart';
+import '../../../../setting/course_setting.dart';
+import '../../../../models/course.dart';
 import '../../widget/baidu_map.dart';
 import 'sign_in.dart';
 
@@ -44,8 +46,22 @@ class LocationSign implements SignStrategy {
   static Widget buildSignArea(SignInPageState state) {
     final hasLocation = state.signParams.address != null;
 
-    return Builder(
-      builder: (BuildContext context) {
+    return FutureBuilder<CourseSettings?>(
+      future: _loadCourseLocation(state),
+      builder: (context, snapshot) {
+        // 课程配置选择位置
+        if (!hasLocation && snapshot.hasData && snapshot.data?.location != null) {
+          final location = snapshot.data!.location!;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (state.mounted && state.signParams.address == null) {
+              state.signParams.latitude = double.tryParse(location.latitude);
+              state.signParams.longitude = double.tryParse(location.longitude);
+              state.signParams.address = location.address.isEmpty ? '未知位置' : location.address;
+              (state.context as Element).markNeedsBuild();
+            }
+          });
+        }
+
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -133,14 +149,7 @@ class LocationSign implements SignStrategy {
                             const SizedBox(width: 8),
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: () {
-                                  state.signParams.address = null;
-                                  state.signParams.latitude = null;
-                                  state.signParams.longitude = null;
-                                  if (state.mounted) {
-                                    (state.context as Element).markNeedsBuild();
-                                  }
-                                },
+                                onPressed: () => _showLocationPicker(state),
                                 child: const Text('重新选择'),
                               ),
                             ),
@@ -156,6 +165,13 @@ class LocationSign implements SignStrategy {
         );
       }
     );
+  }
+
+  /// 加载课程位置配置
+  static Future<CourseSettings?> _loadCourseLocation(SignInPageState state) async {
+    final courseId = state.signParams.courseId;
+    if (courseId.isEmpty) return null;
+    return await CourseSetting.getSettings(courseId);
   }
 
   static Future<void> _showLocationPicker(SignInPageState state) async {
@@ -193,6 +209,10 @@ class LocationSign implements SignStrategy {
                               ? '未知位置'
                               : selectedAddress!;
                           Navigator.pop(context);
+                          
+                          // 异步保存位置到课程配置
+                          _saveLocationToCourse(state);
+                          
                           state.performMultiSign();
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -213,5 +233,24 @@ class LocationSign implements SignStrategy {
         ),
       ),
     );
+  }
+
+  /// 异步保存位置到课程配置
+  static Future<void> _saveLocationToCourse(SignInPageState state) async {
+    await saveLocationToCourse(state);
+  }
+
+  /// 公共方法：保存位置到课程配置
+  static Future<void> saveLocationToCourse(SignInPageState state) async {
+    final courseId = state.signParams.courseId;
+    if (courseId.isEmpty) return;
+
+    final location = CourseLocation(
+      address: state.signParams.address ?? '',
+      latitude: state.signParams.latitude?.toString() ?? '',
+      longitude: state.signParams.longitude?.toString() ?? ''
+    );
+
+    await CourseSetting.updateLocation(courseId, location);
   }
 }
