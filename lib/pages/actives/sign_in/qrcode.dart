@@ -12,9 +12,6 @@ import 'location.dart';
 
 class QRCodeSign implements SignStrategy {
   @override
-  String get signTypeName => '二维码签到';
-
-  @override
   Future<void> execute(
     BuildContext context,
     SignInPageState state,

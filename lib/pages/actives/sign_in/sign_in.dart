@@ -84,9 +84,6 @@ abstract class SignStrategy {
       SignParams params,
       SignInPageState state,
   );
-
-  /// 获取签到类型名称
-  String get signTypeName;
 }
 
 class SignStrategyFactory {

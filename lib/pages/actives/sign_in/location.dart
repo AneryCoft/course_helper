@@ -10,9 +10,6 @@ import 'sign_in.dart';
 
 class LocationSign implements SignStrategy {
   @override
-  String get signTypeName => '位置签到';
-
-  @override
   Future<void> execute(
       BuildContext context,
       SignInPageState state,

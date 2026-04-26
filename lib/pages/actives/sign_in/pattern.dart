@@ -7,9 +7,6 @@ import 'sign_in.dart';
 
 class PatternSign implements SignStrategy {
   @override
-  String get signTypeName => '手势签到';
-
-  @override
   Future<void> execute(
       BuildContext context,
       SignInPageState state,
