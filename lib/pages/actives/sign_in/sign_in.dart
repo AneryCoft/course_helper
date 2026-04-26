@@ -154,6 +154,7 @@ class SignInPageState extends State<SignInPage> {
   // 签到状态管理
   bool _isLoading = false;
   bool _isMultiSigning = false;
+  bool _isDataLoaded = false;
 
   // 签到数据
   // late bool _needPhoto;
@@ -211,7 +212,6 @@ class SignInPageState extends State<SignInPage> {
     super.initState();
     final currentSessionId = AccountManager.currentSessionId!;
     _currentUser = AccountManager.getAccountById(currentSessionId);
-    _initSignStrategy();
     
     _signParams = SignParams(
       active: widget.active,
@@ -224,6 +224,8 @@ class SignInPageState extends State<SignInPage> {
     if (widget.enc != null) {
       _signParams.enc = widget.enc;
     }
+
+    _loadActivityData();
   }
 
   @override
@@ -249,7 +251,12 @@ class SignInPageState extends State<SignInPage> {
         _attendNum = activeInfo['attendNum'];
         // openPreventCheatFlag 1
         _needCaptcha = activeInfo['showVCode'] == 1;
-  
+        
+        // 根据 otherId 确定签到类型
+        if (widget.active.signType == null) {
+          widget.active.signType = getSignTypeFromIndex(_signTypeId);
+        }
+
         switch (widget.active.signType) {
           case SignType.normal:
             _needPhoto = activeInfo['ifphoto'] == 1;
@@ -265,6 +272,12 @@ class SignInPageState extends State<SignInPage> {
             break;
           case _:
         }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('获取活动信息失败')),
+          );
+        }
       }
       if (attendInfo != null){
         _status = attendInfo['status'];
@@ -278,7 +291,6 @@ class SignInPageState extends State<SignInPage> {
           }
         }
       }
-      if (mounted) setState(() {});
 
       // 为已选中的账号分配图片
       if (widget.active.signType == SignType.normal && _needPhoto && _selectedAccounts.isNotEmpty) {
@@ -289,17 +301,25 @@ class SignInPageState extends State<SignInPage> {
     }
   }
 
-  Future<void> _initSignStrategy() async {
+  Future<void> _loadActivityData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     await _parseSignInfo();
-    if (widget.active.signType == null) {
-      widget.active.signType = getSignTypeFromIndex(_signTypeId);
-    }
+    
     _currentStrategy = SignStrategyFactory.create(widget.active.signType);
-    if (_currentStrategy != null) {
+    
+    setState(() {
+      _isLoading = false;
+      _isDataLoaded = true;
+    });
+
+    if (_currentStrategy != null && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _currentStrategy!.execute(context, this, _signParams);
       });
-    } else {
+    } else if (mounted) {
       _showErrorMessage('未知的签到类型');
     }
   }
@@ -308,7 +328,20 @@ class SignInPageState extends State<SignInPage> {
 
   @override
   Widget build(BuildContext context) {
-  return Scaffold(
+    if (!_isDataLoaded) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.active.name),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Colors.white,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator()
+        )
+      );
+    }
+
+    return Scaffold(
       appBar: AppBar(
         title: Text(widget.active.name),
         backgroundColor: Theme.of(context).colorScheme.primary,
