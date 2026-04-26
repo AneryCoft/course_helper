@@ -195,31 +195,6 @@ class ApiService {
     return response;
   }
 
-  /// 将学习通的Star3图片转换为Star4 减少一次重定向
-  static String toNewImageUrl(String url) {
-    try {
-      final uri = Uri.parse(url);
-      final pathSegments = uri.pathSegments;
-
-      if (pathSegments.length >= 3) {
-        final size = pathSegments[1];
-        final fileNameWithExt = pathSegments[2];
-
-        final lastDotIndex = fileNameWithExt.lastIndexOf('.');
-        if (lastDotIndex != -1) {
-          final filename = fileNameWithExt.substring(0, lastDotIndex);
-          final extension = fileNameWithExt.substring(lastDotIndex);
-          return '${uri.scheme}://${uri.host}/star4/$filename/$size$extension';
-        } else {
-          return '${uri.scheme}://${uri.host}/star4/$fileNameWithExt/$size.png';
-        }
-      }
-    } catch (e) {
-      debugPrint('URL转换失败: $e');
-    }
-    return url;
-  }
-
   /// 并发用户请求
   static Future<List<dynamic>> sendForEachUser(
       List<User> users,

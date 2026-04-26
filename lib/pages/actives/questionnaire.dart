@@ -3,6 +3,7 @@ import 'package:flutter_html/flutter_html.dart';
 
 import '../../../api/api_service.dart';
 import '../../../api/quiz.dart';
+import '../../../api/upload.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
 import '../../../session/account.dart';
@@ -278,7 +279,7 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
                         extensions: [
                           ImageExtension(
                             builder: (context) {
-                              final imageUrl = ApiService.toNewImageUrl(context.attributes['src'] ?? '');
+                              final imageUrl = CXUploadApi.toNewImageUrl(context.attributes['src'] ?? '');
                               return Image.network(
                                 imageUrl,
                                 headers: HeadersManager.chaoxingHeaders,
@@ -341,7 +342,7 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
               extensions: [
                 ImageExtension(
                   builder: (context) {
-                    final imageUrl = ApiService.toNewImageUrl(context.attributes['src'] ?? '');
+                    final imageUrl = CXUploadApi.toNewImageUrl(context.attributes['src'] ?? '');
                     return Image.network(
                       imageUrl,
                       headers: HeadersManager.chaoxingHeaders,
@@ -400,7 +401,7 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
             extensions: [
               ImageExtension(
                 builder: (context) {
-                  final imageUrl = ApiService.toNewImageUrl(context.attributes['src'] ?? '');
+                  final imageUrl = CXUploadApi.toNewImageUrl(context.attributes['src'] ?? '');
                   return Image.network(
                     imageUrl,
                     headers: HeadersManager.chaoxingHeaders,
