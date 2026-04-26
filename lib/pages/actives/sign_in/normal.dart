@@ -13,15 +13,12 @@ import 'sign_in.dart';
 
 class NormalSign implements SignStrategy {
   @override
-  String get signTypeName => '普通签到';
-
-  @override
   Future<void> execute(
       BuildContext context,
       SignInPageState state,
       SignParams params,
       ) async {
-    // 不需要额外操作，UI已经在build中集成
+    // 不需要额外操作，图片分配在账号选择回调中处理
   }
 
   @override

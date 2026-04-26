@@ -7,9 +7,6 @@ import 'sign_in.dart';
 
 class CodeSign implements SignStrategy {
   @override
-  String get signTypeName => '签到码签到';
-
-  @override
   Future<void> execute(
       BuildContext context,
       SignInPageState state,
