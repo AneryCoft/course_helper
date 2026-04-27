@@ -160,12 +160,25 @@ class _CourseContentPageState extends State<CourseContentPage> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                subtitle: Text(
-                  active.description,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      active.description.isEmpty ?
+                      '手动结束' : active.description,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    Text(
+                      '参与人数：${active.attendNum}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey
+                      )
+                    )
+                  ],
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
@@ -502,6 +515,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                         description: '',
                         startTime: 0,
                         url: '',
+                        attendNum: 0,
                         status: true,
                         signType: SignType.qrCode
                     ),

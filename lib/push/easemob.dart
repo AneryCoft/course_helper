@@ -129,6 +129,7 @@ class EasemobIM {
         description: activeInfo['subTitle'],
         startTime: 0,
         url: activeInfo['url'],
+        attendNum: 0,
         status: true
       );
 

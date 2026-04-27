@@ -67,6 +67,7 @@ class Active {
   late String description;
   final int startTime;
   final String url;
+  final int attendNum;
   final bool status;
   final Map<String, dynamic>? extras;
   final ActiveType activeType;
@@ -79,6 +80,7 @@ class Active {
     required this.description,
     required this.startTime,
     required this.url,
+    required this.attendNum,
     required this.status,
     this.extras,
     this.signType
@@ -95,6 +97,7 @@ class Active {
       description: json['nameTwo'] ?? '',
       startTime: json['startTime'] ?? 0,
       url: json['url'] ?? '',
+      attendNum: json['attendNum'] ?? 0,
       status: json['status'] == 1,
       extras: json['extraInfo']
     );

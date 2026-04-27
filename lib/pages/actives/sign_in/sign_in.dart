@@ -132,8 +132,6 @@ class SignInPageState extends State<SignInPage> {
 
   int _signTypeId = 0;
 
-  int? _attendNum;
-
   int _status = 0;
   /*
   status:
@@ -248,7 +246,6 @@ class SignInPageState extends State<SignInPage> {
   
       if (activeInfo != null){
         _signTypeId = activeInfo['otherId'];
-        _attendNum = activeInfo['attendNum'];
         // openPreventCheatFlag 1
         _needCaptcha = activeInfo['showVCode'] == 1;
         
