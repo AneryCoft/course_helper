@@ -582,21 +582,23 @@ class _QuizPageState extends State<QuizPage> {
                         '[${_getQuizTypeName(quizType)}] ',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
-                      Html(
-                        data: quiz['content'] ?? '',
-                        extensions: [
-                          ImageExtension(
-                            builder: (context) {
-                              final imageUrl = CXUploadApi.toNewImageUrl(context.attributes['src'] ?? '');
-                              return Image.network(
-                                imageUrl,
-                                headers: HeadersManager.chaoxingHeaders,
-                                width: 80,
-                                alignment: Alignment.bottomCenter
-                              );
-                            }
-                          )
-                        ]
+                      SelectionArea(
+                        child: Html(
+                          data: quiz['content'] ?? '',
+                          extensions: [
+                            ImageExtension(
+                              builder: (context) {
+                                final imageUrl = CXUploadApi.toNewImageUrl(context.attributes['src'] ?? '');
+                                return Image.network(
+                                  imageUrl,
+                                  headers: HeadersManager.chaoxingHeaders,
+                                  width: 80,
+                                  alignment: Alignment.bottomCenter
+                                );
+                              }
+                            )
+                          ]
+                        ),
                       ),
                     ],
                   ),
