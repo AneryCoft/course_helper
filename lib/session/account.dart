@@ -112,13 +112,12 @@ class AccountManager {
   static Future<void> addAccount(User user) async {
     final accounts = _accounts;
     final index = accounts.indexWhere((acc) => acc.uid == user.uid);
+    // 将临时Cookie迁移到该账号
+    await CookieManager.saveTempCookies(user.uid);
     if (index != -1) {
       accounts[index] = user;
     } else {
       accounts.add(user);
-      // 将临时Cookie迁移到该账号
-      await CookieManager.saveTempCookies(user.uid);
-
       // 如果没有当前会话，自动设置为当前账户
       if (!hasActiveSession()) {
         await setCurrentSession(user.uid);
