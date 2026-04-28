@@ -111,6 +111,7 @@ class EasemobIM {
     try {
       await EMClient.getInstance.logout(true);
       _isLoggedIn = false;
+      _onConnectionChanged?.call(false);
     } catch (e) {
       debugPrint('Easemob退出失败: $e');
     }
