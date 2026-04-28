@@ -32,6 +32,7 @@ class CXUploadApi {
       final milliseconds = DateTime.now().millisecond.toString().padLeft(3, '0');
       final formattedTime = '$timestamp$milliseconds';
       final fileName = "$formattedTime.jpg";
+      // DateFormat('yyyyMMddHHmmssSSS').format(DateTime.now());
       // 20260205191805009.jpg
 
       final formData = FormData.fromMap({
