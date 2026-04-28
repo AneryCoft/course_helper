@@ -220,30 +220,6 @@ class QRCodeSign implements SignStrategy {
                     // 二维码已扫描后的立即签到按钮
                     if (state.signParams.enc != null) ...[
                       const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.check_circle,
-                              size: 18,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text(
-                                '二维码已扫描，点击下方按钮签到',
-                                style: TextStyle(color: Colors.blue),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
