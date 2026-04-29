@@ -1,4 +1,4 @@
-import 'package:course_helper/api/upload.dart';
+import 'package:course_helper/api/image.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'dart:async';
@@ -205,7 +205,7 @@ class NormalSign implements SignStrategy {
       state.setUserUploadingStatus(user.uid, true);
       
       try {
-        final objectId = await CXUploadApi.uploadImage(File(pickedFile.path), user.uid);
+        final objectId = await CXImageApi.uploadImage(File(pickedFile.path), user.uid);
         
         if (objectId != null) {
           state.signParams.setUserObjectId(user.uid, objectId);

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../api/upload.dart';
+import '../../../api/image.dart';
 import '../../../api/sign_in.dart';
 import '../../../api/api_service.dart';
 import '../../widget/avatar.dart';
@@ -102,7 +102,7 @@ class _AttendListWidgetState extends State<AttendListWidget> {
         extraWidget = GestureDetector(
           onTap: () => _showImageDialog(context, title),
           child: Image.network(
-            CXUploadApi.getImageUrlWithSize(title, 50, 60),
+            CXImageApi.getImageUrlWithSize(title, 50, 60),
             headers: HeadersManager.chaoxingHeaders,
             width: 50,
             height: 60,
@@ -146,7 +146,7 @@ class _AttendListWidgetState extends State<AttendListWidget> {
           child: Row(
           children: [
             AvatarWidget(
-              imageUrl: CXUploadApi.getAvatarUrlByUid(uid, 80),
+              imageUrl: CXImageApi.getAvatarUrlByUid(uid, 80),
               size: 40,
               borderRadius: 20,
               iconSize: 20
@@ -190,7 +190,7 @@ class _AttendListWidgetState extends State<AttendListWidget> {
             maxScale: 4.0,
             child: Center(
               child: Image.network(
-                CXUploadApi.getImageUrlWithSize(imageUrl, null, null),
+                CXImageApi.getImageUrlWithSize(imageUrl, null, null),
                 headers: HeadersManager.chaoxingHeaders,
                 fit: BoxFit.contain
               ),

@@ -8,7 +8,7 @@ import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 import '../platform.dart';
 import '../api/course.dart';
 import '../api/api_service.dart';
-import '../api/upload.dart';
+import '../api/image.dart';
 import '../session/account.dart';
 import '../models/course.dart';
 import '../models/active.dart';
@@ -932,7 +932,7 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
         });
 
         try {
-          final objectId = await CXUploadApi.uploadImage(File(pickedFile.path), userId);
+          final objectId = await CXImageApi.uploadImage(File(pickedFile.path), userId);
 
           if (objectId != null) {
             setState(() {
@@ -1008,7 +1008,7 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                       fit: BoxFit.contain,
                     )
                   : Image.network(
-                      CXUploadApi.getImageUrl(objectId),
+                      CXImageApi.getImageUrl(objectId),
                       headers: HeadersManager.chaoxingHeaders,
                       fit: BoxFit.contain,
                     ),
@@ -1262,7 +1262,7 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                                                         fit: BoxFit.contain,
                                                       )
                                                     : Image.network(
-                                                        CXUploadApi.getImageUrl(objectId),
+                                                        CXImageApi.getImageUrl(objectId),
                                                         width: 80,
                                                         height: 80,
                                                         fit: BoxFit.contain,

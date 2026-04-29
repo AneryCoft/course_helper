@@ -5,7 +5,7 @@ import 'package:dio/dio.dart';
 import 'api_service.dart';
 import '../utils/encrypt.dart';
 
-class CXUploadApi {
+class CXImageApi {
   /// 上传图片到学习通云盘
   static Future<String?> uploadImage(File imageFile, String userId) async {
     try {
@@ -25,7 +25,12 @@ class CXUploadApi {
         'crc': crc,
         '_token': token
       };
-      await ApiService.sendRequest(crcUrl, params: crcParams);
+      final crcResponse = await ApiService.sendRequest(crcUrl, params: crcParams);
+      final data = crcResponse.data;
+      if (data['result'] && data['exist']) {
+        final imageFileData = data['data'];
+        return imageFileData['objectid'];
+      }
 
       DateTime now = DateTime.now();
       final timestamp = "${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}";
@@ -33,7 +38,6 @@ class CXUploadApi {
       final formattedTime = '$timestamp$milliseconds';
       final fileName = "$formattedTime.jpg";
       // DateFormat('yyyyMMddHHmmssSSS').format(DateTime.now());
-      // 20260205191805009.jpg
 
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(imageFile.path, filename: fileName),
@@ -95,7 +99,7 @@ class CXUploadApi {
   }
 }
 
-class RCUploadApi {
+class RCImageApi {
   /// 上传图片到七牛云
   static Future<String?> uploadImage(File imageFile) async {
     try {

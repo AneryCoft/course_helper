@@ -3,7 +3,7 @@ import 'dart:io';
 import '../../models/user.dart';
 import '../../session/account.dart';
 import '../../api/api_service.dart';
-import '../../api/upload.dart';
+import '../../api/image.dart';
 
 class AccountsSelector extends StatefulWidget {
   final ValueChanged<List<User>> onSelectionChanged;
@@ -274,7 +274,7 @@ class AccountsSelectorState extends State<AccountsSelector> {
                                   onTap: () {
                                     final imageUrl = _userImages.containsKey(user.uid)
                                         ? null
-                                        : CXUploadApi.getImageUrl(_userObjectIds[user.uid]!);
+                                        : CXImageApi.getImageUrl(_userObjectIds[user.uid]!);
                                     _showImageDialog(context, user.uid, imageUrl);
                                   },
                                   child: ClipRRect(
@@ -287,7 +287,7 @@ class AccountsSelectorState extends State<AccountsSelector> {
                                             fit: BoxFit.cover,
                                           )
                                         : Image.network(
-                                            CXUploadApi.getImageUrl(_userObjectIds[user.uid]!),
+                                            CXImageApi.getImageUrl(_userObjectIds[user.uid]!),
                                             width: 40,
                                             height: 40,
                                             fit: BoxFit.cover,
