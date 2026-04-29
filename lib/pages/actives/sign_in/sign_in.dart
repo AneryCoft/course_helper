@@ -16,6 +16,7 @@ import 'pattern.dart';
 import 'code.dart';
 import 'qrcode.dart';
 import 'location.dart';
+import 'attend_list.dart';
 
 
 class SignParams {
@@ -42,6 +43,9 @@ class SignParams {
   String? address;
   double? latitude;
   double? longitude;
+
+  // 群聊签到列表数据
+  List<Map<String, dynamic>>? groupSignedList;
 
   SignParams({
     required this.active,
@@ -176,6 +180,7 @@ class SignInPageState extends State<SignInPage> {
   final Map<String, Map<String, String>> _userCaptchaValidate = {};
 
   // Getter
+  bool get isGroupSign => widget.classId.isEmpty;
   bool get needPhoto => _needPhoto;
   bool get needFace => _needFace;
   String? get designatedPlace => _designatedPlace;
@@ -191,6 +196,10 @@ class SignInPageState extends State<SignInPage> {
 
   void setUserImage(String uid, File imageFile) {
     _accountsSelectorKey.currentState?.setImageForUser(uid, imageFile);
+  }
+
+  void setObjectIdForUser(String uid, String objectId) {
+    _accountsSelectorKey.currentState?.setObjectIdForUser(uid, objectId);
   }
 
   void setUserUploadingStatus(String uid, bool isUploading) {
@@ -236,6 +245,17 @@ class SignInPageState extends State<SignInPage> {
 
   Future<void> _parseSignInfo() async {
     try {
+      if (isGroupSign) { // 群聊签到
+        final groupSignDetail = await SignInApi.getGroupSignDetail(widget.active.id);
+        if (groupSignDetail != null) {
+          _signTypeId = groupSignDetail['otherId'];
+          _needPhoto = groupSignDetail['ifPhoto'] == 1;
+          widget.active.signType = _signTypeId == 4 ?
+          SignType.location : SignType.normal; // 只有位置签到和拍照签到需要输入
+        }
+        return;
+      }
+
       final results = await Future.wait([
         ActiveApi.getActiveInfoWeb(widget.active.id),
         SignInApi.getAttendInfoWeb(widget.active.id)
@@ -352,11 +372,15 @@ class SignInPageState extends State<SignInPage> {
               children: [
                 const SizedBox(height: 20),
 
-
-
                 // 签到操作区域 - 根据策略动态显示
                 if (_currentStrategy != null)
                   _buildSignOperationArea(),
+
+                const SizedBox(height: 20),
+
+                // 群聊签到列表
+                if (isGroupSign)
+                  AttendListWidget(state: this),
 
                 const SizedBox(height: 20),
 

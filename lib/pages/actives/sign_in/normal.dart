@@ -24,6 +24,14 @@ class NormalSign implements SignStrategy {
   @override
   Future<String?> signForAccount(User user, SignParams params, SignInPageState state) async {
     final objectId = params.getUserObjectId(user.uid);
+    if (state.isGroupSign) {
+      return await SignInApi.groupSign(
+          params.active.id,
+          user,
+          objectId: objectId
+      );
+    }
+
     final userValidate = state.getUserCaptchaValidate(user.uid);
     final validate = userValidate?['validate'];
 

@@ -57,6 +57,18 @@ class CXUploadApi {
     return 'https://p.ananas.chaoxing.com/star4/$objectId/origin.jpg';
   }
 
+  static String getImageUrlWithSize(String objectId, int? width, int? height){
+    final size = width == null || height == null ?
+    'origin' : '${width}_${height}c';
+    return 'https://p.cldisk.com/star4/$objectId/$size.jpg';
+  }
+
+  /// 通过UserId获取头像Url
+  static String getAvatarUrlByUid(String uid, int size) {
+    return 'https://photo.chaoxing.com/p/${uid}_$size';
+    // 跳转到https://p.cldisk.com/star3
+  }
+
   /// 将学习通的Star3图片转换为Star4 减少一次重定向
   static String toNewImageUrl(String url) {
     try {

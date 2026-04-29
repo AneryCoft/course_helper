@@ -20,6 +20,16 @@ class LocationSign implements SignStrategy {
 
   @override
   Future<String?> signForAccount(User user, SignParams params, SignInPageState state) async {
+    if (state.isGroupSign) {
+      return await SignInApi.groupSign(
+          params.active.id,
+          user,
+          address: params.address,
+          latitude: params.latitude,
+          longitude: params.longitude
+      );
+    }
+
     final userValidate = state.getUserCaptchaValidate(user.uid);
     final validate = userValidate?['validate'];
     
@@ -27,13 +37,13 @@ class LocationSign implements SignStrategy {
     if (state.needFace) {
       faceId = await SignInApi.getFaceId(user);
     }
-    
+
     return await SignInApi.locationSign(
       params.courseId,
       params.active.id,
-      params.address ?? '未知位置',
-      params.latitude ?? 0,
-      params.longitude ?? 0,
+      params.address!,
+      params.latitude!,
+      params.longitude!,
       user,
       validate: validate,
       faceId: faceId,
