@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../api/api_service.dart';
 import '../../../api/quiz.dart';
@@ -258,6 +260,9 @@ class _QuizPageState extends State<QuizPage> {
                 if (quiz['personAnswer']['recs'] == null) {
                   quiz['personAnswer']['recs'] = [];
                 }
+                if (quiz['personAnswer']['imgs'] == null) {
+                  quiz['personAnswer']['imgs'] = [];
+                }
                 break;
             }
           }
@@ -343,6 +348,9 @@ class _QuizPageState extends State<QuizPage> {
                   quiz['personAnswer']['content'] = '';
                   if (quiz['personAnswer']['recs'] == null) {
                     quiz['personAnswer']['recs'] = [];
+                  }
+                  if (quiz['personAnswer']['imgs'] == null) {
+                    quiz['personAnswer']['imgs'] = [];
                   }
                   break;
               }
@@ -821,6 +829,7 @@ class _QuizPageState extends State<QuizPage> {
                 tag: heroTag,
                 child: Image.network(
                     url,
+                    headers: HeadersManager.chaoxingHeaders,
                     fit: BoxFit.contain
                 ),
               ),
@@ -829,6 +838,72 @@ class _QuizPageState extends State<QuizPage> {
         ),
       ),
     );
+  }
+
+  /// 为简答题选择并上传图片
+  Future<void> _pickImages(dynamic quiz, int quizIndex) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+
+      final List<XFile> images = await picker.pickMultiImage(imageQuality: 80);
+
+      if (images.isNotEmpty) {
+        final uploadFutures = images.map((image) async {
+          try {
+            final file = File(image.path);
+            final objectId = await CXImageApi.uploadImage(file, AccountManager.currentSessionId ?? '');
+            if (objectId != null) {
+              return {'image': image, 'objectId': objectId};
+            }
+            return null;
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('图片上传失败：${image.path}')),
+              );
+            }
+            return null;
+          }
+        }).toList();
+
+        // 等待所有上传完成
+        final results = await Future.wait(uploadFutures);
+
+        // 更新状态
+        if (mounted) {
+          setState(() {
+            for (final result in results) {
+              if (result != null && result['objectId'] != null) {
+                final xfile = result['image'] as XFile;
+                final objectId = result['objectId'] as String;
+
+                quiz['personAnswer']['recs'].add({
+                  'name': xfile.name, // 这里应该是上传的名字 但是没有校验
+                  'objectid': objectId,
+                  'suffix': xfile.path.split('.').last,
+                  'type': '1',
+                  "preview": "",
+                  "thumbnail": ""
+                });
+              }
+            }
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('选择图片失败：$e')),
+        );
+      }
+    }
+  }
+
+  /// 删除简答题的图片
+  void _removeShortAnswerImage(dynamic quiz, int index) {
+    setState(() {
+      quiz['personAnswer']['recs'].removeAt(index);
+    });
   }
 
   Widget _buildBlankAnswerInputs(dynamic quiz, int quizIndex) {
@@ -941,62 +1016,143 @@ class _QuizPageState extends State<QuizPage> {
     // 分离HTML中的文本和图片
     final hintText = correctAnswer.isNotEmpty ? _extractTextFromHtml(correctAnswer) : '请输入答案';
     final imageUrls = correctAnswer.isNotEmpty ? _extractImageUrls(correctAnswer) : <String>[];
+    
+    // 获取已上传的图片列表
+    final uploadedImages = quiz['personAnswer']['recs'] as List? ?? [];
       
-    return SizedBox(
-      height: 150,
-      child: Stack(
-        children: [
-          TextField(
-            key: ValueKey(controllerKey),
-            maxLines: 5,
-            decoration: InputDecoration(
-              hintText: hintText,
-              border: const OutlineInputBorder(),
-            ),
-            controller: controller,
-            onChanged: (value) {
-              setState(() {
-                quiz['personAnswer']['content'] = value;
-              });
-            },
-          ),
-          if (imageUrls.isNotEmpty)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                constraints: const BoxConstraints(maxHeight: 60),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: imageUrls.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final url = entry.value;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: GestureDetector(
-                          onTap: () => _showImageDialog(url, 'quiz_image_${quizIndex}_$index'),
-                          child: Hero(
-                            tag: 'quiz_image_${quizIndex}_$index',
-                            child: Image.network(
-                              url,
-                              headers: HeadersManager.chaoxingHeaders,
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 150,
+                child: Stack(
+                  children: [
+                    TextField(
+                      key: ValueKey(controllerKey),
+                      maxLines: 5,
+                      decoration: InputDecoration(
+                        hintText: hintText,
+                        border: const OutlineInputBorder(),
+                      ),
+                      controller: controller,
+                      onChanged: (value) {
+                        setState(() {
+                          quiz['personAnswer']['content'] = value;
+                        });
+                      },
+                    ),
+                    if (imageUrls.isNotEmpty)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          constraints: const BoxConstraints(maxHeight: 60),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: imageUrls.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final url = entry.value;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: GestureDetector(
+                                    onTap: () => _showImageDialog(url, 'quiz_image_${quizIndex}_$index'),
+                                    child: Hero(
+                                      tag: 'quiz_image_${quizIndex}_$index',
+                                      child: Image.network(
+                                        url,
+                                        headers: HeadersManager.chaoxingHeaders,
+                                        width: 60,
+                                        height: 60,
+                                        fit: BoxFit.cover
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
                             ),
                           ),
                         ),
-                      );
-                    }).toList(),
-                  ),
+                      ),
+                  ],
                 ),
               ),
             ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.add_photo_alternate_outlined, size: 32),
+              onPressed: () => _pickImages(quiz, quizIndex),
+              tooltip: '添加图片',
+            ),
+          ],
+        ),
+        if (uploadedImages.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 80,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: uploadedImages.length,
+              itemBuilder: (context, index) {
+                final imageInfo = uploadedImages[index];
+                final objectId = imageInfo['objectid'] as String?;
+                if (objectId == null || objectId.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                final imageUrl = CXImageApi.getImageUrl(objectId);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Stack(
+                    children: [
+                      GestureDetector(
+                        onTap: () => _showImageDialog(imageUrl, 'short_answer_image_${quizIndex}_$index'),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Hero(
+                            tag: 'short_answer_image_${quizIndex}_$index',
+                            child: Image.network(
+                              imageUrl,
+                              headers: HeadersManager.chaoxingHeaders,
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 4,
+                        top: 4,
+                        child: GestureDetector(
+                          onTap: () => _removeShortAnswerImage(quiz, index),
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.8),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 
