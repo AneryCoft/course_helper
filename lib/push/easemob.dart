@@ -1,6 +1,8 @@
 import 'package:course_helper/session/account.dart';
 import 'package:flutter/material.dart';
 import 'package:im_flutter_sdk/im_flutter_sdk.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../main.dart';
 import '../pages/courses.dart';
@@ -17,6 +19,8 @@ class EasemobIM {
   bool _isLoggedIn = false;
   bool get isLoggedIn => _isLoggedIn;
 
+  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
+
   Function(bool)? _onConnectionChanged;
 
   void setConnectionCallback(Function(bool)? callback) {
@@ -28,6 +32,17 @@ class EasemobIM {
     Function(EMMessage)? onMessageReceived
   }) async {
     try {
+      // 初始化本地通知插件
+      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false
+      );
+      await _notificationsPlugin.initialize(
+        settings: const InitializationSettings(android: androidSettings, iOS: iosSettings)
+      );
+
       final options = EMOptions.withAppKey(_appKey);
       await EMClient.getInstance.init(options);
 
@@ -95,6 +110,12 @@ class EasemobIM {
     try {
       await EMClient.getInstance.loginWithPassword(userName, password);
       _isLoggedIn = true;
+      
+      // 登录后检查并请求通知权限
+      final status = await Permission.notification.status;
+      if (status.isDenied) {
+        await Permission.notification.request();
+      }
     } catch (e) {
       debugPrint('Easemob登录失败: $e');
       // code: 200 desc: The user is already logged in
@@ -117,7 +138,7 @@ class EasemobIM {
     }
   }
 
-  void _handleMessage(EMMessage message) {
+  Future<void> _handleMessage(EMMessage message) async {
     if (message.attributes != null) {
       final attachment = message.attributes!['attachment'];
       final activeInfo = attachment['att_chat_course'];
@@ -141,8 +162,27 @@ class EasemobIM {
           message.attributes!['em_apns_ext']['em_push_title'];
       // late String? groupName;
 
-      // FIXME 群聊签到无法直接用课程签到处理
+      final androidDetails = AndroidNotificationDetails(
+        'course_activity_channel',
+        '课程活动',
+        channelDescription: '接收课程活动通知',
+        importance: Importance.high,
+        priority: Priority.high
+      );
 
+      final notificationDetails = NotificationDetails(android: androidDetails);
+
+      final int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      
+      await _notificationsPlugin.show(
+        id: notificationId,
+        title: '课程活动',
+        body: '收到来自$courseName的$activeTypeName活动',
+        notificationDetails: notificationDetails,
+        payload: '${active.id}|$courseId|$classId',
+      );
+
+      // 始终显示应用内对话框（可选）
       final context = navigatorKey.currentContext;
       if (context != null) {
         showDialog(
@@ -175,6 +215,7 @@ class EasemobIM {
 
     debugPrint('消息: ${message.toJson()}');
   }
+
 
   void _showKickedDialog(LoginExtensionInfo info) {
     final context = navigatorKey.currentContext;
