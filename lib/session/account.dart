@@ -5,6 +5,7 @@ import '../platform.dart';
 import 'cookie.dart';
 import '../push/easemob.dart';
 import '../utils/storage.dart';
+import '../pages/accounts.dart' show AccountChangeNotifier;
 
 
 /// 统一的账户管理器
@@ -121,6 +122,7 @@ class AccountManager {
       // 如果没有当前会话，自动设置为当前账户
       if (!hasActiveSession()) {
         await setCurrentSession(user.uid);
+        AccountChangeNotifier().notifyAccountChanged(user.uid);
         if (user.imAccount != null) {
           EasemobIM().login(user.imAccount!['userName']!, user.imAccount!['password']!);
         }
