@@ -4,6 +4,7 @@ import'package:dynamic_color/dynamic_color.dart';
 import'package:package_info_plus/package_info_plus.dart';
 import'package:url_launcher/url_launcher.dart';
 import'package:dio/dio.dart';
+import'package:photo_manager/photo_manager.dart';
 
 import'./pages/accounts.dart';
 import'./pages/courses.dart';
@@ -14,6 +15,9 @@ import'./session/account.dart';
 import'./platform.dart';
 import './utils/storage.dart';
 import 'push/easemob.dart';
+
+// 赞助对话框显示状态键
+const _hasSponsoredKey = 'has_sponsored';
 
 // 全局Navigator Key,用于在无context时显示dialog
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -110,6 +114,7 @@ class _MainPageState extends State<MainPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       (coursesPageKey.currentState as dynamic)?.onVisibilityChanged(true);
       _checkUpdate();
+      _showSponsorDialog();
     });
   }
 
@@ -196,6 +201,75 @@ class _MainPageState extends State<MainPage> {
         ],
       ),
     );
+  }
+
+  void _showSponsorDialog() {
+    final hasSponsored = StorageManager.prefs.getBool(_hasSponsoredKey) ?? false;
+    if (hasSponsored) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('支持开发者'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'images/mm_reward_qrcode.png',
+                width: 250,
+                height: 250
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '一款开源软件的开发纯属为爱发电\n如果可以，请您赞助支持，哪怕只是1元，谢谢！',
+                style: TextStyle(fontSize: 16)
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              StorageManager.prefs.setBool(_hasSponsoredKey, true);
+              Navigator.pop(context);
+            },
+            child: const Text('我已赞助')
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消')
+          ),
+          FilledButton(
+            onPressed: () => _saveImageAndSponsor(context),
+            child: const Text('去赞助')
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveImageAndSponsor(BuildContext context) async {
+    try {
+      final imageData = await DefaultAssetBundle.of(context).load('images/mm_reward_qrcode.png');
+      final bytes = imageData.buffer.asUint8List();
+
+      await PhotoManager.editor.saveImage(bytes, filename: 'mm_reward_qrcode.png');
+
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('赞赏码已保存到相册，感谢您的支持！')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失败: $e')),
+        );
+      }
+    }
   }
 
   @override
