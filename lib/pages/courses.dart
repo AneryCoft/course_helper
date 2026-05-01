@@ -874,6 +874,9 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
   List<String> _imageObjectIds = [];
   final Map<String, String> _localImagePaths = {};
   bool _isLoading = false;
+  String? _addressError;
+  String? _latitudeError;
+  String? _longitudeError;
 
   @override
   void initState() {
@@ -1076,28 +1079,61 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
   }
 
   Future<void> _saveSettings() async {
+    final latText = _latitudeController.text.trim();
+    final lonText = _longitudeController.text.trim();
+    final addressText = _addressController.text.trim();
+
+    final hasAddress = addressText.isNotEmpty;
+    final hasLat = latText.isNotEmpty;
+    final hasLon = lonText.isNotEmpty;
+    
+    String? addressError;
+    String? latitudeError;
+    String? longitudeError;
+    
+    if (hasAddress && (!hasLat || !hasLon)) {
+      latitudeError = !hasLat ? '请填写纬度' : null;
+      longitudeError = !hasLon ? '请填写经度' : null;
+    } else if (!hasAddress && (hasLat || hasLon)) {
+      addressError = '请填写地址';
+    }
+    
+    if (addressError != null || latitudeError != null || longitudeError != null) {
+      setState(() {
+        _addressError = addressError;
+        _latitudeError = latitudeError;
+        _longitudeError = longitudeError;
+      });
+      return;
+    }
+
     setState(() {
+      _addressError = null;
+      _latitudeError = null;
+      _longitudeError = null;
       _isLoading = true;
     });
 
     try {
-      final latText = _latitudeController.text.trim();
-      final lonText = _longitudeController.text.trim();
       final classroomText = _classroomController.text.trim();
-      final addressText = _addressController.text.trim();
 
       CourseLocation? location;
-      if (latText.isNotEmpty && lonText.isNotEmpty && 
-          classroomText.isNotEmpty && addressText.isNotEmpty) {
+      if (hasAddress && hasLat && hasLon) {
         final latitude = double.tryParse(latText);
         final longitude = double.tryParse(lonText);
         if (latitude != null && longitude != null) {
           location = CourseLocation(
-            classroom: classroomText,
+            classroom: classroomText.isEmpty ? null : classroomText,
             address: addressText,
             latitude: latitude.toStringAsFixed(6),
             longitude: longitude.toStringAsFixed(6),
           );
+        } else {
+          setState(() {
+            _latitudeError = '格式不正确';
+            _longitudeError = '格式不正确';
+          });
+          return;
         }
       }
 
@@ -1161,26 +1197,15 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _addressController,
-                          decoration: const InputDecoration(
-                            labelText: '地址',
-                            hintText: '沧州市黄骅市 河北农业大学(渤海校区)',
-                            prefixIcon: Icon(Icons.place),
-                            border: OutlineInputBorder()
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      IconButton.filled(
-                        onPressed: _showMapPicker,
-                        icon: const Icon(Icons.map),
-                        tooltip: '选择位置'
-                      ),
-                    ],
+                  TextField(
+                    controller: _addressController,
+                    decoration: InputDecoration(
+                      labelText: '地址',
+                      hintText: '北京市海淀区上地七街1号北京市海淀区上地七街1号',
+                      prefixIcon: const Icon(Icons.place),
+                      border: const OutlineInputBorder(),
+                      errorText: _addressError
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -1188,11 +1213,12 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                       Expanded(
                         child: TextField(
                           controller: _latitudeController,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: '纬度',
-                            hintText: '38.387697',
-                            prefixIcon: Icon(Icons.north),
-                            border: OutlineInputBorder()
+                            hintText: '40.040905',
+                            prefixIcon: const Icon(Icons.north),
+                            border: const OutlineInputBorder(),
+                            errorText: _latitudeError
                           ),
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
@@ -1204,17 +1230,29 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                       Expanded(
                         child: TextField(
                           controller: _longitudeController,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: '经度',
-                            hintText: '117.438972',
-                            prefixIcon: Icon(Icons.east),
-                            border: OutlineInputBorder()
+                            hintText: '116.318506',
+                            prefixIcon: const Icon(Icons.east),
+                            border: const OutlineInputBorder(),
+                            errorText: _longitudeError
                           ),
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                             signed: true
                           ),
                         ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton.filled(
+                        onPressed: _showMapPicker,
+                        icon: const Icon(Icons.map),
+                        tooltip: '选择位置'
                       ),
                     ],
                   ),
