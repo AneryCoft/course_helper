@@ -274,6 +274,7 @@ class CookieManager {
         await targetJar.saveFromResponse(uri, [cookie]);
       }
     }
+    _tempCookieJar?.deleteAll();
 
     await saveCookiesForUser(userId);
   }
