@@ -1,6 +1,6 @@
 # 课程助手
 一个管理学习通、雨课堂课程的应用。
-| | | | |
+|账号管理|课程列表|课程设置|签到功能|
 |---|---|---|---|
 | ![账号管理](images/screenshot/accounts.jpg) | ![课程列表](images/screenshot/courses.jpg) | ![课程设置](images/screenshot/course_setting.jpg) | ![签到功能](images/screenshot/sign_in.jpg) |
 
