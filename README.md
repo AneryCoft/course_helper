@@ -1,5 +1,8 @@
 # 课程助手
 一个管理学习通、雨课堂课程的应用。
+| | | | |
+|---|---|---|---|
+| ![账号管理](images/screenshot/accounts.jpg) | ![课程列表](images/screenshot/courses.jpg) | ![课程设置](images/screenshot/course_setting.jpg) | ![签到功能](images/screenshot/sign_in.jpg) |
 
 ## 功能
 - [x] 多账号操作
@@ -12,13 +15,15 @@
 - [x] 问卷
 - [x] 随堂练习（自动提交答案）
 - [ ] 作业
-- [x] 群聊签到
+- [x] 群聊签到（查看参与列表）
 - [x] IM协议
 
 雨课堂: 
 - [x] 动态二维码签到
-- [x] PPT展示
+- [x] PPT展示（查看整个PPT）
 - [x] 课堂答题（支持延时提交）
+
+## 
 
 ## 致谢
 - [Yuuki](https://github.com/SoyBeanMilkx) 提供学习通脱壳包
