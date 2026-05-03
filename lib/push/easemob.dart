@@ -43,7 +43,23 @@ class EasemobIM {
         settings: const InitializationSettings(android: androidSettings, iOS: iosSettings)
       );
 
-      final options = EMOptions.withAppKey(_appKey);
+      final options = EMOptions.withAppKey(_appKey, osType: 2);
+      // 使用Linux登录 避免让移动设备掉线
+
+      // deviceName: 'webim', osType: 16 无法使用网页登录
+      // code: 214 desc: User is logged in to too many devices
+      /*
+      OsType: {
+        values: {
+          OS_IOS: 0,
+          OS_ANDROID: 1,
+          OS_LINUX: 2,
+          OS_OSX: 3,
+          OS_WIN: 4,
+          OS_OTHER: 16
+        }
+      },
+      */
       await EMClient.getInstance.init(options);
 
       EMClient.getInstance.addConnectionEventHandler(
@@ -63,17 +79,10 @@ class EasemobIM {
             _isLoggedIn = false;
             _onConnectionChanged?.call(false);
             _showKickedDialog(info);
-          },
-          // Token过期
-          onTokenDidExpire: () {
-            debugPrint('Token已过期');
-            _isLoggedIn = false;
-            _onConnectionChanged?.call(false);
-          },
+          }
         ),
       );
 
-      // 添加消息监听
       EMClient.getInstance.chatManager.addEventHandler(
         'easemob_msg_handler',
         EMChatEventHandler(
@@ -83,19 +92,7 @@ class EasemobIM {
               onMessageReceived?.call(message);
               _handleMessage(message);
             }
-          },
-          onCmdMessagesReceived: (List<EMMessage> messages) {
-            debugPrint('收到 ${messages.length} 条命令消息');
-          },
-          onMessagesRead: (List<EMMessage> messages) {
-            debugPrint('消息已读回执: ${messages.length} 条');
-          },
-          onGroupMessageRead: (List<EMGroupMessageAck> acks) {
-            debugPrint('群组消息已读: ${acks.length} 条');
-          },
-          onMessagesDelivered: (List<EMMessage> messages) {
-            debugPrint('消息送达回执: ${messages.length} 条');
-          },
+          }
         ),
       );
 
