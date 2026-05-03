@@ -128,9 +128,11 @@ jobs:
       - name: Get tag message
         id: tag_message
         run: |
-          TAG_MSG=$(git tag -l --format='%(contents)' ${{ steps.get_version.outputs.VERSION }})
+          git fetch --tags --force
+          TAG=${{ steps.get_version.outputs.VERSION }}
+          TAG_MSG=$(git for-each-ref refs/tags/$TAG --format='%(contents)')
           if [ -z "$TAG_MSG" ]; then
-            TAG_MSG="Automated release for version ${{ steps.get_version.outputs.VERSION }}"
+            TAG_MSG="Automated release for version $TAG"
           fi
           echo "TAG_MSG<<EOF" >> $GITHUB_OUTPUT
           echo "$TAG_MSG" >> $GITHUB_OUTPUT
