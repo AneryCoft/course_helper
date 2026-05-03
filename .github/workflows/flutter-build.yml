@@ -131,12 +131,9 @@ jobs:
           git fetch --tags --force
           TAG=${{ steps.get_version.outputs.VERSION }}
           TAG_MSG=$(git for-each-ref refs/tags/$TAG --format='%(contents)')
-          if [ -z "$TAG_MSG" ]; then
-            TAG_MSG="Automated release for version $TAG"
-          fi
-          echo "TAG_MSG<<EOF" >> $GITHUB_OUTPUT
-          echo "$TAG_MSG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "TAG_MSG<<EOF" >> $GITHUB_ENV
+          echo "$TAG_MSG" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -146,5 +143,5 @@ jobs:
             # release-assets/ios-ipa/CourseHelper.ipa
           name: Release ${{ steps.get_version.outputs.VERSION }}
           tag_name: ${{ steps.get_version.outputs.VERSION }}
-          body: ${{ steps.tag_message.outputs.TAG_MSG }}
+          body: ${{ env.TAG_MSG }}
           update_release: true
