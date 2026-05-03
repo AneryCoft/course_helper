@@ -7,7 +7,7 @@ import'package:dio/dio.dart';
 import'package:photo_manager/photo_manager.dart';
 
 import'./pages/accounts.dart';
-import'./pages/courses.dart';
+import'./pages/Courses/list.dart';
 import'./pages/login.dart';
 import'./api/api_service.dart';
 import'./session/cookie.dart';

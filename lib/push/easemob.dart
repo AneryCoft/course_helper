@@ -5,7 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../main.dart';
-import '../pages/courses.dart';
+import '../pages/Courses/list.dart';
 import '../models/active.dart';
 
 /// 环信即时通讯
