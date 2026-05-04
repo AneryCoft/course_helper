@@ -90,7 +90,7 @@ class CookieManager {
     }
 
     if (refreshCounts < 2){
-      await _refreshAccounts();
+      _refreshAccounts();
     }
   }
 
@@ -259,10 +259,7 @@ class CookieManager {
   /// 临时Cookie保存到账号
   static Future<void> saveTempCookies(String userId) async {
     final tempJar = getTempCookieJar();
-    if (tempJar == null) {
-      debugPrint('没有临时 Cookie 需要迁移');
-      return;
-    }
+    if (tempJar == null) return;
 
     final targetJar = await getCookieJarForUser(userId);
     final domainUri = getDomainUri();
