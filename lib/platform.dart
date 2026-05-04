@@ -93,7 +93,7 @@ class PlatformManager {
     if (oldPlatform != platform) {
       _currentPlatform = platform;
       try {
-        await StorageManager.prefs.setString(_platformKey, _currentServer.name);
+        await StorageManager.prefs.setString(_platformKey, _currentPlatform.name);
       } catch (e) {
         debugPrint('保存平台失败：$e');
       }
