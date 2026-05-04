@@ -98,10 +98,10 @@ class PlatformManager {
         debugPrint('保存平台失败：$e');
       }
       ApiService.onPlatformChange?.call();
-      _platformChangeController.add(platform);
       await AccountManager.refreshAccounts();
       await AccountManager.switchToPlatformAccount();
       await CookieManager.loadAllCookies();
+      _platformChangeController.add(platform);
     }
   }
   

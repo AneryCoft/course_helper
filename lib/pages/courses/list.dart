@@ -141,7 +141,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   void onVisibilityChanged(bool visible) {
     _isVisible = visible;
     if (visible) {
-      _checkAndStartRefresh();
+      _startPeriodicRefresh();
     } else {
       _refreshTimer?.cancel();
     }
@@ -173,30 +173,23 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         _lastOnLessonCourses = null;
         _loadCourses();
       }
-      _checkAndStartRefresh();
+      _startPeriodicRefresh();
     });
 
-    _checkAndStartRefresh();
+    _startPeriodicRefresh();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _checkAndStartRefresh();
-    } else {
-      _refreshTimer?.cancel();
-    }
-  }
-
-  void _checkAndStartRefresh() {
     _refreshTimer?.cancel();
-    if (_isVisible && PlatformManager().isRainClassroom) {
+    if (state == AppLifecycleState.resumed) {
       _startPeriodicRefresh();
     }
   }
 
   void _startPeriodicRefresh() {
-    _refreshTimer?.cancel();
+    if (!_isVisible || PlatformManager().isChaoxing) return;
+
     _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       if (!mounted || !AccountManager.hasActiveSession()) return;
 
