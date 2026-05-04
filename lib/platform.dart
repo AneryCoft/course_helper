@@ -5,7 +5,6 @@ import 'dart:async';
 import '../api/api_service.dart';
 import '../session/account.dart';
 import '../utils/storage.dart';
-import 'pages/accounts.dart';
 
 /// 平台类型枚举
 enum PlatformType {
@@ -117,7 +116,6 @@ class PlatformManager {
       await AccountManager.refreshAccounts();
       await AccountManager.switchToPlatformAccount();
       await CookieManager.loadAllCookies();
-      AccountChangeNotifier().notifyAccountChanged(AccountManager.currentSessionId);
     }
   }
   
