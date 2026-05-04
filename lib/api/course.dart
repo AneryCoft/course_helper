@@ -254,6 +254,9 @@ class RCCourseApi {
       if (courses == null || onLessonCourses == null) {
         return null;
       }
+      if (courses['data'].isEmpty || courses['data'].isEmpty) {
+        return null;
+      }
 
       Map<String, dynamic> coursesMap = {
         for (var courseItem in courses['data']) courseItem['course_id'].toString(): courseItem
