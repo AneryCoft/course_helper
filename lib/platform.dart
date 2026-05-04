@@ -43,20 +43,6 @@ class PlatformManager {
   
   /// 获取当前雨课堂服务器
   RainClassroomServerType get currentServer => _currentServer;
-  
-  /// 获取雨课堂服务器名称
-  String get serverName {
-    switch (_currentServer) {
-      case RainClassroomServerType.yuketang:
-        return 'yuketang';
-      case RainClassroomServerType.pro:
-        return 'pro';
-      case RainClassroomServerType.changjiang:
-        return 'changjiang';
-      case RainClassroomServerType.huanghe:
-        return 'huanghe';
-    }
-  }
 
   /// 初始化平台
   Future<void> initialize() async {
@@ -107,7 +93,7 @@ class PlatformManager {
     if (oldPlatform != platform) {
       _currentPlatform = platform;
       try {
-        await StorageManager.prefs.setString(_platformKey, currentPlatformName);
+        await StorageManager.prefs.setString(_platformKey, _currentServer.name);
       } catch (e) {
         debugPrint('保存平台失败：$e');
       }
@@ -124,18 +110,12 @@ class PlatformManager {
     if (_currentServer != server) {
       _currentServer = server;
       try {
-        await StorageManager.prefs.setString(_serverKey, serverName);
+        await StorageManager.prefs.setString(_serverKey, _currentServer.name);
       } catch (e) {
         debugPrint('保存服务器失败：$e');
       }
       ApiService.onPlatformChange?.call();
     }
-  }
-
-  /// 获取平台字符串标识
-  String get currentPlatformName {
-    return _currentPlatform == PlatformType.chaoxing ?
-    'chaoxing' : 'rainClassroom';
   }
   
   void dispose() {
