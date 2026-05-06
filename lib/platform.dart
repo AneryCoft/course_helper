@@ -29,10 +29,6 @@ class PlatformManager {
   static const _serverKey = 'current_server';
   PlatformType _currentPlatform = PlatformType.chaoxing;
   RainClassroomServerType _currentServer = RainClassroomServerType.yuketang;
-  
-  // 平台变化通知流
-  final StreamController<PlatformType> _platformChangeController = StreamController<PlatformType>.broadcast();
-  Stream<PlatformType> get platformChanges => _platformChangeController.stream;
 
   /// 获取当前平台
   PlatformType get currentPlatform => _currentPlatform;
@@ -112,9 +108,5 @@ class PlatformManager {
       }
       ApiService.onPlatformChange?.call();
     }
-  }
-  
-  void dispose() {
-    _platformChangeController.close();
   }
 }

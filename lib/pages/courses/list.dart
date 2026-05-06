@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:collection/collection.dart';
 
 import '../../platform.dart';
 import '../../api/course.dart';
@@ -128,9 +129,8 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   List<Course> _courses = [];
   bool _isLoading = true;
   StreamSubscription? _accountChangeSubscription;
-  StreamSubscription? _platformChangeSubscription;
   Timer? _refreshTimer;
-  Map<String, dynamic>? _lastOnLessonCourses;
+  List<dynamic> _lastOnLessonCourses = [];
   bool _isVisible = false;
 
   void refreshCourses() {
@@ -147,7 +147,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   }
 
   /// 使用在线课堂数据更新课程列表
-  void updateWithOnLessonCourses(Map<String, dynamic> onLessonCourses) {
+  void updateWithOnLessonCourses(List<Map<String, dynamic>>? onLessonCourses) {
     _loadCourses(onLessonCourses);
   }
 
@@ -162,20 +162,11 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     _accountChangeSubscription =
         AccountChangeNotifier().accountChanges.listen((_) {
           if (mounted) {
+            _lastOnLessonCourses = [];
             _loadCourses();
           }
+          _startPeriodicRefresh();
         });
-
-    // 监听平台变化
-    _platformChangeSubscription = PlatformManager().platformChanges.listen((_) {
-      if (mounted) {
-        _lastOnLessonCourses = null;
-        _loadCourses();
-      }
-      _startPeriodicRefresh();
-    });
-
-    _startPeriodicRefresh();
   }
 
   @override
@@ -189,13 +180,15 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   void _startPeriodicRefresh() {
     if (!_isVisible || PlatformManager().isChaoxing) return;
 
+    if (_refreshTimer != null && _refreshTimer!.isActive) return;
+
     _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       if (!mounted || !AccountManager.hasActiveSession()) return;
 
       try {
-        final onLessonCourses = await RCCourseApi.getOnLessonAndUpcomingExam();
+        final onLessonCourses = await RCCourseApi.getOnLesson();
         if (onLessonCourses != null && mounted) {
-          if (_lastOnLessonCourses == null || _lastOnLessonCourses.toString() != onLessonCourses.toString()) {
+          if (!const DeepCollectionEquality().equals(_lastOnLessonCourses, onLessonCourses)) {
             _lastOnLessonCourses = onLessonCourses;
             _loadCourses(onLessonCourses);
           }
@@ -206,13 +199,14 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _loadCourses([Map<String, dynamic>? onLessonCourses]) async {
+  Future<void> _loadCourses([List<dynamic>? onLessonCourses]) async {
     setState(() {
       _isLoading = true;
     });
 
     if (!AccountManager.hasActiveSession()) {
       setState(() {
+        _courses = [];
         _isLoading = false;
       });
       return;
@@ -411,7 +405,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
 
   /// 为所有用户扫描
   Future<void> _multiScan(BuildContext context, String qrCodeUrl) async {
-    final allAccounts = AccountManager.getAllAccounts();
+    final allAccounts = AccountManager.allAccounts;
     if (allAccounts.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -658,7 +652,6 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _accountChangeSubscription?.cancel();
-    _platformChangeSubscription?.cancel();
     _refreshTimer?.cancel();
     super.dispose();
   }

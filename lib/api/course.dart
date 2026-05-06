@@ -224,12 +224,15 @@ class RCCourseApi {
     return null;
   }
 
-  static Future<Map<String, dynamic>?> getOnLessonAndUpcomingExam() async {
+  /// 获取正在上课的课程
+  static Future<List<dynamic>?> getOnLesson() async {
+    // 暂时将不会支持upcoming-exam
+    // "upcomingExam": []
     try {
       final response = await ApiService.sendRequest(
         '/api/v3/classroom/on-lesson-upcoming-exam',
       );
-      return response.data;
+      return response.data['data']['onLessonClassrooms'];
     } catch (e) {
       debugPrint('getOnLessonAndUpcomingExam error: $e');
     }
@@ -237,16 +240,16 @@ class RCCourseApi {
   }
 
   /// 获取处理后的课程列表
-  static Future<List<Course>?> getCoursesList([Map<String, dynamic>? onLessonCourses]) async {
+  static Future<List<Course>?> getCoursesList([List<dynamic>? onLessonCourses]) async {
     try {
       late Map<String, dynamic>? courses;
       if (onLessonCourses == null) {
         final results = await Future.wait([
           getCourses(),
-          getOnLessonAndUpcomingExam()
+          getOnLesson()
         ]);
-        courses = results[0];
-        onLessonCourses = results[1];
+        courses = results[0] as Map<String, dynamic>?;
+        onLessonCourses = results[1] as List<dynamic>?;
       } else {
         courses = await getCourses();
       }
@@ -264,15 +267,15 @@ class RCCourseApi {
 
       List<Course> contentList = [];
 
-      final school = AccountManager.getAccountById(AccountManager.currentSessionId!)!.school;
+      // final school = AccountManager.getAccountById(AccountManager.currentSessionId!)!.school;
 
-      for (var onLessonCourseItem in onLessonCourses['data']['onLessonClassrooms']){
+      for (var onLessonCourseItem in onLessonCourses){
         final String courseId = onLessonCourseItem['courseId'];
         if (coursesMap.containsKey(courseId)) {
           var courseItem = coursesMap[courseId];
           courseItem['lesson_id'] = onLessonCourseItem['lessonId'];
           final courseObject = Course.fromRCJson(courseItem);
-          courseObject.schools = school;
+          // courseObject.schools = school;
           contentList.add(courseObject);
         }
       }
