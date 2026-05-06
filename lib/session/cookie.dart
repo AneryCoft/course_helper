@@ -76,7 +76,7 @@ class CookieManager {
 
   static Future<void> loadAllCookies() async {
     // 获取所有账号并预加载 CookieJar
-    final accounts = AccountManager.getAllAccounts();
+    final accounts = AccountManager.allAccounts;
     if (accounts.isEmpty) {
       return;
     }
@@ -90,20 +90,19 @@ class CookieManager {
     }
 
     if (refreshCounts < 2){
-      _refreshAccounts();
+      await _refreshAccounts();
     }
   }
 
   /// 刷新所有账号的Cookie和用户信息
   static Future<void> _refreshAccounts() async {
     refreshCounts++;
-    final accounts = AccountManager.getAllAccounts();
+    final accounts = AccountManager.allAccounts;
 
     int successCount = 0;
     int failCount = 0;
 
     final currentUserId = AccountManager.currentSessionId;
-    if (currentUserId == null) return;
 
     final getUserInfoApi = PlatformManager().isChaoxing?
     CXLoginApi.getUserInfo : RCLoginApi.getUserInfo;

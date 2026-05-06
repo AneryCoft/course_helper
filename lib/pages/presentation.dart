@@ -114,7 +114,7 @@ class _PresentationPageState extends State<PresentationPage> {
   Future<void> _checkToken() async {
     final lessonToken = RCCourseApi.getLessonToken();
     if (lessonToken == null) {
-      final allAccounts = AccountManager.getAllAccounts();
+      final allAccounts = AccountManager.allAccounts;
       final currentUserId = AccountManager.currentSessionId;
         
       for (final user in allAccounts) {
@@ -1267,7 +1267,7 @@ class _PresentationPageState extends State<PresentationPage> {
   }
 
   Future<void> _submitForAllAccounts(String problemId, int problemType, List<String>? imageUrls, bool isTimeout, int? problemDt) async {
-    final allAccounts = AccountManager.getAllAccounts();
+    final allAccounts = AccountManager.allAccounts;
     final currentUserId = AccountManager.currentSessionId;
     
     if (allAccounts.isEmpty) {

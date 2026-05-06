@@ -11,24 +11,6 @@ import '../push/easemob.dart';
 import 'widget/avatar.dart';
 import 'login.dart';
 
-class AccountChangeNotifier {
-  static final AccountChangeNotifier _instance = AccountChangeNotifier._internal();
-  factory AccountChangeNotifier() => _instance;
-  AccountChangeNotifier._internal();
-
-  final StreamController<String?> _controller = StreamController.broadcast();
-
-  Stream<String?> get accountChanges => _controller.stream;
-
-  void notifyAccountChanged(String? accountId) {
-    _controller.add(accountId);
-  }
-
-  void dispose() {
-    _controller.close();
-  }
-}
-
 class AccountsPage extends StatefulWidget {
   const AccountsPage({super.key});
 
@@ -51,7 +33,7 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
 
     // 监听账户变更事件
     _accountChangeSubscription =
-        AccountChangeNotifier().accountChanges.listen((accountId) {
+        AccountChangeNotifier().accountChanges.listen((_) {
           if (mounted) {
             _loadAccounts();
           }
@@ -72,12 +54,9 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
   }
 
   Future<void> _loadAccounts() async {
-    final current = AccountManager.currentSessionId;
-    final allAccounts = AccountManager.getAllAccounts();
-
     setState(() {
-      _accounts = allAccounts;
-      _currentAccountId = current;
+      _accounts = AccountManager.allAccounts;
+      _currentAccountId = AccountManager.currentSessionId;
     });
   }
 
@@ -112,13 +91,6 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
       return;
     }
     await AccountManager.setCurrentSession(user.uid);
-    AccountChangeNotifier().notifyAccountChanged(user.uid);
-
-    setState(() {
-      _currentAccountId = user.uid;
-      _accounts.remove(user);
-      _accounts.insert(0, user);
-    });
   }
 
   Future<void> _navigateToPasswordLogin() async {
@@ -323,7 +295,7 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                 if (EasemobIM().isLoggedIn) {
                   await EasemobIM().logout();
                 } else {
-                  await EasemobIM().loginCurrentUser();
+                  await EasemobIM().loginCurrentAccount();
                 }
               },
             ),

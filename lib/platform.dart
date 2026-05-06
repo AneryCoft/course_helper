@@ -1,4 +1,3 @@
-import 'package:course_helper/session/cookie.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 
@@ -98,10 +97,7 @@ class PlatformManager {
         debugPrint('保存平台失败：$e');
       }
       ApiService.onPlatformChange?.call();
-      await AccountManager.refreshAccounts();
-      await AccountManager.switchToPlatformAccount();
-      await CookieManager.loadAllCookies();
-      _platformChangeController.add(platform);
+      await AccountManager.switchToPlatformAccounts();
     }
   }
   

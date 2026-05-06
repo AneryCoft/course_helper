@@ -16,7 +16,6 @@ import '../actives/quiz.dart';
 import '../actives/evaluate.dart';
 import '../actives/vote.dart';
 import '../actives/questionnaire.dart';
-import '../accounts.dart';
 import 'content.dart';
 import '../presentation.dart';
 
@@ -161,7 +160,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
 
     // 监听账户变更事件
     _accountChangeSubscription =
-        AccountChangeNotifier().accountChanges.listen((accountId) {
+        AccountChangeNotifier().accountChanges.listen((_) {
           if (mounted) {
             _loadCourses();
           }

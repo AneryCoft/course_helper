@@ -77,7 +77,7 @@ class _VotePageState extends State<VotePage> {
             }
             // 从初始选中列表中移除当前用户
             if (_currentUser != null) {
-              _initialSelectedAccounts = AccountManager.getAllAccounts()
+              _initialSelectedAccounts = AccountManager.allAccounts
                   .where((user) => user.uid != _currentUser!.uid)
                   .toList();
             }

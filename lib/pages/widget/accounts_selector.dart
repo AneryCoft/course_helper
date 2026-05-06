@@ -49,7 +49,7 @@ class AccountsSelectorState extends State<AccountsSelector> {
   void _loadAccounts() {
     try {
       // 获取所有账号
-      _allAccounts = AccountManager.getAllAccounts();
+      _allAccounts = AccountManager.allAccounts;
       
       // 使用外部传入的初始选中状态，否则默认全选
       if (widget.initialSelected != null) {
