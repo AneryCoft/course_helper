@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../main.dart';
 import '../pages/Courses/list.dart';
 import '../models/active.dart';
+import '../platform.dart';
 
 /// 环信即时通讯
 class EasemobIM {
@@ -120,7 +121,7 @@ class EasemobIM {
     }
   }
 
-  Future<void> loginCurrentUser() async {
+  Future<void> loginCurrentAccount() async {
     final user = AccountManager.getAccountById(AccountManager.currentSessionId!)!;
     await login(user.imAccount!['userName']!, user.imAccount!['password']!);
   }
@@ -199,6 +200,7 @@ class EasemobIM {
               ),
               FilledButton(
                 onPressed: () async {
+                  await PlatformManager().setPlatform(PlatformType.chaoxing);
                   Navigator.pop(dialogContext);
                   CoursesPage.navigateToActive(context, active, courseId, classId, '');
                 },
@@ -235,7 +237,8 @@ class EasemobIM {
           ),
           FilledButton(
             onPressed: () async {
-              loginCurrentUser();
+              await PlatformManager().setPlatform(PlatformType.chaoxing);
+              loginCurrentAccount();
               Navigator.pop(dialogContext);
             },
             child: const Text('重新登录'),

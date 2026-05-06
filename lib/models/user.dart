@@ -26,7 +26,10 @@ class User {
         phone: json['phone'] ?? '未知手机号',
         uid: json['uid'] ?? '0',
         school: json['school'] ?? '未知学校',
-        platform: json['platform'] ?? 'chaoxing'
+        platform: json['platform'] ?? 'chaoxing',
+        imAccount: json['imAccount'] != null ?
+        Map<String, String>.from(json['imAccount']) : null,
+        status: json['status'] ?? true
     );
   }
 
@@ -38,6 +41,7 @@ class User {
       'uid': uid,
       'school': school,
       'platform': platform,
+      'imAccount': imAccount,
       'status': status
     };
   }
