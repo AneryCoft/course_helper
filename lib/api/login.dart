@@ -152,30 +152,14 @@ class CXLoginApi {
     return null;
   }
   
-  /// 获取二维码登录数据
+  /// 获取二维码登录数据（uuid&enc）
   static Future<Map<String, dynamic>?> getQRCodeData() async {
     try {
-      final loginPageUrl = 'https://passport2.chaoxing.com/login';
-      final response = await ApiService.sendRequest(loginPageUrl, responseType: ResponseType.plain);
+      final url = 'https://passport2.chaoxing.com/refreshQRCode';
+      // final createQRCode = 'https://passport2.chaoxing.com/createqr?uuid=UUID&fid=-1&type=3';
 
-      final html = response.data;
-      
-      // 提取uuid
-      final uuidRegex = RegExp(r'value="(.+?)" id="uuid"');
-      final uuidMatch = uuidRegex.firstMatch(html);
-      final uuid = uuidMatch?.group(1);
-      
-      // 提取enc
-      final encRegex = RegExp(r'value="(.+?)" id="enc"');
-      final encMatch = encRegex.firstMatch(html);
-      final enc = encMatch?.group(1);
-      
-      if (uuid != null && enc != null) {
-        return {
-          'uuid': uuid,
-          'enc': enc,
-        };
-      }
+      final response = await ApiService.sendRequest(url, method: 'POST');
+      return response.data;
     } catch (e) {
       debugPrint('getQRCodeData error: $e');
     }
