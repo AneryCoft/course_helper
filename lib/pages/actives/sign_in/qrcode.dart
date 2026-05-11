@@ -142,7 +142,7 @@ class QRCodeSign implements SignStrategy {
                     ],
 
                     // 已选择位置信息区域（放在扫描按钮上方）
-                    if (state.signParams.address != null) ...[
+                    if (state.designatedPlace != null && state.signParams.address != null) ...[
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
