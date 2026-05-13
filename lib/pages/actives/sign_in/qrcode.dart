@@ -354,12 +354,7 @@ class QRCodeSign implements SignStrategy {
                   );
                   final String signCode = signDetail?['signCode'];
                   if (signCode.isEmpty || code == signDetail?['signCode']) {
-                    if (state.mounted) {
-                      (state.context as Element).markNeedsBuild();
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        state.performMultiSign();
-                      });
-                    }
+                    state.performMultiSign();
                   } else {
                     state.showErrorMessage('二维码已过期');
                   }

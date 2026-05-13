@@ -537,11 +537,11 @@ class SignInPageState extends State<SignInPage> {
       }
     } else if (result == 'success') {
       // 签到成功
-      debugPrint('${user.name} 签到成功');
     } else if (result == 'success2') {
       failedAccounts.add('${user.name} (已过截止时间)');
+    } else if (result == '签到失败，请重新扫描。') {
+      failedAccounts.add('${user.name} (二维码过期)');
     } else {
-      // 签到失败，请重新签到 -> 二维码过期
       failedAccounts.add('${user.name} ($result)');
     }
   }
