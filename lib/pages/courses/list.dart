@@ -215,9 +215,9 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     try {
       late List<Course>? coursesData;
       if (PlatformManager().isChaoxing) {
-        coursesData =  await CXCourseApi.getCoursesList();
+        coursesData = await CXCourseApi.getCoursesList();
       } else if (PlatformManager().isRainClassroom) {
-        coursesData =  await RCCourseApi.getCoursesList(onLessonCourses);
+        coursesData = await RCCourseApi.getCoursesList(onLessonCourses);
       }
 
       if (coursesData != null && coursesData.isNotEmpty) {
@@ -227,7 +227,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         });
       } else {
         setState(() {
-          _courses =  [];
+          _courses = [];
           _isLoading = false;
         });
       }
@@ -240,7 +240,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   }
 
   Future<void> handleScanContent(String result) async {
-    if (!AccountManager.hasActiveSession()){
+    if (!AccountManager.hasActiveSession()) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         showDialog(
@@ -277,7 +277,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
               const SnackBar(content: Text('自动切换平台为学习通')),
             );
           }
-          if (!AccountManager.hasActiveSession()){
+          if (!AccountManager.hasActiveSession()) {
             if (!mounted) return;
             showDialog(
               context: context,
@@ -357,7 +357,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
               const SnackBar(content: Text('自动切换平台为雨课堂')),
             );
           }
-          if (!AccountManager.hasActiveSession()){
+          if (!AccountManager.hasActiveSession()) {
             if (!mounted) return;
             showDialog(
               context: context,
@@ -657,7 +657,6 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
       ),
     );
   }
-
 
   @override
   void dispose() {

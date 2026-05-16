@@ -348,9 +348,7 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
               },
               child: Text(
                 'AneryCoft',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary
-                ),
+                style: TextStyle(color: Theme.of(context).colorScheme.primary),
               ),
             ),
           ],
@@ -480,11 +478,7 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
               // 关于菜单项
               const PopupMenuItem<String>(
                 value: 'about',
-                child: Row(
-                  children: [
-                    Text('关于'),
-                  ],
-                ),
+                child: Row(children: [Text('关于')]),
               ),
             ],
           )

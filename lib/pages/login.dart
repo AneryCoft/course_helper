@@ -293,34 +293,44 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       child: qrState.qrImageUrl != null
                           ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          qrState.qrImageUrl!,
-                          fit: BoxFit.contain,
-                          gaplessPlayback: true,
-                        ),
-                      )
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                qrState.qrImageUrl!,
+                                fit: BoxFit.contain,
+                                gaplessPlayback: true,
+                              ),
+                            )
                           : qrState.isLoading
                           ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 8),
-                            Text('生成中...', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      )
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    '生成中...',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            )
                           : const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline, size: 48, color: Colors.grey),
-                            SizedBox(height: 8),
-                            Text('二维码加载失败', style: TextStyle(color: Colors.grey)),
-                          ],
-                        ),
-                      ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.error_outline,
+                                    size: 48,
+                                    color: Colors.grey,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    '二维码加载失败',
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
                     ),
                     const SizedBox(height: 20),
                     const Text(
