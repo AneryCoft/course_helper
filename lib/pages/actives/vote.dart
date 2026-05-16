@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../api/api_service.dart';
 import '../../../api/quiz.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
@@ -128,32 +129,28 @@ class _VotePageState extends State<VotePage> {
     });
 
     try {
-      for (var account in _selectedAccounts) {
-        AccountManager.setCurrentSessionTemp(account.uid);
-        
-        try {
-          final result = await QuizApi.submitVote(
+      final results = await ApiService.sendForEachUser<Map<String, dynamic>>(
+        _selectedAccounts,
+        (user) async {
+          final api = QuizApi(user);
+          return await api.submitVote(
             widget.courseId,
             widget.classId,
             widget.active.id,
             _voteData!['questionlist'][0]['id'].toString(),
             _selectedOption!,
           );
-          
-          if (result == null || result['status'] != 1) {
-            _failedAccounts.add('${account.name}: ${result?['errorMsg'] ?? '提交失败'}');
-          }
-        } catch (e) {
-          _failedAccounts.add('${account.name}: 异常 - $e');
-        } finally {
-          setState(() {
-          });
+        },
+      );
+
+      // 处理结果
+      for (int i = 0; i < _selectedAccounts.length; i++) {
+        final account = _selectedAccounts[i];
+        final result = results[i];
+        
+        if (result == null || result['status'] != 1) {
+          _failedAccounts.add('${account.name}: ${result?['errorMsg'] ?? '提交失败'}');
         }
-      }
-      
-      // 恢复当前账号
-      if (_currentUser != null) {
-        AccountManager.setCurrentSessionTemp(_currentUser!.uid);
       }
       
       _showSubmitResult();

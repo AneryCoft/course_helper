@@ -46,6 +46,14 @@ class User {
     };
   }
 
+  static User get empty => User(
+      name: '',
+      avatar: '',
+      phone: '',
+      uid: '',
+      school: ''
+  );
+
   void setStatus(bool newStatus) {
     status = newStatus;
   }

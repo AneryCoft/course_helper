@@ -11,7 +11,6 @@ import '../../../api/quiz.dart';
 import '../../../api/image.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
-import '../../../session/account.dart';
 import '../widget/accounts_selector.dart';
 
 class QuizPage extends StatefulWidget {
@@ -103,7 +102,6 @@ class _QuizPageState extends State<QuizPage> {
   
   // 账号选择
   List<User> _selectedAccounts = [];
-  User? _currentUser;
   
   @override
   void initState() {
@@ -115,6 +113,13 @@ class _QuizPageState extends State<QuizPage> {
     // 先请求HTML并检查活动状态
     try {
       final response = await ApiService.sendRequest(widget.active.url, responseType: ResponseType.plain);
+      if (response == null) {
+        setState(() {
+          _errorMessage = '获取数据失败';
+          _isLoading = false;
+        });
+        return;
+      }
       String htmlContent = response.data.toString();
       
       // 使用正则表达式匹配activeStatus
@@ -289,6 +294,13 @@ class _QuizPageState extends State<QuizPage> {
   Future<void> _loadQuizData() async {
     try {
       final response = await ApiService.sendRequest(widget.active.url, responseType: ResponseType.plain);
+      if (response == null) {
+        setState(() {
+          _errorMessage = '获取数据失败';
+          _isLoading = false;
+        });
+        return;
+      }
       
       // 解析HTML中的JavaScript数据
       String htmlContent = response.data.toString();
@@ -405,27 +417,24 @@ class _QuizPageState extends State<QuizPage> {
     final submitData = jsonEncode(_constructSubmitData());
 
     try {
-      for (var account in _selectedAccounts) {
-        AccountManager.setCurrentSessionTemp(account.uid);
-        try {
-          final result = await QuizApi.submitAnswer(
-              widget.classId, widget.courseId, widget.active.id, submitData
+      final results = await ApiService.sendForEachUser<Map<String, dynamic>>(
+        _selectedAccounts,
+        (user) async {
+          final api = QuizApi(user);
+          return await api.submitAnswer(
+            widget.classId, widget.courseId, widget.active.id, submitData
           );
-          
-          if (result != null && result['result'] != 1) {
-            _failedAccounts.add('${account.name}: ${result['errorMsg'] ?? '提交失败'}');
-          }
-        } catch (e) {
-          _failedAccounts.add('${account.name}: 异常 - $e');
-        } finally {
-          setState(() {
-          });
+        },
+      );
+
+      // 处理结果
+      for (int i = 0; i < _selectedAccounts.length; i++) {
+        final account = _selectedAccounts[i];
+        final result = results[i];
+        
+        if (result == null || result['result'] != 1) {
+          _failedAccounts.add('${account.name}: ${result?['errorMsg'] ?? '提交失败'}');
         }
-      }
-      
-      // 恢复当前账号
-      if (_currentUser != null) {
-        AccountManager.setCurrentSessionTemp(_currentUser!.uid);
       }
       
       _showSubmitResult();
@@ -851,7 +860,9 @@ class _QuizPageState extends State<QuizPage> {
         final uploadFutures = images.map((image) async {
           try {
             final file = File(image.path);
-            final objectId = await CXImageApi.uploadImage(file, AccountManager.currentSessionId ?? '');
+            final api = CXImageApi();
+            // FIXME 所有的图片都是当前账号上传的（学习通目前没有对于图片的权鉴）
+            final objectId = await api.uploadImage(file);
             if (objectId != null) {
               return {'image': image, 'objectId': objectId};
             }

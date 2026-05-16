@@ -23,11 +23,11 @@ class NormalSign implements SignStrategy {
 
   @override
   Future<String?> signForAccount(User user, SignParams params, SignInPageState state) async {
+    final api = SignInApi(user);
     final objectId = params.getUserObjectId(user.uid);
     if (state.isGroupSign) {
-      return await SignInApi.groupSign(
+      return await api.groupSign(
           params.active.id,
-          user,
           objectId: objectId
       );
     }
@@ -35,12 +35,11 @@ class NormalSign implements SignStrategy {
     final userValidate = state.getUserCaptchaValidate(user.uid);
     final validate = userValidate?['validate'];
 
-    return await SignInApi.normalSign(
+    return await api.normalSign(
       params.courseId,
       params.active.id,
-      user,
       objectId: objectId,
-      validate: validate,
+      validate: validate
     );
   }
 
@@ -205,7 +204,8 @@ class NormalSign implements SignStrategy {
       state.setUserUploadingStatus(user.uid, true);
       
       try {
-        final objectId = await CXImageApi.uploadImage(File(pickedFile.path), user.uid);
+        final api = CXImageApi(user);
+        final objectId = await api.uploadImage(File(pickedFile.path));
         
         if (objectId != null) {
           state.signParams.setUserObjectId(user.uid, objectId);

@@ -300,6 +300,13 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
           final activeId = params['id'];
           if (activeId != null) {
             final response = await ApiService.sendRequest(result, responseType: ResponseType.plain, allowRedirects: false);
+            if (response == null) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('请求失败')),
+              );
+              return;
+            }
             final locationUrl = response.headers['location']?.first;
 
             final uri = Uri.parse(locationUrl!);
@@ -421,23 +428,27 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     int successCount = 0;
     final List<String> failedAccounts = [];
   
-    final currentUserId = AccountManager.currentSessionId;
-    for (final user in allAccounts) {
-      AccountManager.setCurrentSessionTemp(user.uid);
-      try {
-        final status = await RCCourseApi.scan(qrCodeUrl);
-        if (status == 0) {
-          successCount++;
-        } else if (status == 51203){
-          failedAccounts.add('${user.name} (动态二维码过期)');
-        } else {
-          failedAccounts.add('${user.name} (错误码：$status)');
-        }
-      } catch (e) {
-        failedAccounts.add('${user.name} (异常：$e)');
+    final results = await ApiService.sendForEachUser(
+      allAccounts,
+      (user) async {
+        final api = RCCourseApi(user);
+        return await api.scan(qrCodeUrl);
+      },
+    );
+
+    for (int i = 0; i < results.length; i++) {
+      final status = results[i];
+      final user = allAccounts[i];
+      
+      if (status == 0) {
+        successCount++;
+      } else if (status == 51203) {
+        failedAccounts.add('${user.name} (动态二维码过期)');
+      } else {
+        failedAccounts.add('${user.name} (错误码：$status)');
       }
     }
-    AccountManager.setCurrentSessionTemp(currentUserId!);
+    
   
     if (!mounted) return;
     setState(() {

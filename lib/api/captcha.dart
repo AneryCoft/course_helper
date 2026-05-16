@@ -6,7 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 import '../utils/encrypt.dart';
 
-class CaptchaApi {
+class CaptchaApi extends Api {
+  CaptchaApi([super.user]);
+  
   late int _timestamp;
   late String _iv;
   static final RegExp _captchaRegExp = RegExp(r'cx_captcha_function\((.+)\)');
@@ -16,58 +18,57 @@ class CaptchaApi {
   Future<Map<String, dynamic>?> getCaptchaImages(String referer) async {
     _timestamp = DateTime.now().millisecondsSinceEpoch;
     
-    try {
-      final configUrl = 'https://captcha.chaoxing.com/captcha/get/conf';
-      final configParams = {
-        'callback': 'cx_captcha_function',
-        'captchaId': Constant.cxCaptchaId,
-        '_': _timestamp.toString()
-      };
+    final configUrl = 'https://captcha.chaoxing.com/captcha/get/conf';
+    final configParams = {
+      'callback': 'cx_captcha_function',
+      'captchaId': Constant.cxCaptchaId,
+      '_': _timestamp.toString()
+    };
 
-      final configResponse = await ApiService.sendRequest(configUrl, params: configParams, responseType: ResponseType.plain);
+    final configResponse = await ApiService.sendRequest(configUrl, params: configParams, responseType: ResponseType.plain);
+    if (configResponse == null) return null;
 
-      // 解析配置响应
-      String configResponseText = configResponse.data;
-      Match? configMatch = _captchaRegExp.firstMatch(configResponseText);
-      
-      if (configMatch == null) {
-        debugPrint('Error: Failed to parse captcha config response');
-        return null;
-      }
-
-      String configJsonString = configMatch.group(1)!.trim();
-      Map<String, dynamic> config = jsonDecode(configJsonString);
-
-      int serviceTime = config['t'];
-      String captchaKey = EncryptionUtil.md5Hash('$serviceTime${_uuid()}');
-      String token = '${EncryptionUtil.md5Hash('$serviceTime${Constant.cxCaptchaId}slide$captchaKey')}:${serviceTime + 300000}';
-      _iv = EncryptionUtil.md5Hash('${Constant.cxCaptchaId}slide$_timestamp${_uuid()}');
-
-      final imageUrl = 'https://captcha.chaoxing.com/captcha/get/verification/image';
-      final imageParams = {
-        'callback': 'cx_captcha_function',
-        'captchaId': Constant.cxCaptchaId,
-        'type': 'slide',
-        'version': '1.1.20',
-        'captchaKey': captchaKey,
-        'token': token,
-        'referer': referer,
-        'iv': _iv,
-        '_': (_timestamp + 1).toString()
-      };
-
-      final response = await ApiService.sendRequest(imageUrl, params: imageParams, responseType: ResponseType.plain);
-
-      String responseText = response.data;
-      Match? match = _captchaRegExp.firstMatch(responseText);
-
-      if (match != null) {
-        String jsonString = match.group(1)!.trim();
-        return jsonDecode(jsonString);
-      }
-    } catch (e) {
-      debugPrint('Error getting captcha images: $e');
+    // 解析配置响应
+    String configResponseText = configResponse.data;
+    Match? configMatch = _captchaRegExp.firstMatch(configResponseText);
+    
+    if (configMatch == null) {
+      debugPrint('Error: Failed to parse captcha config response');
+      return null;
     }
+
+    String configJsonString = configMatch.group(1)!.trim();
+    Map<String, dynamic> config = jsonDecode(configJsonString);
+
+    int serviceTime = config['t'];
+    String captchaKey = EncryptionUtil.md5Hash('$serviceTime${_uuid()}');
+    String token = '${EncryptionUtil.md5Hash('$serviceTime${Constant.cxCaptchaId}slide$captchaKey')}:${serviceTime + 300000}';
+    _iv = EncryptionUtil.md5Hash('${Constant.cxCaptchaId}slide$_timestamp${_uuid()}');
+
+    final imageUrl = 'https://captcha.chaoxing.com/captcha/get/verification/image';
+    final imageParams = {
+      'callback': 'cx_captcha_function',
+      'captchaId': Constant.cxCaptchaId,
+      'type': 'slide',
+      'version': '1.1.20',
+      'captchaKey': captchaKey,
+      'token': token,
+      'referer': referer,
+      'iv': _iv,
+      '_': (_timestamp + 1).toString()
+    };
+
+    final response = await ApiService.sendRequest(imageUrl, params: imageParams, responseType: ResponseType.plain);
+    if (response == null) return null;
+
+    String responseText = response.data;
+    Match? match = _captchaRegExp.firstMatch(responseText);
+
+    if (match != null) {
+      String jsonString = match.group(1)!.trim();
+      return jsonDecode(jsonString);
+    }
+    
     return null;
   }
 
@@ -78,41 +79,39 @@ class CaptchaApi {
       return null;
     }
     
-    try {
-      final url = 'https://captcha.chaoxing.com/captcha/check/verification/result';
-      final params = {
-        'callback': 'cx_captcha_function',
-        'captchaId': Constant.cxCaptchaId,
-        'type': 'slide',
-        'token': token,
-        'textClickArr': '[{"x":${xValue.round()}}]',
-        'coordinate': '[]',
-        'runEnv': '10',
-        'version': '1.1.20',
-        't': 'a',
-        'iv': _iv,
-        '_': (_timestamp + 2).toString()
-      };
-      
-      final response = await ApiService.sendRequest(url, params: params, headers: {'Referer': referer}, responseType: ResponseType.plain);
+    final url = 'https://captcha.chaoxing.com/captcha/check/verification/result';
+    final params = {
+      'callback': 'cx_captcha_function',
+      'captchaId': Constant.cxCaptchaId,
+      'type': 'slide',
+      'token': token,
+      'textClickArr': '[{"x":${xValue.round()}}]',
+      'coordinate': '[]',
+      'runEnv': '10',
+      'version': '1.1.20',
+      't': 'a',
+      'iv': _iv,
+      '_': (_timestamp + 2).toString()
+    };
+    
+    final response = await ApiService.sendRequest(url, params: params, headers: {'Referer': referer}, responseType: ResponseType.plain);
+    if (response == null) return null;
 
-      String responseText = response.data;
-      Match? match = _captchaRegExp.firstMatch(responseText);
+    String responseText = response.data;
+    Match? match = _captchaRegExp.firstMatch(responseText);
 
-      if (match != null) {
-        String jsonString = match.group(1)!.trim();
-        Map<String, dynamic> result = jsonDecode(jsonString);
+    if (match != null) {
+      String jsonString = match.group(1)!.trim();
+      Map<String, dynamic> result = jsonDecode(jsonString);
 
-        if (result['error'] == 0 && result['result'] == true) {
-          // 解析extraData中的validate
-          String extraData = result['extraData'];
-          Map<String, dynamic> extraDataMap = jsonDecode(extraData);
-          return extraDataMap['validate'];
-        }
+      if (result['error'] == 0 && result['result'] == true) {
+        // 解析extraData中的validate
+        String extraData = result['extraData'];
+        Map<String, dynamic> extraDataMap = jsonDecode(extraData);
+        return extraDataMap['validate'];
       }
-    } catch (e) {
-      debugPrint('Error submitting captcha: $e');
     }
+    
     return null;
   }
 

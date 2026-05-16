@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../api/api_service.dart';
 import '../../../api/active.dart';
 import '../../../api/evaluate.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
-import '../../../session/account.dart';
 import '../widget/accounts_selector.dart';
 
 class EvaluatePage extends StatefulWidget {
@@ -43,7 +43,6 @@ class _EvaluatePageState extends State<EvaluatePage> {
   
   // 账号选择
   List<User> _selectedAccounts = [];
-  User? _currentUser;
   
   @override
   void initState() {
@@ -166,11 +165,11 @@ class _EvaluatePageState extends State<EvaluatePage> {
     });
     
     try {
-      for (var account in _selectedAccounts) {
-        AccountManager.setCurrentSessionTemp(account.uid);
-        
-        try {
-          final result = await EvaluateApi.stuSubmitAnswer(
+      final results = await ApiService.sendForEachUser<bool>(
+        _selectedAccounts,
+        (user) async {
+          final api = EvaluateApi(user);
+          return await api.stuSubmitAnswer(
             widget.active.id,
             widget.classId,
             widget.courseId,
@@ -178,21 +177,17 @@ class _EvaluatePageState extends State<EvaluatePage> {
             content: _commentController.text,
             scoreList: scoreList
           );
-          
-          if (result != true) {
-            _failedAccounts.add('${account.name}: 提交失败');
-          }
-        } catch (e) {
-          _failedAccounts.add('${account.name}: 异常 - $e');
-        } finally {
-          setState(() {
-          });
+        },
+      );
+
+      // 处理结果
+      for (int i = 0; i < _selectedAccounts.length; i++) {
+        final account = _selectedAccounts[i];
+        final result = results[i];
+        
+        if (result != true) {
+          _failedAccounts.add('${account.name}: 提交失败');
         }
-      }
-      
-      // 恢复当前账号
-      if (_currentUser != null) {
-        AccountManager.setCurrentSessionTemp(_currentUser!.uid);
       }
       
       _showSubmitResult();

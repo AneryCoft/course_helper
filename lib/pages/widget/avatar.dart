@@ -43,6 +43,10 @@ class AvatarCache {
   static Future<Uint8List?> _fetchImage(String url) async {
     try {
       final response = await ApiService.sendRequest(url, responseType: ResponseType.bytes);
+      if (response == null) {
+        debugPrint('头像请求失败: $url');
+        return null;
+      }
       debugPrint('头像请求成功: $url');
       return response.data;
     } catch (e) {

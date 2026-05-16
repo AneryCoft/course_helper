@@ -27,10 +27,12 @@ class CourseContentPage extends StatefulWidget {
 class _CourseContentPageState extends State<CourseContentPage> {
   List<Active> _activeList = [];
   bool _isContentLoading = false;
+  late CXCourseApi _courseApi;
 
   @override
   void initState() {
     super.initState();
+    _courseApi = CXCourseApi();
     _loadCourseContent();
   }
 
@@ -40,7 +42,7 @@ class _CourseContentPageState extends State<CourseContentPage> {
     });
 
     try {
-      final List<Active>? contentList = await CXCourseApi.getActiveList(
+      final List<Active>? contentList = await _courseApi.getActiveList(
         widget.courseId,
         widget.classId,
         widget.cpi,

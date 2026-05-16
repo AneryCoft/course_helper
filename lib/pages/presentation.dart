@@ -9,6 +9,7 @@ import 'dart:io' show WebSocket, File;
 
 import '../api/course.dart';
 import '../api/image.dart';
+import '../api/api_service.dart';
 import '../models/presentation.dart';
 import '../session/account.dart';
 
@@ -112,14 +113,22 @@ class _PresentationPageState extends State<PresentationPage> {
   }
 
   Future<void> _checkToken() async {
-    final lessonToken = RCCourseApi.getLessonToken();
+    final lessonToken = RCCourseApi().lessonToken;
     if (lessonToken == null) {
       final allAccounts = AccountManager.allAccounts;
-      final currentUserId = AccountManager.currentSessionId;
+      
+      final results = await ApiService.sendForEachUser(
+        allAccounts,
+        (user) async {
+          final api = RCCourseApi(user);
+          return await api.checkIn(widget.lessonId);
+        },
+      );
+
+      for (int i = 0; i < results.length; i++) {
+        final result = results[i];
+        final user = allAccounts[i];
         
-      for (final user in allAccounts) {
-        AccountManager.setCurrentSessionTemp(user.uid);
-        final result = await RCCourseApi.checkIn(widget.lessonId);
         if (result != 0) {
           if (result == 50070){
             // 该课堂已开启动态二维码签到，请扫码签到进班
@@ -149,7 +158,6 @@ class _PresentationPageState extends State<PresentationPage> {
           }
         } 
       }
-      AccountManager.setCurrentSessionTemp(currentUserId!);
     }
   }
 
@@ -202,7 +210,7 @@ class _PresentationPageState extends State<PresentationPage> {
         "op": "hello",
         "userid": AccountManager.currentSessionId,
         "role": "student",
-        "auth": RCCourseApi.getLessonToken(),
+        "auth": RCCourseApi().lessonToken,
         "lessonid": widget.lessonId
       };
 
@@ -534,7 +542,7 @@ class _PresentationPageState extends State<PresentationPage> {
     });
     
     try {
-      final pptData = await RCCourseApi.getPresentation(presentationId);
+      final pptData = await RCCourseApi().getPresentation(presentationId);
       if (pptData != null) {
         final presentation = Presentation.fromJson(pptData);
         setState(() {
@@ -1268,7 +1276,6 @@ class _PresentationPageState extends State<PresentationPage> {
 
   Future<void> _submitForAllAccounts(String problemId, int problemType, List<String>? imageUrls, bool isTimeout, int? problemDt) async {
     final allAccounts = AccountManager.allAccounts;
-    final currentUserId = AccountManager.currentSessionId;
     
     if (allAccounts.isEmpty) {
       if (mounted) {
@@ -1282,47 +1289,41 @@ class _PresentationPageState extends State<PresentationPage> {
     int successCount = 0;
     final List<String> failedAccounts = [];
 
-    try {
-      for (final user in allAccounts) {
-        AccountManager.setCurrentSessionTemp(user.uid);
-        
-        try {
-          final result = await RCCourseApi.answer(
-            problemId,
-            problemType,
-            retry: isTimeout,
-            time: isTimeout ? problemDt : null,
-            options: _answer,
-            content: _textAnswer,
-            imageUrls: imageUrls
-          );
+    final results = await ApiService.sendForEachUser(
+      allAccounts,
+      (user) async {
+        final api = RCCourseApi(user);
+        return await api.answer(
+          problemId,
+          problemType,
+          retry: isTimeout,
+          time: isTimeout ? problemDt : null,
+          options: _answer,
+          content: _textAnswer,
+          imageUrls: imageUrls
+        );
+      },
+    );
 
-          if (result != null && result['code'] == 0) {
-            successCount++;
-          } else {
-            failedAccounts.add('${user.name}: ${result?["msg"] ?? "提交失败"}');
-          }
-        } catch (e) {
-          failedAccounts.add('${user.name}: 异常 - $e');
-        }
-      }
-      AccountManager.setCurrentSessionTemp(currentUserId!);
-
-      _showSubmitResult(successCount, allAccounts.length, failedAccounts);
+    for (int i = 0; i < results.length; i++) {
+      final result = results[i];
+      final user = allAccounts[i];
       
-      // 提交成功后禁用按钮并清空图片
-      setState(() {
-        _countdownSeconds = 0;
-        _selectedImages.clear();
-        _uploadedImageUrls.clear();
-      });
-    } finally {
-      // 确保状态能被重置
-      if (mounted) {
-        setState(() {
-        });
+      if (result != null && result['code'] == 0) {
+        successCount++;
+      } else {
+        failedAccounts.add('${user.name}: ${result?["msg"] ?? "提交失败"}');
       }
     }
+
+    _showSubmitResult(successCount, allAccounts.length, failedAccounts);
+    
+    // 提交成功后禁用按钮并清空图片
+    setState(() {
+      _countdownSeconds = 0;
+      _selectedImages.clear();
+      _uploadedImageUrls.clear();
+    });
   }
 
   void _showSubmitResult(int successCount, int totalCount, List<String> failedAccounts) {

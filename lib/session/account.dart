@@ -42,6 +42,8 @@ class AccountManager {
   /// 获取当前会话的用户 ID（同步，使用缓存）
   static String? get currentSessionId => _currentSessionId;
 
+  static User? get currentUser => _currentSessionId != null ? getAccountById(_currentSessionId!) : null;
+
 
   /// 初始化账户管理器
   static Future<void> initialize() async {
@@ -122,14 +124,15 @@ class AccountManager {
   /// 添加账户（如果已存在则更新）
   static Future<void> addAccount(User user) async {
     final index = _accounts.indexWhere((acc) => acc.uid == user.uid);
-    // 将临时Cookie迁移到该账号
-    await CookieManager.saveTempCookies(user.uid);
+
     if (index != -1) {
       _accounts[index] = user;
       if (user.uid == _currentSessionId) {
         AccountChangeNotifier().notifyAccountChanged();
       }
     } else {
+      // 将临时Cookie迁移到该账号
+      await CookieManager.saveTempCookies(user.uid);
       _accounts.add(user);
       // 如果没有当前会话，自动设置为当前账户
       if (!hasActiveSession()) {

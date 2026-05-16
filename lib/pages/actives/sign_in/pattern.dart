@@ -18,13 +18,12 @@ class PatternSign implements SignStrategy {
   Future<String?> signForAccount(User user, SignParams params, SignInPageState state) async {
     final userValidate = state.getUserCaptchaValidate(user.uid);
     final validate = userValidate?['validate'];
-    
-    return await SignInApi.codeSign(
+
+    return await SignInApi(user).codeSign(
       params.courseId,
       params.active.id,
       params.pattern,
-      user,
-      validate: validate,
+      validate: validate
     );
   }
   

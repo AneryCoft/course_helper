@@ -6,6 +6,7 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import '../utils/encrypt.dart';
 import '../utils/storage.dart';
 import '../session/cookie.dart';
+import '../session/account.dart';
 import '../platform.dart';
 import '../models/user.dart';
 
@@ -81,7 +82,7 @@ class ApiService {
   static void Function()? onPlatformChange;
 
   /// 获取雨课堂服务器对应的 baseUrl
-  static const _serverBaseUrlMap = {
+  static const serverBaseUrlMap = {
     RainClassroomServerType.yuketang: 'https://www.yuketang.cn',
     RainClassroomServerType.pro: 'https://pro.yuketang.cn',
     RainClassroomServerType.changjiang: 'https://changjiang.yuketang.cn',
@@ -96,7 +97,7 @@ class ApiService {
         _dio.options.baseUrl = '';
         _dio.options.headers = HeadersManager.chaoxingHeaders;
       } else if (PlatformManager().isRainClassroom) {
-        _dio.options.baseUrl = _serverBaseUrlMap[PlatformManager().currentServer]!;
+        _dio.options.baseUrl = serverBaseUrlMap[PlatformManager().currentServer]!;
         _dio.options.headers = HeadersManager.rainClassroomHeaders;
       }
     };
@@ -147,7 +148,7 @@ class ApiService {
   }
 
   /// 发送 HTTP 请求
-  static Future<Response> sendRequest(
+  static Future<Response?> sendRequest(
       String url,
       {
         String method = 'GET',
@@ -155,50 +156,57 @@ class ApiService {
         Map<String, String>? headers,
         dynamic body,
         ResponseType responseType = ResponseType.json,
-        bool allowRedirects = true
+        bool allowRedirects = true,
+        String? userId
       }
       ) async {
-    final options = Options(
-      method: method,
-      headers: headers,
-      responseType: responseType
-    );
+    try {
+      final options = Options(
+        method: method,
+        headers: headers,
+        responseType: responseType,
+        extra: {'userId': userId ?? AccountManager.currentSessionId}
+      );
 
-    var response = await _dio.request(url, queryParameters: params, data: body, options: options);
+      var response = await _dio.request(url, queryParameters: params, data: body, options: options);
 
-    if (allowRedirects) {
-      int redirectCount = 0;
-      const maxRedirects = 3;
-      
-      while (redirectCount < maxRedirects) {
-        var locationUrl = response.headers['location']?.first;
-        if (locationUrl == null) break;
+      if (allowRedirects) {
+        int redirectCount = 0;
+        const maxRedirects = 3;
         
-        // 只有路径
-        if (!locationUrl.startsWith('http')){
-          final uri = response.realUri;
-          final baseUri = '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}';
-          locationUrl = baseUri + locationUrl;
+        while (redirectCount < maxRedirects) {
+          var locationUrl = response.headers['location']?.first;
+          if (locationUrl == null) break;
+          
+          // 只有路径
+          if (!locationUrl.startsWith('http')){
+            final uri = response.realUri;
+            final baseUri = '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}';
+            locationUrl = baseUri + locationUrl;
+          }
+          
+          response = await _dio.get(locationUrl, options: options);
+          redirectCount++;
         }
-        
-        response = await _dio.get(locationUrl, options: options);
-        redirectCount++;
       }
+
+      if (options.responseType == ResponseType.json) {
+        if (response.data is String) {
+          response.data = jsonDecode(response.data);
+        }
+      } // dio 的 json 解析有问题
+
+      return response;
+    } catch (e, stackTrace) {
+      debugPrint('HTTP Exception [$url]: $e\n$stackTrace');
     }
-
-    if (options.responseType == ResponseType.json) {
-      if (response.data is String) {
-        response.data = jsonDecode(response.data);
-      }
-    } // dio 的 json 解析有问题
-
-    return response;
+    return null;
   }
 
   /// 并发用户请求
-  static Future<List<dynamic>> sendForEachUser(
+  static Future<List<T?>> sendForEachUser<T>(
       List<User> users,
-      Future<dynamic> Function(User user) apiFunction,
+      Future<T?> Function(User user) apiFunction,
       ) async {
     if (users.isEmpty) {
       return [];
@@ -215,4 +223,10 @@ class ApiService {
 
     return await Future.wait(futures);
   }
+}
+
+abstract class Api {
+  final User? user;
+
+  Api([User? user]) : user = user ?? AccountManager.currentUser;
 }

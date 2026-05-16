@@ -494,9 +494,9 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
     });
 
     try {
-      for (var account in _selectedAccounts) {
-        AccountManager.setCurrentSessionTemp(account.uid);
-        try {
+      final results = await ApiService.sendForEachUser<Map<String, dynamic>>(
+        _selectedAccounts,
+        (user) async {
           // 构造提交数据：Map<String, List<String>> answers (questionId -> [answer])
           final submitAnswers = <String, List<String>>{};
           for (var question in _questionList) {
@@ -524,27 +524,24 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
             }
           }
           
-          final result = await QuizApi.submitQuestionnaire(
+          final api = QuizApi(user);
+          return await api.submitQuestionnaire(
             widget.courseId, 
             widget.classId, 
             widget.active.id, 
             submitAnswers
           );
-          
-          if (result == null || result['result'] != 1) {
-            _failedAccounts.add('${account.name}: ${result?['errorMsg'] ?? '提交失败'}');
-          }
-        } catch (e) {
-          _failedAccounts.add('${account.name}: 异常 - $e');
-        } finally {
-          setState(() {
-          });
+        },
+      );
+
+      // 处理结果
+      for (int i = 0; i < _selectedAccounts.length; i++) {
+        final account = _selectedAccounts[i];
+        final result = results[i];
+        
+        if (result == null || result['result'] != 1) {
+          _failedAccounts.add('${account.name}: ${result?['errorMsg'] ?? '提交失败'}');
         }
-      }
-      
-      // 恢复当前账号
-      if (_currentUser != null) {
-        AccountManager.setCurrentSessionTemp(_currentUser!.uid);
       }
       
       _showSubmitResult();

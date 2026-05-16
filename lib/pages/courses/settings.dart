@@ -5,7 +5,6 @@ import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 
 import '../../api/image.dart';
 import '../../api/api_service.dart';
-import '../../session/account.dart';
 import '../../models/course.dart';
 import '../../setting/course_setting.dart';
 import '../widget/baidu_map.dart';
@@ -82,7 +81,6 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
       
       if (pickedFiles.isEmpty) return;
 
-      final userId = AccountManager.currentSessionId!;
       final uploadFutures = pickedFiles.map((pickedFile) async {
         final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
         setState(() {
@@ -91,7 +89,8 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
         });
 
         try {
-          final objectId = await CXImageApi.uploadImage(File(pickedFile.path), userId);
+          final api = CXImageApi();
+          final objectId = await api.uploadImage(File(pickedFile.path));
 
           if (objectId != null) {
             setState(() {

@@ -30,26 +30,26 @@ class QRCodeSign implements SignStrategy {
     SignParams params,
     SignInPageState state,
   ) async {
+    final api = SignInApi(user);
     final userValidate = state.getUserCaptchaValidate(user.uid);
     final validate = userValidate?['validate'];
     final enc2 = userValidate?['enc2'];
 
     String? faceId;
     if (state.needFace) {
-      faceId = await SignInApi.getFaceId(user);
+      faceId = await api.getFaceId();
     }
 
-    return await SignInApi.qrCodeSign(
+    return await api.qrCodeSign(
       params.courseId,
       params.active.id,
       params.enc!,
-      user,
       address: params.address,
       latitude: params.latitude,
       longitude: params.longitude,
       enc2: enc2,
       validate: validate,
-      faceId: faceId,
+      faceId: faceId
     );
   }
 

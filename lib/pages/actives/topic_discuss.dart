@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import '../../../api/topic_discuss.dart';
+import '../../../api/api_service.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
 import '../../../session/account.dart';
@@ -37,7 +38,6 @@ class _TopicDiscussPageState extends State<TopicDiscussPage> {
 
   // 账号选择
   List<User> _selectedAccounts = [];
-  User? _currentUser;
   
   // 评论输入
   bool _isAnonymous = false;
@@ -50,7 +50,6 @@ class _TopicDiscussPageState extends State<TopicDiscussPage> {
   }
   
   Future<void> _initialize() async {
-    TopicDiscussApi.updateUser();
     await _loadTopicData();
   }
 
@@ -62,12 +61,22 @@ class _TopicDiscussPageState extends State<TopicDiscussPage> {
 
   Future<void> _loadTopicData() async {
     try {
-      final topicData = await TopicDiscussApi.getTopic(_topicId);
+      final currentUid = AccountManager.currentSessionId;
+      if (currentUid == null) {
+        setState(() {
+          _errorMessage = '未登录';
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      final api = TopicDiscussApi();
+      final topicData = await api.getTopic(_topicId);
       if (topicData != null && topicData['result'] == 1) {
         _topicData = topicData['data'];
         _topicUuid = _topicData!['uuid'] ?? '';
         _canAnonymous = _topicData!['userAuth']['operationAuth']['canAnonymousAddReply'] == 1;
-        final repliesData = await TopicDiscussApi.getReplies(_topicUuid);
+        final repliesData = await api.getReplies(_topicUuid);
         if (repliesData != null && repliesData['result'] == 1) {
           setState(() {
             _replies = repliesData['data']['list'];
@@ -113,35 +122,26 @@ class _TopicDiscussPageState extends State<TopicDiscussPage> {
     });
 
     try {
-      for (var account in _selectedAccounts) {
-        AccountManager.setCurrentSessionTemp(account.uid);
-              
-        // 更新 TopicDiscussAPI 的用户信息
-        TopicDiscussApi.updateUser();
-        
-        try {
-          final result = await TopicDiscussApi.addReply(
+      final results = await ApiService.sendForEachUser<Map<String, dynamic>>(
+        _selectedAccounts,
+        (user) async {
+          final api = TopicDiscussApi(user);
+          return await api.addReply(
             _commentController.text.trim(),
             _isAnonymous,
             _topicUuid,
           );
-          
-          if (result != null && result['result'] == 1) {
-            // 发布成功
-          } else {
-            _failedAccounts.add('${account.name}: ${result?['errorMsg'] ?? '发布失败'}');
-          }
-        } catch (e) {
-          _failedAccounts.add('${account.name}: 异常 - $e');
-        } finally {
-          setState(() {
-          });
+        },
+      );
+
+      // 处理结果
+      for (int i = 0; i < _selectedAccounts.length; i++) {
+        final account = _selectedAccounts[i];
+        final result = results[i];
+        
+        if (result == null || result['result'] != 1) {
+          _failedAccounts.add('${account.name}: ${result?['errorMsg'] ?? '发布失败'}');
         }
-      }
-      
-      // 恢复当前账号
-      if (_currentUser != null) {
-        AccountManager.setCurrentSessionTemp(_currentUser!.uid);
       }
       
       // 重新加载评论
@@ -160,7 +160,8 @@ class _TopicDiscussPageState extends State<TopicDiscussPage> {
 
   Future<void> _reloadComments() async {
     try {
-      final repliesData = await TopicDiscussApi.getReplies(_topicUuid);
+      final api = TopicDiscussApi();
+      final repliesData = await api.getReplies(_topicUuid);
       if (repliesData != null && repliesData['result'] == 1) {
         setState(() {
           _replies = repliesData['data']['list'];

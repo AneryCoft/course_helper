@@ -181,7 +181,7 @@ class EncryptionUtil {
   }
 
   static Map<String, String> getEncParams(Map<String, String> params) {
-    Map<String, String> encParams = {
+    final encParams = {
       '_c_0_': getUniqueId(),
       'token': Constant.infEncToken,
       '_time': DateTime.now().millisecondsSinceEpoch.toString()

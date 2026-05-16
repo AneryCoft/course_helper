@@ -19,11 +19,10 @@ class CodeSign implements SignStrategy {
     final userValidate = state.getUserCaptchaValidate(user.uid);
     final validate = userValidate?['validate'];
     
-    return await SignInApi.codeSign(
+    return await SignInApi(user).codeSign(
       params.courseId,
       params.active.id,
       params.code,
-      user,
       validate: validate,
     );
   }
