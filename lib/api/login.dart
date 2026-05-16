@@ -15,14 +15,8 @@ class CXLoginApi extends Api {
   ) async {
     final url = 'https://passport2.chaoxing.com/fanyalogin';
 
-    final usernameCipher = EncryptionUtil.aesCbcEncrypt(
-      username,
-      Constant.webLoginKey,
-    );
-    final passwordCipher = EncryptionUtil.aesCbcEncrypt(
-      password,
-      Constant.webLoginKey,
-    );
+    final usernameCipher = EncryptionUtil.aesCbcEncrypt(username, Constant.webLoginKey);
+    final passwordCipher = EncryptionUtil.aesCbcEncrypt(password, Constant.webLoginKey);
 
     final formData = {
       'fid': '-1',
