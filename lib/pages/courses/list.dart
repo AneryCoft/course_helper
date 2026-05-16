@@ -20,18 +20,23 @@ import '../actives/questionnaire.dart';
 import 'content.dart';
 import '../presentation.dart';
 
-
 class CoursesPage extends StatefulWidget {
   const CoursesPage({super.key});
 
   @override
   State<CoursesPage> createState() => _CoursesPageState();
 
-  static void navigateToActive(BuildContext context, Active active, String courseId, String classId, String cpi) {
+  static void navigateToActive(
+    BuildContext context,
+    Active active,
+    String courseId,
+    String classId,
+    String cpi,
+  ) {
     if (!active.status) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('该活动已结束')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('该活动已结束')));
       return;
     }
 
@@ -46,12 +51,12 @@ class CoursesPage extends StatefulWidget {
               active: active,
               courseId: courseId,
               classId: classId,
-              cpi: cpi
+              cpi: cpi,
             ),
           ),
         );
         break;
-      
+
       case ActiveType.topicDiscuss:
         Navigator.push(
           context,
@@ -60,20 +65,17 @@ class CoursesPage extends StatefulWidget {
           ),
         );
         break;
-      
+
       case ActiveType.quiz:
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => QuizPage(
-              active: active,
-              courseId: courseId,
-              classId: classId
-            ),
+            builder: (context) =>
+                QuizPage(active: active, courseId: courseId, classId: classId),
           ),
         );
         break;
-      
+
       case ActiveType.evaluation:
         Navigator.push(
           context,
@@ -81,21 +83,18 @@ class CoursesPage extends StatefulWidget {
             builder: (context) => EvaluatePage(
               active: active,
               courseId: courseId,
-              classId: classId
+              classId: classId,
             ),
           ),
         );
         break;
-      
+
       case ActiveType.vote:
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => VotePage(
-              active: active,
-              courseId: courseId,
-              classId: classId
-            ),
+            builder: (context) =>
+                VotePage(active: active, courseId: courseId, classId: classId),
           ),
         );
         break;
@@ -107,18 +106,16 @@ class CoursesPage extends StatefulWidget {
             builder: (context) => QuestionnairePage(
               active: active,
               courseId: courseId,
-              classId: classId
+              classId: classId,
             ),
           ),
         );
         break;
-      
+
       default:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('该活动类型暂不支持'),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('该活动类型暂不支持')));
     }
   }
 }
@@ -159,14 +156,15 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     _loadCourses();
 
     // 监听账户变更事件
-    _accountChangeSubscription =
-        AccountChangeNotifier().accountChanges.listen((_) {
-          if (mounted) {
-            _lastOnLessonCourses = [];
-            _loadCourses();
-          }
-          _startPeriodicRefresh();
-        });
+    _accountChangeSubscription = AccountChangeNotifier().accountChanges.listen((
+      _,
+    ) {
+      if (mounted) {
+        _lastOnLessonCourses = [];
+        _loadCourses();
+      }
+      _startPeriodicRefresh();
+    });
   }
 
   @override
@@ -188,7 +186,10 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
       try {
         final onLessonCourses = await RCCourseApi.getOnLesson();
         if (onLessonCourses != null && mounted) {
-          if (!const DeepCollectionEquality().equals(_lastOnLessonCourses, onLessonCourses)) {
+          if (!const DeepCollectionEquality().equals(
+            _lastOnLessonCourses,
+            onLessonCourses,
+          )) {
             _lastOnLessonCourses = onLessonCourses;
             _loadCourses(onLessonCourses);
           }
@@ -215,9 +216,9 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     try {
       late List<Course>? coursesData;
       if (PlatformManager().isChaoxing) {
-        coursesData =  await CXCourseApi.getCoursesList();
+        coursesData = await CXCourseApi.getCoursesList();
       } else if (PlatformManager().isRainClassroom) {
-        coursesData =  await RCCourseApi.getCoursesList(onLessonCourses);
+        coursesData = await RCCourseApi.getCoursesList(onLessonCourses);
       }
 
       if (coursesData != null && coursesData.isNotEmpty) {
@@ -227,7 +228,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         });
       } else {
         setState(() {
-          _courses =  [];
+          _courses = [];
           _isLoading = false;
         });
       }
@@ -240,7 +241,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   }
 
   Future<void> handleScanContent(String result) async {
-    if (!AccountManager.hasActiveSession()){
+    if (!AccountManager.hasActiveSession()) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         showDialog(
@@ -261,23 +262,23 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
       });
       return;
     }
-  
+
     if (result.startsWith('http')) {
       try {
         final uri = Uri.parse(result);
         final baseUrl = uri.origin + uri.path;
         final params = uri.queryParameters;
-  
+
         // 判断是否为签到 URL
         if (baseUrl == 'https://mobilelearn.chaoxing.com/widget/sign/e') {
           if (!PlatformManager().isChaoxing) {
             await PlatformManager().setPlatform(PlatformType.chaoxing);
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('自动切换平台为学习通')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('自动切换平台为学习通')));
           }
-          if (!AccountManager.hasActiveSession()){
+          if (!AccountManager.hasActiveSession()) {
             if (!mounted) return;
             showDialog(
               context: context,
@@ -296,15 +297,19 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
             );
             return;
           }
-  
+
           final activeId = params['id'];
           if (activeId != null) {
-            final response = await ApiService.sendRequest(result, responseType: ResponseType.plain, allowRedirects: false);
+            final response = await ApiService.sendRequest(
+              result,
+              responseType: ResponseType.plain,
+              allowRedirects: false,
+            );
             if (response == null) {
               if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请求失败')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('请求失败')));
               return;
             }
             final locationUrl = response.headers['location']?.first;
@@ -320,44 +325,47 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
             if (match != null) {
               final enc = match.group(1);
 
+              if (!mounted) return;
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => SignInPage(
                     active: Active(
-                        type: 2,
-                        id: activeId,
-                        name: '二维码签到',
-                        description: '',
-                        startTime: 0,
-                        url: '',
-                        attendNum: 0,
-                        status: true,
-                        signType: SignType.qrCode
+                      type: 2,
+                      id: activeId,
+                      name: '二维码签到',
+                      description: '',
+                      startTime: 0,
+                      url: '',
+                      attendNum: 0,
+                      status: true,
+                      signType: SignType.qrCode,
                     ),
                     courseId: '',
                     classId: classId,
                     cpi: '',
-                    enc: enc
+                    enc: enc,
                   ),
                 ),
               );
             } else {
               if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('未找到 enc 参数')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('未找到 enc 参数')));
             }
           }
-        } else if (baseUrl.contains('.yuketang.cn/api/v3/lesson/check-in/dynamic-qr-code')){
+        } else if (baseUrl.contains(
+          '.yuketang.cn/api/v3/lesson/check-in/dynamic-qr-code',
+        )) {
           if (!PlatformManager().isRainClassroom) {
             await PlatformManager().setPlatform(PlatformType.rainClassroom);
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('自动切换平台为雨课堂')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('自动切换平台为雨课堂')));
           }
-          if (!AccountManager.hasActiveSession()){
+          if (!AccountManager.hasActiveSession()) {
             if (!mounted) return;
             showDialog(
               context: context,
@@ -375,7 +383,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
             );
             return;
           }
-  
+
           await _multiScan(context, result);
         } else {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -398,15 +406,15 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         }
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('URL 解析失败：$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('URL 解析失败：$e')));
       }
     } else {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('扫描结果：$result')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('扫描结果：$result')));
     }
   }
 
@@ -415,31 +423,28 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     final allAccounts = AccountManager.allAccounts;
     if (allAccounts.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('没有可用的账号进行签到'))
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('没有可用的账号进行签到')));
       return;
     }
-  
+
     setState(() {
       _isLoading = true;
     });
-  
+
     int successCount = 0;
     final List<String> failedAccounts = [];
-  
-    final results = await ApiService.sendForEachUser(
-      allAccounts,
-      (user) async {
-        final api = RCCourseApi(user);
-        return await api.scan(qrCodeUrl);
-      },
-    );
+
+    final results = await ApiService.sendForEachUser(allAccounts, (user) async {
+      final api = RCCourseApi(user);
+      return await api.scan(qrCodeUrl);
+    });
 
     for (int i = 0; i < results.length; i++) {
       final status = results[i];
       final user = allAccounts[i];
-      
+
       if (status == 0) {
         successCount++;
       } else if (status == 51203) {
@@ -448,18 +453,27 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         failedAccounts.add('${user.name} (错误码：$status)');
       }
     }
-    
-  
-    if (!mounted) return;
+
+    if (!mounted || !context.mounted) return;
     setState(() {
       _isLoading = false;
     });
-  
-    _showMultiScanResult(context, successCount, allAccounts.length, failedAccounts);
+
+    _showMultiScanResult(
+      context,
+      successCount,
+      allAccounts.length,
+      failedAccounts,
+    );
   }
 
   /// 显示所有签到结果
-  void _showMultiScanResult(BuildContext context, int successCount, int totalCount, List<String> failedAccounts) {
+  void _showMultiScanResult(
+    BuildContext context,
+    int successCount,
+    int totalCount,
+    List<String> failedAccounts,
+  ) {
     String message = '签到完成！\n成功: $successCount/$totalCount';
     if (failedAccounts.isNotEmpty) {
       message += '\n\n失败账号:\n${failedAccounts.join('\n')}';
@@ -501,9 +515,8 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ScanPage(
-                    onScanResult: handleScanContent,
-                  ),
+                  builder: (context) =>
+                      ScanPage(onScanResult: handleScanContent),
                 ),
               );
             },
@@ -526,25 +539,29 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                 itemBuilder: (context, index) {
                   var course = _courses[index];
                   return Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     child: InkWell(
                       onTap: () {
                         Navigator.push(
                           context,
-                          PlatformManager().isChaoxing ?
-                          MaterialPageRoute(
-                            builder: (context) => CourseContentPage(
-                              courseId: course.courseId,
-                              courseName: course.name,
-                              classId: course.classId,
-                              cpi: course.cpi!
-                            ),
-                          ) : MaterialPageRoute(
-                            builder: (context) => PresentationPage(
-                              lessonId: course.lessonId!,
-                              title: course.name
-                            ),
-                          ),
+                          PlatformManager().isChaoxing
+                              ? MaterialPageRoute(
+                                  builder: (context) => CourseContentPage(
+                                    courseId: course.courseId,
+                                    courseName: course.name,
+                                    classId: course.classId,
+                                    cpi: course.cpi!,
+                                  ),
+                                )
+                              : MaterialPageRoute(
+                                  builder: (context) => PresentationPage(
+                                    lessonId: course.lessonId!,
+                                    title: course.name,
+                                  ),
+                                ),
                         );
                       },
                       child: Stack(
@@ -569,13 +586,19 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                                         width: 50,
                                         height: 50,
                                         decoration: BoxDecoration(
-                                          color: Theme.of(context).colorScheme.secondaryContainer,
-                                          borderRadius: BorderRadius.circular(6),
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.secondaryContainer,
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
                                         ),
                                         child: Center(
                                           child: Icon(
                                             Icons.school,
-                                            color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSecondaryContainer,
                                             size: 25,
                                           ),
                                         ),
@@ -583,7 +606,8 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             course.name,
@@ -607,7 +631,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                                     ),
                                   ],
                                 ),
-          
+
                                 const SizedBox(height: 5),
                                 if (course.note != null)
                                   Text(
@@ -625,7 +649,8 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                                       color: Colors.grey,
                                     ),
                                   ),
-                                if (course.beginDate != null && course.endDate != null)
+                                if (course.beginDate != null &&
+                                    course.endDate != null)
                                   Text(
                                     '开课时间：${course.beginDate} 至 ${course.endDate}',
                                     style: const TextStyle(
@@ -657,7 +682,6 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
       ),
     );
   }
-
 
   @override
   void dispose() {

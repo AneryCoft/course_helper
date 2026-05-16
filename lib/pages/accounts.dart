@@ -18,7 +18,8 @@ class AccountsPage extends StatefulWidget {
   State<AccountsPage> createState() => _AccountsPageState();
 }
 
-class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMixin {
+class _AccountsPageState extends State<AccountsPage>
+    with TickerProviderStateMixin {
   List<User> _accounts = [];
   final Set<String> _selectedAccounts = <String>{};
   bool _isMultiSelectMode = false;
@@ -32,12 +33,13 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
     _loadAccounts();
 
     // 监听账户变更事件
-    _accountChangeSubscription =
-        AccountChangeNotifier().accountChanges.listen((_) {
-          if (mounted) {
-            _loadAccounts();
-          }
-        });
+    _accountChangeSubscription = AccountChangeNotifier().accountChanges.listen((
+      _,
+    ) {
+      if (mounted) {
+        _loadAccounts();
+      }
+    });
 
     // 监听环信连接状态变化
     EasemobIM().setConnectionCallback((connected) {
@@ -96,7 +98,9 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
   Future<void> _navigateToPasswordLogin() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const LoginPage(initialLoginType: 'password')),
+      MaterialPageRoute(
+        builder: (_) => const LoginPage(initialLoginType: 'password'),
+      ),
     );
     if (result == true) {
       await _loadAccounts();
@@ -106,7 +110,9 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
   Future<void> _navigateToCaptchaLogin() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const LoginPage(initialLoginType: 'captcha')),
+      MaterialPageRoute(
+        builder: (_) => const LoginPage(initialLoginType: 'captcha'),
+      ),
     );
     if (result == true) {
       await _loadAccounts();
@@ -118,21 +124,28 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
 
     if (!await qrState.initialize()) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('获取二维码失败')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('获取二维码失败')));
       }
       qrState.dispose();
       return;
     }
 
     qrState.startPolling((bool success) async {
-      if (success && await handleLoginSuccess(context) && mounted) {
+      if (success) {
+        final loginSuccess = await handleLoginSuccess(context);
+        if (!mounted || !loginSuccess) return;
         Navigator.pop(context, true);
         await _loadAccounts();
       }
       qrState.dispose();
     });
+
+    if (!mounted) {
+      qrState.dispose();
+      return;
+    }
 
     await showDialog<bool>(
       context: context,
@@ -170,41 +183,55 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                       ),
                       child: qrState.qrImageUrl != null
                           ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          qrState.qrImageUrl!,
-                          fit: BoxFit.contain,
-                          gaplessPlayback: true,
-                        ),
-                      )
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                qrState.qrImageUrl!,
+                                fit: BoxFit.contain,
+                                gaplessPlayback: true,
+                              ),
+                            )
                           : qrState.isLoading
                           ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 8),
-                            Text('生成中...', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      )
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    '生成中...',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            )
                           : const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline, size: 48, color: Colors.grey),
-                            SizedBox(height: 8),
-                            Text('二维码加载失败', style: TextStyle(color: Colors.grey)),
-                          ],
-                        ),
-                      ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.error_outline,
+                                    size: 48,
+                                    color: Colors.grey,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    '二维码加载失败',
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      PlatformManager().isChaoxing ?
-                      '使用学习通APP扫码登录' : '使用微信扫码登录',
+                      PlatformManager().isChaoxing
+                          ? '使用学习通APP扫码登录'
+                          : '使用微信扫码登录',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -227,11 +254,13 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                     onPressed: qrState.isRefreshing || qrState.isLoading
                         ? null
                         : () async {
-                      setState(() => qrState.isRefreshing = true);
-                      await qrState.refreshQRCode();
-                      setState(() => qrState.isRefreshing = false);
-                    },
-                    child: qrState.isRefreshing ? const Text('刷新中...') : const Text('刷新'),
+                            setState(() => qrState.isRefreshing = true);
+                            await qrState.refreshQRCode();
+                            setState(() => qrState.isRefreshing = false);
+                          },
+                    child: qrState.isRefreshing
+                        ? const Text('刷新中...')
+                        : const Text('刷新'),
                   ),
                 ],
               ),
@@ -256,14 +285,21 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
               color: Theme.of(context).colorScheme.primary,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Text('当前', style: TextStyle(color: Colors.white, fontSize: 12)),
+            child: const Text(
+              '当前',
+              style: TextStyle(color: Colors.white, fontSize: 12),
+            ),
           ),
       ],
     );
   }
 
   Widget _buildListItemContent(
-      BuildContext context, User user, bool isSelected, bool isCurrentAccount) {
+    BuildContext context,
+    User user,
+    bool isSelected,
+    bool isCurrentAccount,
+  ) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       leading: AvatarWidget(key: ValueKey(user.avatar), imageUrl: user.avatar),
@@ -275,19 +311,17 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
           if (!user.status)
             Tooltip(
               message: '账号失效',
-              child: Icon(
-                Icons.error_outline,
-                color: Colors.red,
-                size: 30
-              )
+              child: Icon(Icons.error_outline, color: Colors.red, size: 30),
             ),
           if (isCurrentAccount && PlatformManager().isChaoxing)
             IconButton(
               icon: Icon(
-                EasemobIM().isLoggedIn ?
-                Icons.notifications : Icons.notifications_off,
-                color: EasemobIM().isLoggedIn ?
-                Theme.of(context).colorScheme.primary : Colors.grey
+                EasemobIM().isLoggedIn
+                    ? Icons.notifications
+                    : Icons.notifications_off,
+                color: EasemobIM().isLoggedIn
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.grey,
               ),
               iconSize: 30,
               tooltip: '消息推送',
@@ -320,12 +354,10 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
 
   void _showAboutDialog() async {
     final packageInfo = await PackageInfo.fromPlatform();
-    final appIcon = Image.asset(
-      'images/logo.png',
-      width: 60,
-      height: 60
-    );
-    
+    final appIcon = Image.asset('images/logo.png', width: 60, height: 60);
+
+    if (!mounted) return;
+
     showAboutDialog(
       context: context,
       applicationName: '课程助手',
@@ -348,9 +380,7 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
               },
               child: Text(
                 'AneryCoft',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary
-                ),
+                style: TextStyle(color: Theme.of(context).colorScheme.primary),
               ),
             ),
           ],
@@ -402,22 +432,22 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                                 RadioListTile<RainClassroomServerType>(
                                   title: const Text('雨课堂'),
                                   value: RainClassroomServerType.yuketang,
-                                  dense: true
+                                  dense: true,
                                 ),
                                 RadioListTile<RainClassroomServerType>(
                                   title: const Text('荷塘 · 雨课堂'),
                                   value: RainClassroomServerType.pro,
-                                  dense: true
+                                  dense: true,
                                 ),
                                 RadioListTile<RainClassroomServerType>(
                                   title: const Text('长江 · 雨课堂'),
                                   value: RainClassroomServerType.changjiang,
-                                  dense: true
+                                  dense: true,
                                 ),
                                 RadioListTile<RainClassroomServerType>(
                                   title: const Text('黄河 · 雨课堂'),
                                   value: RainClassroomServerType.huanghe,
-                                  dense: true
+                                  dense: true,
                                 ),
                               ],
                             ),
@@ -480,40 +510,49 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
               // 关于菜单项
               const PopupMenuItem<String>(
                 value: 'about',
-                child: Row(
-                  children: [
-                    Text('关于'),
-                  ],
-                ),
+                child: Row(children: [Text('关于')]),
               ),
             ],
-          )
+          ),
         ],
       ),
       body: _accounts.isEmpty
           ? const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('暂无账号', style: TextStyle(fontSize: 18, color: Colors.grey)),
-            SizedBox(height: 8),
-            Text('点击右下角添加账号', style: TextStyle(color: Colors.grey)),
-          ],
-        ),
-      )
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '暂无账号',
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
+                  SizedBox(height: 8),
+                  Text('点击右下角添加账号', style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            )
           : ListView.builder(
-        itemCount: _accounts.length,
-        itemBuilder: (context, index) {
-          final user = _accounts[index];
-          final isSelected = _selectedAccounts.contains(user.uid);
-          final isCurrent = user.uid == _currentAccountId;
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: isCurrent ? Theme.of(context).colorScheme.primaryContainer : null,
-            child: _buildListItemContent(context, user, isSelected, isCurrent),
-          );
-        },
-      ),
+              itemCount: _accounts.length,
+              itemBuilder: (context, index) {
+                final user = _accounts[index];
+                final isSelected = _selectedAccounts.contains(user.uid);
+                final isCurrent = user.uid == _currentAccountId;
+                return Card(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  color: isCurrent
+                      ? Theme.of(context).colorScheme.primaryContainer
+                      : null,
+                  child: _buildListItemContent(
+                    context,
+                    user,
+                    isSelected,
+                    isCurrent,
+                  ),
+                );
+              },
+            ),
       floatingActionButton: SpeedDial(
         icon: Icons.add,
         activeIcon: Icons.close,
@@ -521,7 +560,9 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
         spaceBetweenChildren: 2,
         overlayColor: Colors.transparent,
         overlayOpacity: 0.3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+        ),
         children: [
           SpeedDialChild(
             child: const Icon(Icons.qr_code),

@@ -9,14 +9,10 @@ import '../../models/course.dart';
 import '../../setting/course_setting.dart';
 import '../widget/baidu_map.dart';
 
-
 class CourseSettingsPage extends StatefulWidget {
   final String courseId;
 
-  const CourseSettingsPage({
-    super.key,
-    required this.courseId,
-  });
+  const CourseSettingsPage({super.key, required this.courseId});
 
   @override
   State<CourseSettingsPage> createState() => _CourseSettingsPageState();
@@ -70,7 +66,7 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
     try {
       final picker = ImagePicker();
       List<XFile> pickedFiles;
-      
+
       if (source == ImageSource.gallery) {
         pickedFiles = await picker.pickMultiImage();
       } else {
@@ -78,7 +74,7 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
         if (pickedFile == null) return;
         pickedFiles = [pickedFile];
       }
-      
+
       if (pickedFiles.isEmpty) return;
 
       final uploadFutures = pickedFiles.map((pickedFile) async {
@@ -124,9 +120,9 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
 
       if (mounted) {
         if (failCount == 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('成功上传 $successCount 张图片')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('成功上传 $successCount 张图片')));
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('上传完成：成功 $successCount 张，失败 $failCount 张')),
@@ -134,9 +130,10 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('选择图片错误：$e')),
-      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('选择图片错误：$e')));
     }
   }
 
@@ -149,7 +146,11 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
   }
 
   /// 放大图片对话框
-  void _showImageDialog(BuildContext context, String objectId, String? localPath) {
+  void _showImageDialog(
+    BuildContext context,
+    String objectId,
+    String? localPath,
+  ) {
     showDialog(
       context: context,
       builder: (context) => GestureDetector(
@@ -161,10 +162,7 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
             maxScale: 4.0,
             child: Center(
               child: localPath != null
-                  ? Image.file(
-                      File(localPath),
-                      fit: BoxFit.contain,
-                    )
+                  ? Image.file(File(localPath), fit: BoxFit.contain)
                   : Image.network(
                       CXImageApi.getImageUrl(objectId),
                       headers: HeadersManager.chaoxingHeaders,
@@ -210,9 +208,14 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                     child: ElevatedButton(
                       onPressed: () {
                         setState(() {
-                          _latitudeController.text = selectedCoordinate!.latitude.toStringAsFixed(6);
-                          _longitudeController.text = selectedCoordinate!.longitude.toStringAsFixed(6);
-                          _addressController.text = selectedAddress?.isEmpty ?? true
+                          _latitudeController.text = selectedCoordinate!
+                              .latitude
+                              .toStringAsFixed(6);
+                          _longitudeController.text = selectedCoordinate!
+                              .longitude
+                              .toStringAsFixed(6);
+                          _addressController.text =
+                              selectedAddress?.isEmpty ?? true
                               ? '未知位置'
                               : selectedAddress!;
                         });
@@ -241,19 +244,21 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
     final hasAddress = addressText.isNotEmpty;
     final hasLat = latText.isNotEmpty;
     final hasLon = lonText.isNotEmpty;
-    
+
     String? addressError;
     String? latitudeError;
     String? longitudeError;
-    
+
     if (hasAddress && (!hasLat || !hasLon)) {
       latitudeError = !hasLat ? '请填写纬度' : null;
       longitudeError = !hasLon ? '请填写经度' : null;
     } else if (!hasAddress && (hasLat || hasLon)) {
       addressError = '请填写地址';
     }
-    
-    if (addressError != null || latitudeError != null || longitudeError != null) {
+
+    if (addressError != null ||
+        latitudeError != null ||
+        longitudeError != null) {
       setState(() {
         _addressError = addressError;
         _latitudeError = latitudeError;
@@ -300,15 +305,15 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
       await CourseSetting.saveSettings(widget.courseId, settings);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('设置已保存')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('设置已保存')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失败：$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('保存失败：$e')));
       }
     } finally {
       if (mounted) {
@@ -336,10 +341,7 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                 children: [
                   const Text(
                     '位置',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
                   TextField(
@@ -348,7 +350,7 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                       labelText: '教室(可选)',
                       hintText: '1教-3211',
                       prefixIcon: Icon(Icons.meeting_room),
-                      border: OutlineInputBorder()
+                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -359,7 +361,7 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                       hintText: '北京市海淀区上地七街1号北京市海淀区上地七街1号',
                       prefixIcon: const Icon(Icons.place),
                       border: const OutlineInputBorder(),
-                      errorText: _addressError
+                      errorText: _addressError,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -373,11 +375,11 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                             hintText: '40.040905',
                             prefixIcon: const Icon(Icons.north),
                             border: const OutlineInputBorder(),
-                            errorText: _latitudeError
+                            errorText: _latitudeError,
                           ),
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
-                            signed: true
+                            signed: true,
                           ),
                         ),
                       ),
@@ -390,11 +392,11 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                             hintText: '116.318506',
                             prefixIcon: const Icon(Icons.east),
                             border: const OutlineInputBorder(),
-                            errorText: _longitudeError
+                            errorText: _longitudeError,
                           ),
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
-                            signed: true
+                            signed: true,
                           ),
                         ),
                       ),
@@ -407,17 +409,14 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                       IconButton.filled(
                         onPressed: _showMapPicker,
                         icon: const Icon(Icons.map),
-                        tooltip: '选择位置'
+                        tooltip: '选择位置',
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
                   const Text(
                     '图片',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
                   Card(
@@ -434,17 +433,27 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                                 itemBuilder: (context, index) {
                                   final objectId = _imageObjectIds[index];
                                   final localPath = _localImagePaths[objectId];
-                                  final isUploading = objectId.startsWith('temp_');
+                                  final isUploading = objectId.startsWith(
+                                    'temp_',
+                                  );
                                   return Padding(
                                     padding: const EdgeInsets.only(right: 8),
                                     child: Stack(
                                       children: [
                                         GestureDetector(
-                                          onTap: !isUploading ? () {
-                                            _showImageDialog(context, objectId, localPath);
-                                          } : null,
+                                          onTap: !isUploading
+                                              ? () {
+                                                  _showImageDialog(
+                                                    context,
+                                                    objectId,
+                                                    localPath,
+                                                  );
+                                                }
+                                              : null,
                                           child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
                                             child: Stack(
                                               children: [
                                                 localPath != null
@@ -455,44 +464,77 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                                                         fit: BoxFit.contain,
                                                       )
                                                     : Image.network(
-                                                        CXImageApi.getImageUrl(objectId),
+                                                        CXImageApi.getImageUrl(
+                                                          objectId,
+                                                        ),
                                                         width: 80,
                                                         height: 80,
                                                         fit: BoxFit.contain,
-                                                        headers: HeadersManager.chaoxingHeaders,
-                                                        loadingBuilder: (context, child, loadingProgress) {
-                                                          if (loadingProgress == null) return child;
-                                                          return Container(
-                                                            width: 80,
-                                                            height: 80,
-                                                            color: Colors.grey.shade200,
-                                                            child: Center(
-                                                              child: CircularProgressIndicator(
-                                                                strokeWidth: 2,
-                                                                value: loadingProgress.expectedTotalBytes != null
-                                                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                                                    : null,
-                                                              ),
-                                                            ),
-                                                          );
-                                                        },
-                                                        errorBuilder: (context, error, stackTrace) {
-                                                          return Container(
-                                                            width: 80,
-                                                            height: 80,
-                                                            color: Colors.grey.shade200,
-                                                            child: const Icon(Icons.broken_image, color: Colors.grey),
-                                                          );
-                                                        },
+                                                        headers: HeadersManager
+                                                            .chaoxingHeaders,
+                                                        loadingBuilder:
+                                                            (
+                                                              context,
+                                                              child,
+                                                              loadingProgress,
+                                                            ) {
+                                                              if (loadingProgress ==
+                                                                  null) {
+                                                                return child;
+                                                              }
+                                                              return Container(
+                                                                width: 80,
+                                                                height: 80,
+                                                                color: Colors
+                                                                    .grey
+                                                                    .shade200,
+                                                                child: Center(
+                                                                  child: CircularProgressIndicator(
+                                                                    strokeWidth:
+                                                                        2,
+                                                                    value:
+                                                                        loadingProgress.expectedTotalBytes !=
+                                                                            null
+                                                                        ? loadingProgress.cumulativeBytesLoaded /
+                                                                              loadingProgress.expectedTotalBytes!
+                                                                        : null,
+                                                                  ),
+                                                                ),
+                                                              );
+                                                            },
+                                                        errorBuilder:
+                                                            (
+                                                              context,
+                                                              error,
+                                                              stackTrace,
+                                                            ) {
+                                                              return Container(
+                                                                width: 80,
+                                                                height: 80,
+                                                                color: Colors
+                                                                    .grey
+                                                                    .shade200,
+                                                                child: const Icon(
+                                                                  Icons
+                                                                      .broken_image,
+                                                                  color: Colors
+                                                                      .grey,
+                                                                ),
+                                                              );
+                                                            },
                                                       ),
                                                 if (isUploading)
                                                   Container(
                                                     width: 80,
                                                     height: 80,
-                                                    color: Colors.black.withValues(alpha: 0.3),
+                                                    color: Colors.black
+                                                        .withValues(alpha: 0.3),
                                                     child: const Center(
                                                       child: CircularProgressIndicator(
-                                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                        valueColor:
+                                                            AlwaysStoppedAnimation<
+                                                              Color
+                                                            >(Colors.white),
                                                       ),
                                                     ),
                                                   ),
@@ -508,7 +550,9 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                                             child: Container(
                                               padding: const EdgeInsets.all(2),
                                               decoration: BoxDecoration(
-                                                color: Colors.red.withValues(alpha: 0.8),
+                                                color: Colors.red.withValues(
+                                                  alpha: 0.8,
+                                                ),
                                                 shape: BoxShape.circle,
                                               ),
                                               child: const Icon(
@@ -531,12 +575,14 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
                               ElevatedButton.icon(
-                                onPressed: () => _pickAndUploadImage(ImageSource.camera),
+                                onPressed: () =>
+                                    _pickAndUploadImage(ImageSource.camera),
                                 icon: const Icon(Icons.camera_alt),
                                 label: const Text('拍照'),
                               ),
                               ElevatedButton.icon(
-                                onPressed: () => _pickAndUploadImage(ImageSource.gallery),
+                                onPressed: () =>
+                                    _pickAndUploadImage(ImageSource.gallery),
                                 icon: const Icon(Icons.photo_library),
                                 label: const Text('相册'),
                               ),
@@ -553,10 +599,7 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                     child: ElevatedButton.icon(
                       onPressed: _saveSettings,
                       icon: const Icon(Icons.save),
-                      label: const Text(
-                        '保存设置',
-                        style: TextStyle(fontSize: 16),
-                      ),
+                      label: const Text('保存设置', style: TextStyle(fontSize: 16)),
                     ),
                   ),
                 ],

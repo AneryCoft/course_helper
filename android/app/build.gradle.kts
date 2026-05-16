@@ -16,6 +16,9 @@ if (keystorePropertiesFile.exists()) {
     println("key.properties not found. Please create it in the android directory.")
 }
 
+val hasReleaseSigning = listOf("keyAlias", "keyPassword", "storeFile", "storePassword")
+    .all { key -> keystoreProperties.getProperty(key)?.isNotBlank() == true }
+
 android {
     namespace = "com.anerycoft.coursehelper"
     compileSdk = flutter.compileSdkVersion
@@ -42,18 +45,24 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = file(keystoreProperties["storeFile"])
-            storePassword = keystoreProperties["storePassword"] as String
+        if (hasReleaseSigning) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
         }
     }
 
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             // signingConfig = signingConfigs.getByName("debug")
             
             // 启用代码混淆

@@ -5,7 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../main.dart';
-import '../pages/Courses/list.dart';
+import '../pages/courses/list.dart';
 import '../models/active.dart';
 import '../platform.dart';
 
@@ -20,7 +20,8 @@ class EasemobIM {
   bool _isLoggedIn = false;
   bool get isLoggedIn => _isLoggedIn;
 
-  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
   Function(bool)? _onConnectionChanged;
 
@@ -30,18 +31,23 @@ class EasemobIM {
 
   Future<void> initialize({
     Function(bool)? onConnectionChanged,
-    Function(EMMessage)? onMessageReceived
+    Function(EMMessage)? onMessageReceived,
   }) async {
     try {
       // 初始化本地通知插件
-      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const androidSettings = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
       const iosSettings = DarwinInitializationSettings(
         requestAlertPermission: false,
         requestBadgePermission: false,
-        requestSoundPermission: false
+        requestSoundPermission: false,
       );
       await _notificationsPlugin.initialize(
-        settings: const InitializationSettings(android: androidSettings, iOS: iosSettings)
+        settings: const InitializationSettings(
+          android: androidSettings,
+          iOS: iosSettings,
+        ),
       );
 
       final options = EMOptions.withAppKey(_appKey, osType: 2);
@@ -80,7 +86,7 @@ class EasemobIM {
             _isLoggedIn = false;
             _onConnectionChanged?.call(false);
             _showKickedDialog(info);
-          }
+          },
         ),
       );
 
@@ -93,7 +99,7 @@ class EasemobIM {
               onMessageReceived?.call(message);
               _handleMessage(message);
             }
-          }
+          },
         ),
       );
 
@@ -108,7 +114,7 @@ class EasemobIM {
     try {
       await EMClient.getInstance.loginWithPassword(userName, password);
       _isLoggedIn = true;
-      
+
       // 登录后检查并请求通知权限
       final status = await Permission.notification.status;
       if (status.isDenied) {
@@ -122,7 +128,9 @@ class EasemobIM {
   }
 
   Future<void> loginCurrentAccount() async {
-    final user = AccountManager.getAccountById(AccountManager.currentSessionId!)!;
+    final user = AccountManager.getAccountById(
+      AccountManager.currentSessionId!,
+    )!;
     await login(user.imAccount!['userName']!, user.imAccount!['password']!);
   }
 
@@ -150,13 +158,14 @@ class EasemobIM {
         startTime: 0,
         url: activeInfo['url'],
         attendNum: 0,
-        status: true
+        status: true,
       );
 
       final courseInfo = activeInfo['courseInfo'];
       final courseId = courseInfo?['courseid'] ?? '';
       final classId = courseInfo?['classid'].toString() ?? '';
-      final courseName = courseInfo?['coursename'] ??
+      final courseName =
+          courseInfo?['coursename'] ??
           message.attributes!['em_apns_ext']['em_push_title'];
       // late String? groupName;
 
@@ -165,13 +174,13 @@ class EasemobIM {
         '课程活动',
         channelDescription: '接收课程活动通知',
         importance: Importance.high,
-        priority: Priority.high
+        priority: Priority.high,
       );
 
       final notificationDetails = NotificationDetails(android: androidDetails);
 
       final int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      
+
       await _notificationsPlugin.show(
         id: notificationId,
         title: '课程活动',
@@ -182,7 +191,7 @@ class EasemobIM {
 
       // 始终显示应用内对话框（可选）
       final context = navigatorKey.currentContext;
-      if (context != null) {
+      if (context != null && context.mounted) {
         showDialog(
           context: context,
           builder: (dialogContext) => AlertDialog(
@@ -190,7 +199,7 @@ class EasemobIM {
             content: SingleChildScrollView(
               child: Text(
                 '收到来自$courseName的$activeTypeName活动',
-                style: const TextStyle(fontSize: 15)
+                style: const TextStyle(fontSize: 15),
               ),
             ),
             actions: [
@@ -201,8 +210,15 @@ class EasemobIM {
               FilledButton(
                 onPressed: () async {
                   await PlatformManager().setPlatform(PlatformType.chaoxing);
+                  if (!dialogContext.mounted || !context.mounted) return;
                   Navigator.pop(dialogContext);
-                  CoursesPage.navigateToActive(context, active, courseId, classId, '');
+                  CoursesPage.navigateToActive(
+                    context,
+                    active,
+                    courseId,
+                    classId,
+                    '',
+                  );
                 },
                 child: const Text('查看'),
               ),
@@ -215,7 +231,6 @@ class EasemobIM {
     debugPrint('消息: ${message.toJson()}');
   }
 
-
   void _showKickedDialog(LoginExtensionInfo info) {
     final context = navigatorKey.currentContext;
     if (context == null) return;
@@ -226,8 +241,8 @@ class EasemobIM {
         content: SingleChildScrollView(
           // User-Agent: ${info.ext}
           child: Text(
-              '当前学习通IM账号在${info.deviceName}登录',
-              style: const TextStyle(fontSize: 15)
+            '当前学习通IM账号在${info.deviceName}登录',
+            style: const TextStyle(fontSize: 15),
           ),
         ),
         actions: [
@@ -239,6 +254,7 @@ class EasemobIM {
             onPressed: () async {
               await PlatformManager().setPlatform(PlatformType.chaoxing);
               loginCurrentAccount();
+              if (!dialogContext.mounted) return;
               Navigator.pop(dialogContext);
             },
             child: const Text('重新登录'),

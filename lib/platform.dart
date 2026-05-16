@@ -8,7 +8,7 @@ import '../utils/storage.dart';
 /// 平台类型枚举
 enum PlatformType {
   chaoxing, // 学习通
-  rainClassroom // 雨课堂
+  rainClassroom, // 雨课堂
 }
 
 /// 雨课堂服务器类型枚举
@@ -16,7 +16,7 @@ enum RainClassroomServerType {
   yuketang, // 雨课堂
   pro, // 荷塘雨课堂
   changjiang, // 长江雨课堂
-  huanghe // 黄河雨课堂
+  huanghe, // 黄河雨课堂
 }
 
 /// 平台状态管理器
@@ -35,7 +35,7 @@ class PlatformManager {
 
   bool get isChaoxing => _currentPlatform == PlatformType.chaoxing;
   bool get isRainClassroom => _currentPlatform == PlatformType.rainClassroom;
-  
+
   /// 获取当前雨课堂服务器
   RainClassroomServerType get currentServer => _currentServer;
 
@@ -54,7 +54,7 @@ class PlatformManager {
             break;
         }
       }
-      
+
       // 加载雨课堂服务器设置
       final serverStr = StorageManager.prefs.getString(_serverKey);
       if (serverStr != null && serverStr.isNotEmpty) {
@@ -73,9 +73,9 @@ class PlatformManager {
             break;
         }
       }
-      
+
       // 触发平台变化回调，初始化 headers
-      ApiService.onPlatformChange!();
+      ApiService.onPlatformChange?.call();
     } catch (e) {
       debugPrint('加载平台失败：$e');
     }
@@ -96,7 +96,7 @@ class PlatformManager {
       await AccountManager.switchToPlatformAccounts();
     }
   }
-  
+
   /// 设置雨课堂服务器
   Future<void> setServer(RainClassroomServerType server) async {
     if (_currentServer != server) {
