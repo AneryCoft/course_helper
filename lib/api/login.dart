@@ -12,7 +12,7 @@ class CXLoginApi extends Api {
   static Future<Map<String, dynamic>?> loginWeb(String username, String password) async {
     final url = 'https://passport2.chaoxing.com/fanyalogin';
 
-    final usernameCipher = EncryptionUtil.aesCbcEncrypt(password, Constant.webLoginKey);
+    final usernameCipher = EncryptionUtil.aesCbcEncrypt(username, Constant.webLoginKey);
     final passwordCipher = EncryptionUtil.aesCbcEncrypt(password, Constant.webLoginKey);
 
     final formData = {

@@ -13,7 +13,7 @@ import '../utils/storage.dart';
 class CookieInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
-    if (options.headers['Cookie'] == null){
+    if (options.headers['Cookie'] == null) {
       final uri = options.uri;
       List<Cookie> cookies = [];
       final String? userId = options.extra['userId'];
@@ -30,9 +30,9 @@ class CookieInterceptor extends Interceptor {
           final cookieStr = cookies.map((c) => '${c.name}=${c.value}').join('; ');
           options.headers['Cookie'] = cookieStr;
 
-          if (PlatformManager().isRainClassroom){
+          if (PlatformManager().isRainClassroom) {
             final cookieMap = Map.fromEntries(cookies.map((c) => MapEntry(c.name, c.value)));
-            if (cookieMap.containsKey('sid')){ // APP
+            if (cookieMap.containsKey('sid')) { // APP
               options.headers['x-csrftoken'] = cookieMap['csrftoken'];
               options.headers['x-uid'] = userId;
               options.headers['sessionid'] = cookieMap['sessionid'];
@@ -107,7 +107,7 @@ class CookieManager {
       }),
     );
 
-    if (_refreshCounts < 2){
+    if (_refreshCounts < 2) {
       await _refreshAccounts();
     }
   }
