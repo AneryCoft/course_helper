@@ -200,6 +200,8 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   }
 
   Future<void> _loadCourses([List<dynamic>? onLessonCourses]) async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
     });
@@ -220,6 +222,8 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         coursesData = await RCCourseApi.getCoursesList(onLessonCourses);
       }
 
+      if (!mounted) return;
+
       if (coursesData != null && coursesData.isNotEmpty) {
         setState(() {
           _courses = coursesData!;
@@ -232,6 +236,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _courses = [];
         _isLoading = false;
@@ -308,18 +313,35 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
               return;
             }
             final locationUrl = response.headers['location']?.first;
+            if (locationUrl == null) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('签到链接解析失败')),
+              );
+              return;
+            }
 
-            final uri = Uri.parse(locationUrl!);
+            final uri = Uri.parse(locationUrl);
             final params = uri.queryParameters;
 
             final classId = params['classId'] ?? '';
-            final decodedRcode = Uri.decodeComponent(params['rcode']!);
+            final rcode = params['rcode'];
+            if (rcode == null) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('未找到 rcode 参数')),
+              );
+              return;
+            }
+
+            final decodedRcode = Uri.decodeComponent(rcode);
             RegExp encRegex = RegExp(r'enc=([^&\s]+)');
             Match? match = encRegex.firstMatch(decodedRcode);
 
             if (match != null) {
               final enc = match.group(1);
 
+              if (!mounted) return;
               Navigator.push(
                 context,
                 MaterialPageRoute(

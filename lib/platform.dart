@@ -75,7 +75,7 @@ class PlatformManager {
       }
       
       // 触发平台变化回调，初始化 headers
-      ApiService.onPlatformChange!();
+      ApiService.onPlatformChange?.call();
     } catch (e) {
       debugPrint('加载平台失败：$e');
     }

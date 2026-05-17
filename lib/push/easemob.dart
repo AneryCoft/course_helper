@@ -5,7 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../main.dart';
-import '../pages/Courses/list.dart';
+import '../pages/courses/list.dart';
 import '../models/active.dart';
 import '../platform.dart';
 
@@ -122,8 +122,14 @@ class EasemobIM {
   }
 
   Future<void> loginCurrentAccount() async {
-    final user = AccountManager.getAccountById(AccountManager.currentSessionId!)!;
-    await login(user.imAccount!['userName']!, user.imAccount!['password']!);
+    final currentSessionId = AccountManager.currentSessionId;
+    if (currentSessionId == null) return;
+
+    final user = AccountManager.getAccountById(currentSessionId);
+    final imAccount = user?.imAccount;
+    if (imAccount == null) return;
+
+    await login(imAccount['userName']!, imAccount['password']!);
   }
 
   Future<void> logout() async {
@@ -137,8 +143,9 @@ class EasemobIM {
   }
 
   Future<void> _handleMessage(EMMessage message) async {
-    if (message.attributes != null) {
-      final attachment = message.attributes!['attachment'];
+    final attributes = message.attributes;
+    final attachment = attributes?['attachment'];
+    if (attachment is Map && attachment['att_chat_course'] is Map) {
       final activeInfo = attachment['att_chat_course'];
 
       final String activeTypeName = activeInfo['atypeName'];
@@ -156,8 +163,10 @@ class EasemobIM {
       final courseInfo = activeInfo['courseInfo'];
       final courseId = courseInfo?['courseid'] ?? '';
       final classId = courseInfo?['classid'].toString() ?? '';
+      final apnsExt = attributes?['em_apns_ext'];
+      final pushTitle = apnsExt is Map ? apnsExt['em_push_title'] : '';
       final courseName = courseInfo?['coursename'] ??
-          message.attributes!['em_apns_ext']['em_push_title'];
+          pushTitle;
       // late String? groupName;
 
       final androidDetails = AndroidNotificationDetails(
@@ -202,7 +211,9 @@ class EasemobIM {
                 onPressed: () async {
                   await PlatformManager().setPlatform(PlatformType.chaoxing);
                   Navigator.pop(dialogContext);
-                  CoursesPage.navigateToActive(context, active, courseId, classId, '');
+                  if (context.mounted) {
+                    CoursesPage.navigateToActive(context, active, courseId, classId, '');
+                  }
                 },
                 child: const Text('查看'),
               ),

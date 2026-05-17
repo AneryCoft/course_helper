@@ -10,10 +10,11 @@ plugins {
 
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
+val hasReleaseKeystore = keystorePropertiesFile.exists()
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 } else {
-    println("key.properties not found. Please create it in the android directory.")
+    println("key.properties not found. Release builds will use the debug signing config.")
 }
 
 android {
@@ -43,18 +44,23 @@ android {
 
     signingConfigs {
         create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = file(keystoreProperties["storeFile"])
-            storePassword = keystoreProperties["storePassword"] as String
+            if (hasReleaseKeystore) {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"])
+                storePassword = keystoreProperties["storePassword"] as String
+            }
         }
     }
 
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
-            // signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             
             // 启用代码混淆
             isMinifyEnabled = true

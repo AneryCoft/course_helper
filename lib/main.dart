@@ -7,7 +7,7 @@ import'package:dio/dio.dart';
 import'package:photo_manager/photo_manager.dart';
 
 import'./pages/accounts.dart';
-import'./pages/Courses/list.dart';
+import'./pages/courses/list.dart';
 import'./pages/login.dart';
 import'./api/api_service.dart';
 import'./session/cookie.dart';
@@ -112,6 +112,7 @@ class _MainPageState extends State<MainPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       (coursesPageKey.currentState as dynamic)?.onVisibilityChanged(true);
       _checkUpdate();
       _showSponsorDialog();
@@ -129,6 +130,7 @@ class _MainPageState extends State<MainPage> {
       final latestVersion = data['tag_name']?.toString().replaceAll('v', '') ?? '';
 
       if (_isNewerVersion(latestVersion, currentVersion)) {
+        if (!mounted) return;
         _showUpdateDialog(
           latestVersion: latestVersion,
           releaseNotes: data['body'] ?? '暂无更新说明',

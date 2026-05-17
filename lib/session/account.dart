@@ -78,14 +78,21 @@ class AccountManager {
     _currentSessionId = userId;
 
     if (userId != null) {
-      StorageManager.prefs.setString(_sessionKey, userId);
-      final user = getAccountById(userId)!;
+      await StorageManager.prefs.setString(_sessionKey, userId);
+      final user = getAccountById(userId);
+      if (user == null) {
+        _currentSessionId = null;
+        await StorageManager.prefs.remove(_sessionKey);
+        AccountChangeNotifier().notifyAccountChanged();
+        return;
+      }
+
       _accounts.remove(user);
       _accounts.insert(0, user);
-      _saveAccounts();
+      await _saveAccounts();
       // 当前账号始终在列表开头
 
-      if (getAccountById(userId)!.imAccount != null) {
+      if (user.imAccount != null) {
         if (EasemobIM().isLoggedIn) {
           EasemobIM().logout().then((_) {
             EasemobIM().loginCurrentAccount();
@@ -93,7 +100,7 @@ class AccountManager {
         }
       }
     } else {
-      StorageManager.prefs.remove(_sessionKey);
+      await StorageManager.prefs.remove(_sessionKey);
 
       if (PlatformManager().isChaoxing) {
         EasemobIM().logout();
@@ -142,17 +149,17 @@ class AccountManager {
         }
       }
     }
-    _saveAccounts();
+    await _saveAccounts();
   }
 
   /// 批量删除账户
   static Future<void> removeAccounts(List<String> userIds) async {
     _accounts.removeWhere((acc) => userIds.contains(acc.uid));
-    _saveAccounts();
+    await _saveAccounts();
 
     for (var uid in userIds) {
       if (uid == currentSessionId) {
-        setCurrentSession(null);
+        await setCurrentSession(null);
       }
       await CookieManager.clearCookiesForUser(uid);
     }
