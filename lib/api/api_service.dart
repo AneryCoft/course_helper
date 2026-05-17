@@ -25,8 +25,7 @@ class HeadersManager {
   static const _cxVersionCode = '10940';
   static const _cxApiVersion = '314';
 
-  static const _uniqueIdKey = 'app_unique_id';
-  static late String _uniqueId;
+  static final _uniqueId = ApiService.uniqueId;
 
   static late String _cxUserAgent;
 
@@ -47,13 +46,6 @@ class HeadersManager {
   };
 
   static Future<void> updateChaoxingHeaders() async {
-    final prefs = StorageManager.prefs;
-    if (prefs.containsKey(_uniqueIdKey)){
-      _uniqueId = prefs.getString(_uniqueIdKey)!;
-    } else {
-      _uniqueId = EncryptionUtil.getUniqueId();
-      prefs.setString(_uniqueIdKey, _uniqueId);
-    }
     // 内测版：@Azeroth
     // 正式版：@Kalimdor
     final userAgentTemp = '(device:$_deviceModel) Language/zh_CN com.chaoxing.mobile/ChaoXingStudy_${_cxProductId}_${_cxVersion}_android_phone_${_cxVersionCode}_$_cxApiVersion (@Kalimdor)_$_uniqueId';
@@ -80,6 +72,20 @@ class HeadersManager {
 class ApiService {
   static late Dio _dio;
   static void Function()? onPlatformChange;
+  static const _uniqueIdKey = 'app_unique_id';
+
+  /// 获取当前设备唯一标识（伪）
+  static String get uniqueId {
+    late String uniqueId;
+    final prefs = StorageManager.prefs;
+    if (prefs.containsKey(_uniqueIdKey)){
+      uniqueId = prefs.getString(_uniqueIdKey)!;
+    } else {
+      uniqueId = EncryptionUtil.getUniqueId();
+      prefs.setString(_uniqueIdKey, uniqueId);
+    }
+    return uniqueId;
+  }
 
   /// 获取雨课堂服务器对应的 baseUrl
   static const serverBaseUrlMap = {

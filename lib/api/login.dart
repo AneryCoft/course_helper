@@ -175,7 +175,7 @@ class RCLoginApi extends Api {
       'password': '',
       'email': '',
       'code': '',
-      'pushDeviceId': '', // 密码登录会有
+      'pushDeviceId': ApiService.uniqueId,
       'ticket': ticket,
       'rand': rand
     };
