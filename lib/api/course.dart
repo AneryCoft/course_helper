@@ -159,13 +159,16 @@ class RCCourseApi extends Api {
   }
 
   static Future<Map<String, dynamic>?> getCourses() async {
-    final response = await ApiService.sendRequest('/v/course_meta/learning_list/');
+    final url = '/v/course_meta/learning_list/';
+    final response = await ApiService.sendRequest(url);
     return response?.data;
   }
 
   /// 获取正在上课的课程
   static Future<List<dynamic>?> getOnLesson() async {
-    final response = await ApiService.sendRequest('/api/v3/classroom/on-lesson-upcoming-exam');
+    // final url = '/api/v3/classroom/on-lesson-upcoming-exam';
+    final url = '/api/v3/classroom/on-lesson';
+    final response = await ApiService.sendRequest(url);
     if (response?.data['code'] == 0){
       return response?.data['data']['onLessonClassrooms'];
     }
