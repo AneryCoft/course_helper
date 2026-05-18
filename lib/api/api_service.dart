@@ -113,8 +113,8 @@ class ApiService {
     await HeadersManager.updateChaoxingHeaders();
     
     _dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 20),
+      connectTimeout: const Duration(seconds: 3),
+      receiveTimeout: const Duration(seconds: 10),
       sendTimeout: const Duration(seconds: 10),
       followRedirects: false,
       validateStatus: (status) => status! < 500
@@ -162,6 +162,7 @@ class ApiService {
         Map<String, String>? headers,
         dynamic body,
         ResponseType responseType = ResponseType.json,
+        int? receiveTimeoutSeconds,
         bool allowRedirects = true,
         String? userId
       }
@@ -171,6 +172,7 @@ class ApiService {
         method: method,
         headers: headers,
         responseType: responseType,
+        receiveTimeout: Duration(seconds: receiveTimeoutSeconds ?? 10),
         extra: {'userId': userId ?? AccountManager.currentSessionId}
       );
 

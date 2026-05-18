@@ -285,4 +285,27 @@ class RCLoginApi extends Api {
     }
     return null;
   }
+
+  /// 获取二维码信息（Windows）
+  static Future<Map<String, dynamic>?> getQRCodeData() async {
+    final url = '/api/v3/user/login/pre-info';
+    final response = await ApiService.sendRequest(url, userId: '');
+    if (response?.data['code'] == 0) {
+      return await response?.data['data'];
+      // qrContent qrImage token
+    }
+    return null;
+  }
+
+  /// 二维码登录
+  static Future<Map<String, dynamic>?> loginQRCode(String token) async {
+    final url = '/api/v3/user/login';
+    final jsonData = {"token": token};
+    final response = await ApiService.sendRequest(url, method: 'POST', body: jsonData, receiveTimeoutSeconds: 31, userId: ''); // 30秒后响应
+    if (response?.data['code'] == 0) {
+      return await response?.data['data'];
+    }
+    // 50001 SCAN_QR_CODE_TIMEOUT
+    return null;
+  }
 }

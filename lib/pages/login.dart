@@ -58,7 +58,7 @@ class LoginPage extends StatefulWidget {
 class QRCodeLoginState {
   String? qrUuid;
   String? qrEnc; // 学习通
-  String? qrState; // 雨课堂
+  String? qrToken; // 雨课堂
   String? qrImageUrl;
   bool isLoading = true;
   bool isRefreshing = false;
@@ -66,28 +66,37 @@ class QRCodeLoginState {
 
   Timer? _pollingTimer;
   final _isChaoxing = PlatformManager().isChaoxing;
+  VoidCallback? onRefresh;
+
+  /// 获取二维码数据
+  Future<Map<String, dynamic>?> _getQRCodeData() async {
+    if (_isChaoxing) {
+      return await CXLoginApi.getQRCodeData();
+    } else {
+      return await RCLoginApi.getQRCodeData();
+    }
+  }
+
+  /// 更新二维码信息
+  void _updateQRInfo(Map<String, dynamic> qrData) {
+    if (_isChaoxing) {
+      qrUuid = qrData['uuid'];
+      qrEnc = qrData['enc'];
+      qrImageUrl = 'https://passport2.chaoxing.com/createqr?uuid=$qrUuid&fid=-1';
+    } else {
+      qrToken = qrData['token'];
+      qrImageUrl = qrData['qrImage'];
+    }
+  }
 
   /// 初始化二维码数据
   Future<bool> initialize() async {
     try {
-      if (!_isChaoxing) {
-        final qrData = await RCLoginApi.getQRCodeUuid();
-        if (qrData != null && qrData.length == 2) {
-          qrUuid = qrData[0];
-          qrState = qrData[1];
-          qrImageUrl = 'https://open.weixin.qq.com/connect/qrcode/$qrUuid';
-          isLoading = false;
-          return true;
-        }
-      } else {
-        final qrData = await CXLoginApi.getQRCodeData();
-        if (qrData != null) {
-          qrUuid = qrData['uuid'];
-          qrEnc = qrData['enc'];
-          qrImageUrl = 'https://passport2.chaoxing.com/createqr?uuid=$qrUuid&fid=-1';
-          isLoading = false;
-          return true;
-        }
+      final qrData = await _getQRCodeData();
+      if (qrData != null) {
+        _updateQRInfo(qrData);
+        isLoading = false;
+        return true;
       }
       return false;
     } catch (e) {
@@ -97,30 +106,32 @@ class QRCodeLoginState {
   }
 
   /// 开始轮询登录状态
-  void startPolling(Function(bool success) onLoginComplete) {
+  void startPolling(Function(bool success) onLoginComplete, {VoidCallback? onRefresh}) {
     _pollingTimer?.cancel();
+    this.onRefresh = onRefresh;
 
-    if (!_isChaoxing) {
-      // 雨课堂：使用 while 循环，每次等待 15 秒
-      _startRainClassroomPolling(onLoginComplete);
-    } else {
-      // 学习通：使用 Timer.periodic，每 3 秒检查一次
+    if (_isChaoxing) {
+      // 每3秒检查一次
       _startChaoxingPolling(onLoginComplete);
+    } else {
+      _startRainClassroomNewPolling(onLoginComplete);
     }
   }
 
-  /// 雨课堂轮询逻辑
-  void _startRainClassroomPolling(Function(bool success) onLoginComplete) async {
-    while (isLoginActive && qrUuid != null && qrState != null) {
+  /// 雨课堂新API轮询逻辑（使用token）
+  void _startRainClassroomNewPolling(Function(bool success) onLoginComplete) async {
+    while (isLoginActive && qrToken != null) {
       try {
-        final status = await RCLoginApi.checkQRAuthStatus(qrUuid!, qrState!);
-        if (status == '405') {
+        final result = await RCLoginApi.loginQRCode(qrToken!);
+        if (result != null) {
+          // 登录成功
           onLoginComplete(true);
           return;
-        } else if (status == '402') {
-          // 二维码过期，刷新
+        } else {
+          // 超时或失败，刷新二维码
           await refreshQRCode();
-          if (!isLoginActive || qrUuid == null) return;
+          onRefresh?.call();
+          if (!isLoginActive || qrToken == null) return;
         }
       } catch (e) {
         debugPrint('轮询失败: $e');
@@ -148,6 +159,7 @@ class QRCodeLoginState {
           } else if (result['type']?.toString() == '2') {
             timer.cancel();
             await refreshQRCode();
+            onRefresh?.call();
           }
         }
       } catch (e) {
@@ -161,26 +173,20 @@ class QRCodeLoginState {
     if (isRefreshing) return;
 
     isRefreshing = true;
+    isLoading = true;
+    qrImageUrl = null;
+    onRefresh?.call();
+    
     try {
-      if (!_isChaoxing) {
-        final qrData = await RCLoginApi.getQRCodeUuid();
-        if (qrData != null && qrData.length == 2) {
-          qrUuid = qrData[0];
-          qrState = qrData[1];
-          qrImageUrl = 'https://open.weixin.qq.com/connect/qrcode/$qrUuid';
-        }
-      } else {
-        final qrData = await CXLoginApi.getQRCodeData();
-        if (qrData != null) {
-          qrUuid = qrData['uuid'];
-          qrEnc = qrData['enc'];
-          qrImageUrl = 'https://passport2.chaoxing.com/createqr?uuid=$qrUuid&fid=-1';
-        }
+      final qrData = await _getQRCodeData();
+      if (qrData != null) {
+        _updateQRInfo(qrData);
       }
     } catch (e) {
       debugPrint('刷新二维码失败: $e');
     } finally {
       isRefreshing = false;
+      isLoading = false;
     }
   }
 
@@ -263,6 +269,10 @@ class _LoginPageState extends State<LoginPage> {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            qrState.onRefresh = () {
+              setState(() {});
+            };
+            
             return PopScope(
               canPop: true,
               onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -297,7 +307,6 @@ class _LoginPageState extends State<LoginPage> {
                               child: Image.network(
                                 qrState.qrImageUrl!,
                                 fit: BoxFit.contain,
-                                gaplessPlayback: true,
                               ),
                             )
                           : qrState.isLoading
@@ -354,20 +363,6 @@ class _LoginPageState extends State<LoginPage> {
                       Navigator.pop(context);
                     },
                     child: const Text('取消'),
-                  ),
-                  TextButton(
-                    onPressed: qrState.isRefreshing || qrState.isLoading
-                        ? null
-                        : () async {
-                      setState(() {
-                        qrState.isRefreshing = true;
-                      });
-                      await qrState.refreshQRCode();
-                      setState(() {
-                        qrState.isRefreshing = false;
-                      });
-                    },
-                    child: qrState.isRefreshing ? const Text('刷新中...') : const Text('刷新'),
                   ),
                 ],
               ),
@@ -521,7 +516,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _sendCaptcha() async {
-    debugPrint('发送验证码');
     String phone = _usernameController.text.trim();
     if (phone.isEmpty) {
       if (mounted) {

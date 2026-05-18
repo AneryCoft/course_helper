@@ -32,14 +32,9 @@ class CookieInterceptor extends Interceptor {
 
           if (PlatformManager().isRainClassroom) {
             final cookieMap = Map.fromEntries(cookies.map((c) => MapEntry(c.name, c.value)));
-            if (cookieMap.containsKey('sid')) { // APP
-              options.headers['x-csrftoken'] = cookieMap['csrftoken'];
-              options.headers['x-uid'] = userId;
-              options.headers['sessionid'] = cookieMap['sessionid'];
-            } else { // Web
-              options.headers['x-client'] = 'web';
-              options.headers['xt-agent'] = 'web';
-            }
+            options.headers['x-csrftoken'] = cookieMap['csrftoken'];
+            options.headers['x-uid'] = userId;
+            options.headers['sessionid'] = cookieMap['sessionid'];
           }
         }
       }

@@ -140,6 +140,10 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            qrState.onRefresh = () {
+              setState(() {});
+            };
+            
             return PopScope(
               canPop: true,
               onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -174,7 +178,6 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                         child: Image.network(
                           qrState.qrImageUrl!,
                           fit: BoxFit.contain,
-                          gaplessPlayback: true,
                         ),
                       )
                           : qrState.isLoading
@@ -216,22 +219,12 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                 ),
                 actions: [
                   TextButton(
+                    child: const Text('取消'),
                     onPressed: () {
                       qrState.isLoginActive = false;
                       qrState.dispose();
                       Navigator.pop(context);
-                    },
-                    child: const Text('取消'),
-                  ),
-                  TextButton(
-                    onPressed: qrState.isRefreshing || qrState.isLoading
-                        ? null
-                        : () async {
-                      setState(() => qrState.isRefreshing = true);
-                      await qrState.refreshQRCode();
-                      setState(() => qrState.isRefreshing = false);
-                    },
-                    child: qrState.isRefreshing ? const Text('刷新中...') : const Text('刷新'),
+                    }
                   ),
                 ],
               ),
