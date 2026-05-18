@@ -35,7 +35,6 @@ Future<bool> handleLoginSuccess(BuildContext context) async {
     }
     return true;
   } catch (e) {
-    debugPrint('处理登录成功失败：$e');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('登录处理失败')),
@@ -400,7 +399,6 @@ class _LoginPageState extends State<LoginPage> {
           }
         },
         onFail: (data) {
-          debugPrint('验证失败：$data');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('验证失败：${data['errorMessage']}')),
@@ -412,7 +410,6 @@ class _LoginPageState extends State<LoginPage> {
 
       return completer.future;
     } catch (e) {
-      debugPrint('腾讯验证码验证异常：$e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('验证异常：$e')),
@@ -425,15 +422,6 @@ class _LoginPageState extends State<LoginPage> {
   /// 密码/验证码登录
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
-      if (PlatformManager().isRainClassroom) {
-        if (_ticket == null || _randstr == null){
-          final captchaResult = await _showTencentCaptcha();
-          if (captchaResult != true) {
-            return;
-          }
-        }
-      }
-  
       setState(() {
         _isLoading = true;
       });
@@ -466,6 +454,31 @@ class _LoginPageState extends State<LoginPage> {
             }
           }
         } else {
+          // 雨课堂验证码前置校验
+          if (_currentLoginType == '2') {
+            final verifyResult = await RCLoginApi.verifyCaptcha(
+                _usernameController.text,
+                _captchaController.text
+            );
+        
+            if (verifyResult == null || verifyResult['code'] != 0) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(verifyResult?['msg'] ?? '验证码验证失败')),
+                );
+              }
+              return;
+            }
+          } else {
+            // 非验证码模式需要腾讯验证码
+            if (_ticket == null || _randstr == null){
+              final captchaResult = await _showTencentCaptcha();
+              if (captchaResult != true) {
+                return;
+              }
+            }
+          }
+
           result = await RCLoginApi.login(
             _currentLoginType == '2' ? 3 : 2, // 1: 密码登录 2: 邮箱登录 3: 验证码登录
             _usernameController.text,
@@ -474,8 +487,11 @@ class _LoginPageState extends State<LoginPage> {
             _randstr!,
           );
 
-          _ticket = null;
-          _randstr = null;
+          // 非验证码模式清空验证码凭证
+          if (_currentLoginType != '2') {
+            _ticket = null;
+            _randstr = null;
+          }
 
           late String errorMessage;
           if (result != null) {
@@ -506,8 +522,6 @@ class _LoginPageState extends State<LoginPage> {
       } finally {
         if (mounted) {
           setState(() {
-            _ticket = null;
-            _randstr = null;
             _isLoading = false;
           });
         }
