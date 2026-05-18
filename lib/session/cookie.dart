@@ -208,12 +208,11 @@ class CookieManager {
 
   /// 临时Cookie保存到账号
   static Future<void> saveTempCookies(String userId) async {
+    final tempCookies = await _tempCookieJar.loadForRequest(domainUri);
+    if (tempCookies.isEmpty) return;
     // 复制一份CookieJar
     final newCookieJar = CookieJar();
-    final tempCookies = await _tempCookieJar.loadForRequest(domainUri);
-    if (tempCookies.isNotEmpty) {
-      await newCookieJar.saveFromResponse(domainUri, tempCookies);
-    }
+    await newCookieJar.saveFromResponse(domainUri, tempCookies);
 
     _userCookieJars[userId] = newCookieJar;
     await _saveCookiesToStorage(userId, newCookieJar);
