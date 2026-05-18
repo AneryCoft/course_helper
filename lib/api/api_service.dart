@@ -117,7 +117,7 @@ class ApiService {
       receiveTimeout: const Duration(seconds: 10),
       sendTimeout: const Duration(seconds: 10),
       followRedirects: false,
-      validateStatus: (status) => status! < 500
+      validateStatus: (status) => status != null && status >= 200 && status < 400
       // contentType: Headers.formUrlEncodedContentType, // application/x-www-form-urlencoded
       // headers: HeadersManager.chaoxingHeaders,
     ));
