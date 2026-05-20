@@ -365,13 +365,24 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
               tooltip: '删除选中账号',
             ),
           if (_selectedPlatform == PlatformType.rainClassroom)
-            PopupMenuButton<RainClassroomServerType>(
-              icon: const Icon(Icons.dns),
-              tooltip: '切换服务器',
-              onSelected: (RainClassroomServerType server) async {
-                await PlatformManager().setServer(server);
-              },
-              itemBuilder: (BuildContext context) => [
+            StatefulBuilder(
+              builder: (context, setState) {
+                // 服务器类型与颜色
+                const serverColors = {
+                  RainClassroomServerType.yuketang: Color(0xFF5096F5),
+                  RainClassroomServerType.pro: Color(0xFF7B3BB5),
+                  RainClassroomServerType.changjiang: Color(0xFFC21F30),
+                  RainClassroomServerType.huanghe: Color(0xFFB57232)
+                };
+                
+                final serverColor = serverColors[PlatformManager().currentServer];
+                return PopupMenuButton<RainClassroomServerType>(
+                  icon: Icon(Icons.dns, color: serverColor),
+                  tooltip: '切换服务器',
+                  onSelected: (RainClassroomServerType server) async {
+                    await PlatformManager().setServer(server);
+                  },
+                  itemBuilder: (BuildContext context) => [
                 PopupMenuItem<RainClassroomServerType>(
                   enabled: true,
                   child: StatefulBuilder(
@@ -383,9 +394,10 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                             groupValue: PlatformManager().currentServer,
                             onChanged: (RainClassroomServerType? value) async {
                               if (value != null) {
-                                setPopupState(() {});
-                                Navigator.pop(context);
                                 await PlatformManager().setServer(value);
+                                Navigator.pop(context);
+                                // 延迟执行以确保弹窗关闭后再刷新
+                                Future.microtask(() => setState(() {}));
                               }
                             },
                             child: Column(
@@ -419,6 +431,8 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                   ),
                 ),
               ],
+                );
+              },
             ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
