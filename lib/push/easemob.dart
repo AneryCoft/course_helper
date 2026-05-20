@@ -5,7 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../main.dart';
-import '../pages/Courses/list.dart';
+import '../pages/courses/list.dart';
 import '../models/active.dart';
 import '../platform.dart';
 
