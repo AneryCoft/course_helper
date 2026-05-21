@@ -12,6 +12,7 @@ import '../api/image.dart';
 import '../api/api_service.dart';
 import '../models/presentation.dart';
 import '../session/account.dart';
+import '../platform.dart';
 
 @pragma('vm:entry-point')
 void _startForegroundCallback() {
@@ -203,7 +204,12 @@ class _PresentationPageState extends State<PresentationPage> {
 
   Future<void> _connectWebSocket() async {
     try {
-      final ws = await WebSocket.connect('wss://www.yuketang.cn/wsapp/');
+      late String lessonUrl;
+      final currentServerName = PlatformManager().currentServer.name;
+      lessonUrl = currentServerName == 'yuketang'?
+      'wss://www.yuketang.cn/wsapp/' : 'wss://$currentServerName.yuketang.cn/wsapp/';
+
+      final ws = await WebSocket.connect(lessonUrl);
       _ws = ws;
 
       final helloData = {
