@@ -1,8 +1,65 @@
+import 'package:dio/dio.dart';
 import 'dart:convert';
 
 import 'api_service.dart';
 import '../utils/encrypt.dart';
+import '../models/user.dart';
 
+
+class Location {
+  final User? user;
+  final String address;
+  final double latitude;
+  final double longitude;
+
+  Location({this.user, required this.address, required this.latitude, required this.longitude});
+
+  // location
+  String toJson() {
+    return jsonEncode({
+      'result': 1,
+      'address': address,
+      'longitude': longitude,
+      'latitude': latitude
+    });
+  }
+
+  // locationResult
+  String toResultJson() {
+    final timeStampMS = DateTime.now().millisecondsSinceEpoch.toString();
+    final cxcid = user?.deviceInfo?['cid'] ?? '';
+    final sc = user?.deviceInfo?['sc'] ?? '';
+
+    final signConfigMap = {
+      'data': '{"latitude":$latitude,"longitude":$longitude,"address":"$address"}',
+      'cxtime': timeStampMS,
+      'cxcid': cxcid
+    };
+
+    final sortedKeys = signConfigMap.keys.toList()..sort();
+    final buffer = StringBuffer();
+    for (final key in sortedKeys) {
+      buffer.write('$key${signConfigMap[key]}');
+    }
+    buffer.write(sc);
+    final signToken = EncryptionUtil.md5Hash(buffer.toString());
+
+
+    return jsonEncode({
+      'result': 1,
+      'latitude': latitude,
+      'longitude': longitude,
+      'mockData': {'strategy': 0, 'probability': -1},
+      'locType': 161, // -200 说明客户端获取到了经纬度，但是没有获取到位置描述
+      'address': address,
+      'signConfig': {
+        'signToken': signToken,
+        'cxcid': cxcid,
+        'cxtime': timeStampMS
+      }
+    });
+  }
+}
 
 class SignInApi extends Api {
   SignInApi([super.user]);
@@ -60,7 +117,7 @@ class SignInApi extends Api {
 
   /// 手势 签到码签到
   Future<String?> codeSign(String courseId, String activeId, String signCode,
-      {String? validate}) async {
+      {String? address, double? latitude, double? longitude, String? validate}) async {
     final params = {
       'activeId': activeId,
       'courseId': courseId,
@@ -80,6 +137,14 @@ class SignInApi extends Api {
     } else {
       params['validate'] = validate;
     }
+    if (address != null && latitude != null && longitude != null) {
+      params['latitude'] = latitude.toStringAsFixed(6);
+      params['longitude'] = longitude.toStringAsFixed(6);
+
+      final location = Location(user: user, address: address, latitude: latitude, longitude: longitude);
+      params['location'] = location.toJson();
+      params['locationResult'] = location.toResultJson();
+    }
 
     final response = await ApiService.sendRequest(_signUrl, params: params, responseType: ResponseType.plain, userId: user?.uid);
     return response?.data;
@@ -88,7 +153,7 @@ class SignInApi extends Api {
   /// 位置签到
   Future<String?> locationSign(String courseId, String activeId, String address,
       double latitude, double longitude, {String? validate, String? faceId, String? faceEnc}) async {
-    final params = {
+    final data = {
       'name': user?.name ?? '',
       'address': address,
       'activeId': activeId,
@@ -110,20 +175,23 @@ class SignInApi extends Api {
     };
 
     if (validate == null) {
-      params.remove('validate');
+      data.remove('validate');
     } else {
-      params['validate'] = validate;
+      data['validate'] = validate;
     }
 
     if (faceId != null) {
-      params['currentFaceId'] = faceId;
-      params['ifCFP'] = '1';
+      data['currentFaceId'] = faceId;
+      data['ifCFP'] = '1';
     }
     if (faceEnc != null) {
-      params['faceEnc'] = faceEnc;
+      data['faceEnc'] = faceEnc;
     }
 
-    final response = await ApiService.sendRequest(_signUrl, params: params, responseType: ResponseType.plain, userId: user?.uid);
+    final location = Location(user: user, address: address, latitude: latitude, longitude: longitude);
+    data['locationResult'] = location.toResultJson();
+
+    final response = await ApiService.sendRequest(_signUrl, method: 'POST', body: data, responseType: ResponseType.plain, userId: user?.uid);
     return response?.data;
   }
 
@@ -167,8 +235,9 @@ class SignInApi extends Api {
     };
 
     if (address != null && latitude != null && longitude != null) {
-      String locationJson = '{"result":1,"latitude":$latitude,"longitude":$longitude,"mockData":{"strategy":0,"probability":-1},"address":"$address"}';
-      params['location'] = locationJson;
+      final location = Location(user: user, address: address, latitude: latitude, longitude: longitude);
+      params['location'] = location.toJson();
+      params['locationResult'] = location.toResultJson();
     }
 
     if (enc2 == null || validate == null) {
