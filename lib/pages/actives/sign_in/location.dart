@@ -3,6 +3,7 @@ import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 
 import '../../../../models/user.dart';
 import '../../../../api/sign_in.dart';
+import '../../../../api/face.dart';
 import '../../../../setting/course_setting.dart';
 import '../../../../models/course.dart';
 import '../../widget/baidu_map.dart';
@@ -36,9 +37,10 @@ class LocationSign implements SignStrategy {
     String? faceId;
     String? faceEnc;
     if (state.needFace) {
-      faceId = await api.getFaceId();
+      final faceApi = FaceApi(user);
+      faceId = await faceApi.getFaceId();
       if (faceId != null && faceId.isNotEmpty) {
-        faceEnc = await api.getFaceEnc(params.active.id, faceId);
+        faceEnc = await faceApi.getFaceEnc(params.active.id, faceId);
       }
     }
 
