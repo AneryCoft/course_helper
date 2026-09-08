@@ -47,7 +47,15 @@ class CookieInterceptor extends Interceptor {
   void onResponse(Response response, ResponseInterceptorHandler handler) async {
     final setCookieHeaders = response.headers['set-cookie'];
     if (setCookieHeaders != null) {
-      final cookies = setCookieHeaders.map((s) => Cookie.fromSetCookieValue(s)).toList();
+      List<Cookie> cookies = [];
+      for (var header in setCookieHeaders) {
+        try {
+          cookies.add(Cookie.fromSetCookieValue(header));
+        } catch (e) {
+          // sso_schooltime 存在非法字符 解析器存在问题
+          debugPrint('忽略错误Cookie: $header');
+        }
+      }
 
       final String? userId = response.requestOptions.extra['userId'];
 
