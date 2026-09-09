@@ -16,7 +16,7 @@ subprojects {
         val androidExtension = project.extensions.findByType(com.android.build.gradle.LibraryExtension::class.java)
         if (androidExtension != null) {
             val currentNamespace = androidExtension.namespace
-            if (currentNamespace == null || currentNamespace.isEmpty()) {
+            if (currentNamespace.isNullOrEmpty()) {
                 androidExtension.namespace = project.group.toString()
             }
             // 强制设置 compileSdk 为 34 以支持 lStar 属性
