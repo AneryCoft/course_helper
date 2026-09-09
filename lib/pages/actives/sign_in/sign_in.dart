@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -8,8 +9,10 @@ import '../../../../api/sign_in.dart';
 import '../../../../setting/course_setting.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
+import '../../../models/course.dart';
 import '../../../session/account.dart';
 import '../../widget/accounts_selector.dart';
+import '../../widget/baidu_map.dart';
 import '../../widget/captcha.dart';
 import 'normal.dart';
 import 'pattern.dart';
@@ -214,6 +217,14 @@ class SignInPageState extends State<SignInPage> {
     if (mounted) setState(() {});
   }
 
+  /// 清除已选择的签到位置
+  void clearSignLocation() {
+    _signParams.address = null;
+    _signParams.latitude = null;
+    _signParams.longitude = null;
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
@@ -272,6 +283,9 @@ class SignInPageState extends State<SignInPage> {
         // 根据 otherId 确定签到类型
         if (widget.active.signType == null) {
           widget.active.signType = getSignTypeFromIndex(_signTypeId);
+        } else if (widget.active.signType != SignType.normal) {
+          _locationRange = activeInfo['locationRange'];
+          _designatedPlace = activeInfo['locationText'];
         }
 
         switch (widget.active.signType) {
@@ -283,8 +297,6 @@ class SignInPageState extends State<SignInPage> {
             break;
           case SignType.qrCode:
           case SignType.location:
-            _locationRange = activeInfo['locationRange'];
-            _designatedPlace = activeInfo['locationText'];
             _needFace = activeInfo['openCheckFaceFlag'] == 1;
             break;
           case _:
@@ -649,5 +661,250 @@ class SignInPageState extends State<SignInPage> {
     }
     
     if (mounted) setState(() {});
+  }
+}
+
+/// 签到定位共用UI
+class SignLocationUi {
+  static Widget wrapWithAutoFill(
+      SignInPageState state, {
+        required List<Widget> Function(BuildContext context) buildChildren,
+      }) {
+    final hasLocation = state.signParams.address != null;
+
+    return FutureBuilder<CourseSettings?>(
+      future: loadCourseLocation(state),
+      builder: (context, snapshot) {
+        // 课程配置选择位置（仅在未选择位置且有配置时自动填充）
+        if (!hasLocation && snapshot.hasData && snapshot.data?.location != null) {
+          final location = snapshot.data!.location!;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (state.mounted && state.signParams.address == null) {
+              state.signParams.latitude = double.tryParse(location.latitude);
+              state.signParams.longitude = double.tryParse(location.longitude);
+              state.signParams.address = location.address.isEmpty ? '未知位置' : location.address;
+              (state.context as Element).markNeedsBuild();
+            }
+          });
+        }
+
+        return Builder(
+          builder: (context) {
+            return Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: buildChildren(context),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// 定位相关UI
+  static List<Widget> buildSection(
+      BuildContext context,
+      SignInPageState state, {
+        bool alwaysShow = false,
+        bool showSignButton = false,
+        VoidCallback? onReselect,
+      }) {
+    final hasLocation = state.signParams.address != null;
+    final showLocationUi = alwaysShow || state.designatedPlace != null;
+
+    return [
+      // 指定签到地点显示
+      if (state.designatedPlace != null && state.designatedPlace!.isNotEmpty) ...[
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Theme.of(context).colorScheme.outline),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info, size: 18, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '指定签到地点：${state.designatedPlace!}\n范围：${state.locationRange!}米',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+
+      // 位置选择按钮（未选位置时显示）
+      if (showLocationUi && !hasLocation) ...[
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => showPicker(state, autoSign: showSignButton),
+            icon: const Icon(Icons.location_on),
+            label: const Text('选择签到位置'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+
+      // 已选择位置信息区域
+      if (showLocationUi && hasLocation) ...[
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.location_on, size: 18, color: Theme.of(context).colorScheme.onSecondaryContainer),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      state.signParams.address!,
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSecondaryContainer),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  if (showSignButton) ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => state.performMultiSign(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('签到'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: onReselect ?? state.clearSignLocation,
+                      child: const Text('重新选择'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+    ];
+  }
+
+  /// 位置选择页面
+  static Future<void> showPicker(SignInPageState state, {bool autoSign = false}) async {
+    final BuildContext context = state.context;
+    BMFCoordinate? selectedCoordinate;
+    String? selectedAddress;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(title: const Text('选择签到位置')),
+          body: Column(
+            children: [
+              Expanded(
+                child: BaiduMapWidget(
+                  onLocationSelectedWithAddress: (coordinate, address) {
+                    selectedCoordinate = coordinate;
+                    selectedAddress = address;
+                  },
+                ),
+              ),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (selectedCoordinate != null) {
+                          // 保存位置到签到参数
+                          state.signParams.latitude = selectedCoordinate!.latitude;
+                          state.signParams.longitude = selectedCoordinate!.longitude;
+                          state.signParams.address = selectedAddress?.isEmpty ?? true
+                              ? '未知位置'
+                              : selectedAddress!;
+                          Navigator.pop(context);
+
+                          // 异步保存位置到课程配置
+                          saveLocationToCourse(state);
+
+                          // 返回后刷新UI，显示已选择位置
+                          if (state.mounted) {
+                            (state.context as Element).markNeedsBuild();
+                          }
+
+                          if (autoSign) {
+                            state.performMultiSign();
+                          }
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('请先点击地图选择位置')),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: Text(autoSign ? '确认选择并签到' : '确认选择'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 加载课程位置配置
+  static Future<CourseSettings?> loadCourseLocation(SignInPageState state) async {
+    final courseId = state.signParams.courseId;
+    if (courseId.isEmpty) return null;
+    return await CourseSetting.getSettings(courseId);
+  }
+
+  /// 保存位置到课程配置
+  static Future<void> saveLocationToCourse(SignInPageState state) async {
+    final courseId = state.signParams.courseId;
+    if (courseId.isEmpty) return;
+
+    final location = CourseLocation(
+        address: state.signParams.address ?? '',
+        latitude: state.signParams.latitude?.toString() ?? '',
+        longitude: state.signParams.longitude?.toString() ?? ''
+    );
+
+    await CourseSetting.updateLocation(courseId, location);
   }
 }

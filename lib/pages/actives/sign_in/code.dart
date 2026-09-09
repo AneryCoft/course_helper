@@ -23,42 +23,41 @@ class CodeSign implements SignStrategy {
       params.courseId,
       params.active.id,
       params.code,
+      address: params.address,
+      latitude: params.latitude,
+      longitude: params.longitude,
       validate: validate,
     );
   }
 
   static Widget buildSignArea(SignInPageState state) {
-    return Builder(
-      builder: (BuildContext context) {
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('请输入 ${state.signParams.numberCount} 位签到码'),
-                const SizedBox(height: 16),
-                _CodeInputField(state: state),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: state.getCodeInput().length == state.signParams.numberCount
-                        ? () => _verifyAndSign(state)
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: const Text('确认签到'),
-                  ),
-                ),
-              ],
+    return SignLocationUi.wrapWithAutoFill(
+      state,
+      buildChildren: (context) {
+        return [
+          // 定位相关UI
+          ...SignLocationUi.buildSection(context, state),
+
+          Text('请输入 ${state.signParams.numberCount} 位签到码'),
+          const SizedBox(height: 16),
+          _CodeInputField(state: state),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: state.getCodeInput().length == state.signParams.numberCount
+                  ? () => _verifyAndSign(state)
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text('确认签到'),
             ),
           ),
-        );
-      }
+        ];
+      },
     );
   }
 
