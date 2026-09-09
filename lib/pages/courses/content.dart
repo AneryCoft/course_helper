@@ -4,6 +4,7 @@ import '../../api/course.dart';
 import '../../models/active.dart';
 import 'list.dart';
 import 'settings.dart';
+import '../../platform.dart';
 
 
 class CourseContentPage extends StatefulWidget {
@@ -104,10 +105,10 @@ class _CourseContentPageState extends State<CourseContentPage> {
       body: _isContentLoading
           ? const Center(child: CircularProgressIndicator())
           : _activeList.isEmpty
-          ? const Center(
+          ? Center(
         child: Text(
-          '暂无内容',
-          style: TextStyle(fontSize: 18, color: Colors.grey),
+          PlatformManager().isRainClassroom ? '暂无正在上课的课程' : '暂无内容',
+          style: const TextStyle(fontSize: 18, color: Colors.grey)
         ),
       )
           : RefreshIndicator(
