@@ -232,6 +232,33 @@ class _PresentationPageState extends State<PresentationPage> {
     }
   }
 
+  void _toSlide(int slideIndex, {bool animate = true}) {
+    final targetIndex = slideIndex - 1;
+    if (targetIndex < 0) return;
+
+    setState(() {
+      _currentLessonSlideIndex = targetIndex;
+      _currentSlideIndex = targetIndex;
+      if (targetIndex < _slides.length) {
+        _currentProblem = _slides[targetIndex]['problem'];
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_pageController.hasClients) return;
+
+      if (animate) {
+        _pageController.animateToPage(
+          targetIndex,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut
+        );
+      } else {
+        _pageController.jumpToPage(targetIndex);
+      }
+    });
+  }
+
   void _handleMessage(dynamic message) async {
     try {
       final data = jsonDecode(message);
@@ -241,238 +268,179 @@ class _PresentationPageState extends State<PresentationPage> {
       
       final messageText = data['message'];
 
-      if (op == 'hello') {
-        if (messageText == 'lesson finished') {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('课堂已结束')),
-              );
-            }
-          });
-          return;
-        }
-
-        final presentationId = data['presentation'];
-        final slideIndex = data['slideindex'];
-        final timeline = data['timeline'] as List?;
-
-        String? latestPresId;
-        int? latestSlideIndex;
-        if (timeline != null) {
-          for (var event in timeline.reversed) {
-            if (event['type'] == 'slide' && event['pres'] != null) {
-              latestPresId = event['pres'];
-              latestSlideIndex = event['si'];
-              break;
-            }
-          }
-        }
-        
-        final targetPresId = latestPresId ?? presentationId;
-        final targetSlideIndex = latestSlideIndex ?? slideIndex;
-        
-        if (targetPresId != null) {
-          await _loadPresentation(targetPresId);
-          if (targetSlideIndex != null && targetSlideIndex > 0) {
-            final targetIndex = targetSlideIndex - 1;
-            setState(() {
-              _currentSlideIndex = targetIndex;
-              _currentLessonSlideIndex = targetIndex; // 记录课堂当前播放的页码
-              if (_currentSlideIndex >= 0 && _currentSlideIndex < _slides.length) {
-                _currentProblem = _slides[_currentSlideIndex]['problem'];
-              }
-            });
-          }
-        }
-        
-        if (timeline != null) {
-          _addTimelineEvents(timeline);
-        }
-        
-        setState(() {
-          _isInitialized = true;
-        });
-        
-        // 等待页面构建完成后滑动到指定页
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (targetSlideIndex != null && targetSlideIndex > 0) {
-            final targetIndex = targetSlideIndex - 1;
-            if (_pageController.hasClients) {
-              _pageController.jumpToPage(targetIndex);
-            }
-          }
-        });
-      } else if (op == 'unlockproblem') {
-        final problemData = data['problem'];
-        if (problemData != null) {
-          // WebSocket 消息中使用 'prob' 或 'sid' 作为题目ID
-          final problemId = problemData['prob'];
-          final limit = problemData['limit'];
-          final dt = problemData['dt'];
-          if (limit != null && limit > 0) {
-            setState(() {
-              _countdownSeconds = limit;
-              if (problemId != null && !_unlockedProblemIds.contains(problemId)) {
-                _unlockedProblemIds.add(problemId);
-              }
-              if (_currentProblem != null && dt != null) {
-                _currentProblem = _currentProblem!.copyWith(dt: dt);
-              }
-            });
-            _startCountdown(limit);
-          }
-        }
-      } else if (op == 'showpresentation') {
-        final presentationId = data['presentation'];
-        final slideIndex = data['slideindex'];
-        final timeline = data['timeline'] as List?;
-        // final shownow = data['shownow'] ?? false;
-        
-        if (presentationId != null && presentationId != _currentPresentationId) {
-          await _loadPresentation(presentationId);
-        }
-        
-        if (slideIndex != null) {
-          final targetIndex = slideIndex - 1;
-          setState(() {
-            _currentLessonSlideIndex = targetIndex;
-            _currentSlideIndex = targetIndex;
-            if (_currentSlideIndex >= 0 && _currentSlideIndex < _slides.length) {
-              _currentProblem = _slides[_currentSlideIndex]['problem'];
-            }
-          });
-          // 滑动到指定页面
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_pageController.hasClients) {
-              _pageController.animateToPage(
-                _currentSlideIndex,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-              );
-            }
-          });
-        }
-        
-        if (timeline != null) {
-          _addTimelineEvents(timeline);
-        }
-      } else if (op == 'slide') {
-        final slideIndex = data['slideindex'];
-        if (slideIndex != null) {
-          final targetIndex = slideIndex - 1;
-          setState(() {
-            _currentLessonSlideIndex = targetIndex;
-            _currentSlideIndex = targetIndex;
-            if (_currentSlideIndex >= 0 && _currentSlideIndex < _slides.length) {
-              _currentProblem = _slides[_currentSlideIndex]['problem'];
-            }
-          });
-          // 滑动到指定页面
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_pageController.hasClients) {
-              _pageController.animateToPage(
-                _currentSlideIndex,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-              );
-            }
-          });
-        }
-      } else if (op == 'slidenav') {
-        // 处理幻灯片导航消息
-        final slideData = data['slide'];
-        if (slideData != null) {
-          final slideIndex = slideData['si'];
-          if (slideIndex != null) {
-            final targetIndex = slideIndex - 1;
-            setState(() {
-              _currentLessonSlideIndex = targetIndex;
-              _currentSlideIndex = targetIndex;
-              if (_currentSlideIndex >= 0 && _currentSlideIndex < _slides.length) {
-                _currentProblem = _slides[_currentSlideIndex]['problem'];
-              }
-            });
-            // 滑动到指定页面
+      switch (op) {
+        case 'hello':
+          if (messageText == 'lesson finished') {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (_pageController.hasClients) {
-                _pageController.animateToPage(
-                  _currentSlideIndex,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('课堂已结束')),
                 );
               }
             });
+            return;
           }
-        }
-      } else if (op == 'extendtime') {
-        // 处理延时消息
-        final problemData = data['problem'];
-        if (problemData != null) {
-          final extend = problemData['extend'];
-          if (extend != null && extend > 0) {
-            setState(() {
-              if (_countdownSeconds != null) {
-                _countdownSeconds = (_countdownSeconds! + extend).toInt();
+
+          final presentationId = data['presentation'];
+          final slideIndex = data['slideindex'];
+          final timeline = data['timeline'] as List?;
+
+          String? latestPresId;
+          int? latestSlideIndex;
+          if (timeline != null) {
+            for (var event in timeline.reversed) {
+              if (event['type'] == 'slide' && event['pres'] != null) {
+                latestPresId = event['pres'];
+                latestSlideIndex = event['si'];
+                break;
               }
-            });
+            }
           }
-        }
-      } else if (op == 'callpaused') {
-        // 处理随机点名等事件
-        final eventData = data['event'];
-        if (eventData != null) {
-          final code = eventData['code'];
-          if (code == 'RANDOM_PICK') {
-            // 随机点名事件 - 添加到时间线
-            setState(() {
-              _timeline.add(TimelineEvent(
-                type: 'randompick',
-                code: 'RANDOM_PICK',
-                title: eventData['title'],
-                timestamp: DateTime.now(),
-              ));
-            });
-          }
-        }
-      } else if (op == 'showfinished') {
-        // 处理幻灯片结束放映事件
-        final eventData = data['event'];
-        if (eventData != null) {
-          final code = eventData['code'];
-          final title = eventData['title'];
-          final dt = eventData['dt'];
           
-          if (code == 'SHOW_FINISH') {
-            setState(() {
-              _timeline.add(TimelineEvent(
-                type: 'event',
-                code: code,
-                title: title ?? '幻灯片结束放映',
-                timestamp: DateTime.fromMillisecondsSinceEpoch(dt),
-              ));
-            });
-          }
-        }
-      } else if (op == 'lessonfinished') {
-        // 处理下课事件
-        final eventData = data['event'];
-        if (eventData != null) {
-          final code = eventData['code'];
-          final title = eventData['title'];
-          final dt = eventData['dt'];
+          final targetPresId = latestPresId ?? presentationId;
+          final targetSlideIndex = latestSlideIndex ?? slideIndex;
           
-          if (code == 'LESSON_FINISH') {
-            setState(() {
-              _timeline.add(TimelineEvent(
-                type: 'event',
-                code: code,
-                title: title ?? '下课啦！',
-                timestamp: DateTime.fromMillisecondsSinceEpoch(dt),
-              ));
-            });
+          if (targetPresId != null) {
+            await _loadPresentation(targetPresId);
+            if (targetSlideIndex != null && targetSlideIndex > 0) {
+              _toSlide(targetSlideIndex, animate: false);
+            }
           }
-        }
+          
+          if (timeline != null) {
+            _addTimelineEvents(timeline);
+          }
+          
+          setState(() {
+            _isInitialized = true;
+          });
+          break;
+
+        case 'unlockproblem':
+          final problemData = data['problem'];
+          if (problemData != null) {
+            // WebSocket 消息中使用 'prob' 或 'sid' 作为题目ID
+            final problemId = problemData['prob'];
+            final limit = problemData['limit'];
+            final dt = problemData['dt'];
+            if (limit != null && limit > 0) {
+              setState(() {
+                _countdownSeconds = limit;
+                if (problemId != null && !_unlockedProblemIds.contains(problemId)) {
+                  _unlockedProblemIds.add(problemId);
+                }
+                if (_currentProblem != null && dt != null) {
+                  _currentProblem = _currentProblem!.copyWith(dt: dt);
+                }
+              });
+              _startCountdown(limit);
+            }
+          }
+          break;
+
+        case 'showpresentation':
+          final presentationId = data['presentation'];
+          final slideIndex = data['slideindex'];
+          final timeline = data['timeline'] as List?;
+          // final shownow = data['shownow'] ?? false;
+          
+          if (presentationId != null && presentationId != _currentPresentationId) {
+            await _loadPresentation(presentationId);
+          }
+          
+          if (slideIndex != null) {
+            _toSlide(slideIndex);
+          }
+          
+          if (timeline != null) {
+            _addTimelineEvents(timeline);
+          }
+          break;
+
+        case 'slide':
+        case 'slidenav':
+          final slideIndex = op == 'slide' ?
+          data['slideindex'] : data['slide']?['si'];
+          if (slideIndex != null) {
+            _toSlide(slideIndex);
+          }
+          break;
+
+        case 'extendtime':
+          // 延时
+          final problemData = data['problem'];
+          if (problemData != null) {
+            final extend = problemData['extend'];
+            if (extend != null && extend > 0) {
+              setState(() {
+                if (_countdownSeconds != null) {
+                  _countdownSeconds = (_countdownSeconds! + extend).toInt();
+                }
+              });
+            }
+          }
+          break;
+
+        case 'callpaused':
+          // 随机点名
+          final eventData = data['event'];
+          if (eventData != null) {
+            final code = eventData['code'];
+            final dt = eventData['dt'];
+            if (code == 'RANDOM_PICK') {
+              setState(() {
+                _timeline.add(TimelineEvent(
+                  type: 'randompick',
+                  code: 'RANDOM_PICK',
+                  title: eventData['title'],
+                  timestamp: DateTime.fromMillisecondsSinceEpoch(dt)
+                ));
+              });
+            }
+          }
+          break;
+
+        case 'showfinished':
+          // 幻灯片结束放映
+          final eventData = data['event'];
+          if (eventData != null) {
+            final code = eventData['code'];
+            final title = eventData['title'];
+            final dt = eventData['dt'];
+            
+            if (code == 'SHOW_FINISH') {
+              setState(() {
+                _timeline.add(TimelineEvent(
+                  type: 'event',
+                  code: code,
+                  title: title,
+                  timestamp: DateTime.fromMillisecondsSinceEpoch(dt),
+                ));
+              });
+            }
+          }
+          break;
+
+        case 'lessonfinished':
+          // 下课
+          final eventData = data['event'];
+          if (eventData != null) {
+            final code = eventData['code'];
+            final title = eventData['title'];
+            final dt = eventData['dt'];
+            
+            if (code == 'LESSON_FINISH') {
+              setState(() {
+                _timeline.add(TimelineEvent(
+                  type: 'event',
+                  code: code,
+                  title: title,
+                  timestamp: DateTime.fromMillisecondsSinceEpoch(dt)
+                ));
+              });
+            }
+          }
+          break;
       }
     } catch (e) {
       debugPrint('解析消息失败：$e');
@@ -492,7 +460,6 @@ class _PresentationPageState extends State<PresentationPage> {
       final pres = event['pres'];
       
       if (type != null) {
-        // 处理特殊事件类型
         String eventType = type;
         String eventTitle = title ?? '';
 
@@ -502,8 +469,7 @@ class _PresentationPageState extends State<PresentationPage> {
             eventTitle = title ?? '随机点名';
           }
         }
-        
-        // 过滤掉 slide 类型事件（不显示幻灯片切换）
+
         if (eventType == 'slide') {
           continue;
         }
