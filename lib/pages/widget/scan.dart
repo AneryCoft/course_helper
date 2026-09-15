@@ -1,111 +1,134 @@
-import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:image_picker/image_picker.dart';
 import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class ScanPage extends StatefulWidget {
   final Function(String)? onScanResult;
-  
+
   const ScanPage({super.key, this.onScanResult});
 
   @override
   State<ScanPage> createState() => _ScanPageState();
 }
 
-class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
+class _ScanPageState extends State<ScanPage>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
+  static const int animationTime = 2000;
+
   MobileScannerController? _controller;
-  String? scanResult;
-  StreamSubscription<Object?>? _subscription;
-  
-  final int animationTime = 2000;
-  AnimationController? _animationController;
+  late final AnimationController _animationController;
+
   bool isScan = false;
-  bool _isInitializing = false;
+  bool _isInitializing = true;
+  bool _handled = false;
+  bool _torchOn = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: animationTime),
+    )..addStatusListener(_onAnimationStatus);
+
+    _controller = MobileScannerController(
+      autoStart: false,
+      cameraResolution: const Size(1920, 1080),
+      detectionSpeed: DetectionSpeed.normal,
+      detectionTimeoutMs: 500,
+      formats: [BarcodeFormat.qrCode],
+      autoZoom: true
+    );
+
     _initializeScanner();
   }
 
   @override
   void dispose() {
-    // 先停止动画控制器
-    if (_animationController != null) {
-      _animationController?.stop();
-      _animationController?.dispose();
-      _animationController = null;
-    }
-    
-    // 安全地停止相机和清理资源
-    _subscription?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+
+    _animationController.dispose();
     _controller?.dispose();
     _controller = null;
-    
+
     isScan = false;
     super.dispose();
   }
 
-  Future<void> _initializeScanner() async {
-    if (!mounted) return;
-    
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final controller = _controller;
+    if (controller == null) return;
+
     try {
-      _controller = MobileScannerController(
-        autoStart: false,
-        cameraResolution: Size(1920, 1080),
-        detectionSpeed: DetectionSpeed.unrestricted,
-        formats: [BarcodeFormat.qrCode],
-        autoZoom: true
-      );
-      
-      await _controller!.start();
-      
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-        });
-        startScan();
+      switch (state) {
+        case AppLifecycleState.resumed:
+          controller.start();
+        case AppLifecycleState.inactive:
+        case AppLifecycleState.paused:
+        case AppLifecycleState.detached:
+        case AppLifecycleState.hidden:
+          controller.stop();
       }
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-        });
-      }
+    } catch (e) {
+      debugPrint('Lifecycle handling error: $e');
     }
   }
 
-  void startScan() async {
-    isScan = true;
-    _initAnimation();
+  Future<void> _initializeScanner() async {
+    if (!mounted) return;
+
+    try {
+      await _controller?.start();
+      if (!mounted) return;
+
+      setState(() => _isInitializing = false);
+      startScan();
+    } catch (e) {
+      debugPrint('initializeScanner error: $e');
+      if (!mounted) return;
+      setState(() => _isInitializing = false);
+    }
   }
 
-  void _initAnimation() {
-    _animationController ??= AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: animationTime),
-    )..addListener(() => setState(() {}))
-      ..addStatusListener((state) {
-        if (!mounted) {
-          return;
-        }
+  void _onAnimationStatus(AnimationStatus status) {
+    if (!mounted) return;
 
-        if (state == AnimationStatus.completed) {
-          Future.delayed(Duration(seconds: 1), () {
-            if (_animationController != null && _animationController!.status != AnimationStatus.dismissed) {
-              _animationController?.reverse();
-            }
-          });
-        } else if (state == AnimationStatus.dismissed) {
-          Future.delayed(Duration(seconds: 1), () {
-            if (_animationController != null && _animationController!.status != AnimationStatus.forward) {
-              _animationController?.forward();
-            }
-          });
+    if (status == AnimationStatus.completed) {
+      Future.delayed(const Duration(seconds: 1), () {
+        if (!mounted) return;
+        if (_animationController.status != AnimationStatus.dismissed) {
+          _animationController.reverse();
         }
       });
+    } else if (status == AnimationStatus.dismissed) {
+      Future.delayed(const Duration(seconds: 1), () {
+        if (!mounted) return;
+        if (_animationController.status != AnimationStatus.forward) {
+          _animationController.forward();
+        }
+      });
+    }
+  }
 
-    _animationController?.forward();
+  Future<void> toggleTorch() async {
+    try {
+      await _controller?.toggleTorch();
+      if (!mounted) return;
+      setState(() => _torchOn = !_torchOn);
+    } catch (e) {
+      debugPrint('toggleTorch error: $e');
+    }
+  }
+
+  void startScan() {
+    isScan = true;
+    _handled = false;
+    _animationController.forward();
   }
 
   void stop() {
@@ -113,28 +136,63 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
 
     isScan = false;
     _controller?.stop();
-    
-    if (_animationController != null) {
-      _animationController?.stop();
-      _animationController?.reset();
-    }
+    _animationController.stop();
+    _animationController.reset();
   }
 
-
-  void scanImage(String path) async {
+  Future<void> scanImage(String path) async {
     try {
       final barcodeCapture = await _controller?.analyzeImage(path);
       stop();
-      if (mounted && barcodeCapture != null && barcodeCapture.barcodes.isNotEmpty) {
-        final code = barcodeCapture.barcodes.first.rawValue;
-        if (code != null) {
-          _handleScanResult(code);
-        }
-      } else {
-        await _controller?.start();
+      if (!mounted) return;
+
+      final barcodes = barcodeCapture?.barcodes;
+      final code = (barcodes != null && barcodes.isNotEmpty)
+          ? barcodes.first.rawValue
+          : null;
+
+      if (code != null) {
+        _handleScanResult(code);
+        return;
       }
+      await _controller?.start();
+      if (!mounted) return;
+      startScan();
     } catch (e) {
       debugPrint('Failed to analyze image: $e');
+      if (!mounted) return;
+      try {
+        await _controller?.start();
+        if (!mounted) return;
+        startScan();
+      } catch (err) {
+        debugPrint('Failed to restart scanner: $err');
+      }
+    }
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_handled) return;
+    if (capture.barcodes.isEmpty) return;
+
+    final code = capture.barcodes.first.rawValue;
+    if (code == null) return;
+
+    _handled = true;
+    _handleScanResult(code);
+  }
+
+  void _handleScanResult(String data) async {
+    if (!mounted) return;
+
+    stop();
+
+    if (!mounted) return;
+    try {
+      widget.onScanResult?.call(data);
+      Navigator.of(context).pop(data);
+    } catch (e) {
+      debugPrint('Navigator error: $e');
     }
   }
 
@@ -143,65 +201,127 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
     return Material(
       color: Colors.black,
       child: LayoutBuilder(builder: (context, constraints) {
-        final qrScanSize = constraints.maxWidth * 0.85;
         final mediaQuery = MediaQuery.of(context);
+        final qrScanSize = constraints.maxWidth * 0.7;
+
+        final scanWindow = Rect.fromCenter(
+          center: Offset(
+            constraints.maxWidth / 2,
+            constraints.maxHeight / 2,
+          ),
+          width: qrScanSize,
+          height: qrScanSize,
+        );
 
         return Stack(
           children: [
             MobileScanner(
               controller: _controller,
-              onDetect: (BarcodeCapture capture) {
-                if (capture.barcodes.isNotEmpty) {
-                  final code = capture.barcodes.first.rawValue;
-                  debugPrint('条码内容：$code');
-                  if (code != null) {
-                    _handleScanResult(code);
-                  }
-                }
+              scanWindow: scanWindow,
+              fit: BoxFit.contain,
+              tapToFocus: true,
+              onDetect: _onDetect,
+              placeholderBuilder: (context) => const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              ),
+              errorBuilder: (context, error) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: Colors.white,
+                        size: 48,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        '相机启动失败：${error.errorCode}',
+                        style: const TextStyle(color: Colors.white),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              overlayBuilder: (context, overlayConstraints) {
+                return Center(
+                  child: SizedBox(
+                    width: scanWindow.width,
+                    height: scanWindow.height,
+                    child: AnimatedBuilder(
+                      animation: _animationController,
+                      builder: (context, child) {
+                        return CustomPaint(
+                          painter: QrScanBoxPainter(
+                            boxLineColor:
+                            Theme.of(context).colorScheme.primary,
+                            animationValue: _animationController.value,
+                            isForward: _animationController.status ==
+                                AnimationStatus.forward,
+                          ),
+                          child: child,
+                        );
+                      },
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+                );
               },
             ),
-            // 在初始化期间显示加载指示器
+
             if (_isInitializing)
               const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                ),
+                child: CircularProgressIndicator(color: Colors.white),
               ),
+
             Positioned(
-              left: (constraints.maxWidth - qrScanSize) / 2,
-              top: (constraints.maxHeight - qrScanSize) * 0.333333,
-              child: CustomPaint(
-                painter: QrScanBoxPainter(
-                  boxLineColor: Theme.of(context).colorScheme.primary,
-                  animationValue: _animationController?.value ?? 0,
-                  isForward: _animationController?.status == AnimationStatus.forward,
+              left: 8,
+              top: mediaQuery.padding.top + 8,
+              child: IconButton(
+                onPressed: () {
+                  stop();
+                  Navigator.of(context).pop();
+                },
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: Colors.white,
+                  size: 28,
                 ),
-                child: SizedBox(width: qrScanSize, height: qrScanSize),
               ),
             ),
+
             Positioned(
-              width: constraints.maxWidth,
-              bottom: constraints.maxHeight == mediaQuery.size.height ? 12 + mediaQuery.padding.bottom : 12,
+              left: 0,
+              right: 0,
+              bottom: constraints.maxHeight == mediaQuery.size.height
+                  ? 12 + mediaQuery.padding.bottom
+                  : 12,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   IconButton(
                     onPressed: () async {
-                      final XFile? image = await ImagePicker().pickImage(source: ImageSource.gallery);
+                      final XFile? image = await ImagePicker()
+                          .pickImage(source: ImageSource.gallery);
                       if (image == null) return;
                       scanImage(image.path);
                     },
-                    icon: const Icon(Icons.photo_library, color: Colors.white, size: 35),
+                    icon: const Icon(
+                      Icons.photo_library,
+                      color: Colors.white,
+                      size: 35,
+                    ),
                   ),
-                  TextButton(
-                    onPressed: () {
-                      stop();
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text(
-                      '取消', 
-                      style: TextStyle(color: Colors.white, fontSize: 18)
+                  IconButton(
+                    onPressed: toggleTorch,
+                    icon: Icon(
+                      _torchOn ? Icons.flashlight_on : Icons.flashlight_off,
+                      color: _torchOn ? Colors.yellow : Colors.white,
+                      size: 35,
                     ),
                   ),
                 ],
@@ -212,35 +332,17 @@ class _ScanPageState extends State<ScanPage> with TickerProviderStateMixin {
       }),
     );
   }
-
-
-
-  void _handleScanResult(String data) async {
-    if (!mounted) return;
-    
-    // 先停止扫描
-    stop();
-    
-    if (!mounted) return;
-    try {
-      widget.onScanResult!(data);
-      Navigator.of(context).pop(data);
-    } catch (e) {
-      debugPrint('Navigator $e');
-    }
-  }
 }
 
-// 自定义扫描框绘制器
 class QrScanBoxPainter extends CustomPainter {
   final double animationValue;
   final bool isForward;
   final Color boxLineColor;
 
   QrScanBoxPainter({
-    required this.animationValue, 
-    required this.isForward, 
-    required this.boxLineColor
+    required this.animationValue,
+    required this.isForward,
+    required this.boxLineColor,
   });
 
   @override
@@ -255,10 +357,12 @@ class QrScanBoxPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
+
     final borderPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
+
     final path = Path();
     // leftTop
     path.moveTo(0, 50);
@@ -273,7 +377,8 @@ class QrScanBoxPainter extends CustomPainter {
     // rightBottom
     path.moveTo(size.width, size.height - 50);
     path.lineTo(size.width, size.height - 12);
-    path.quadraticBezierTo(size.width, size.height, size.width - 12, size.height);
+    path.quadraticBezierTo(
+        size.width, size.height, size.width - 12, size.height);
     path.lineTo(size.width - 50, size.height);
     // leftBottom
     path.moveTo(50, size.height);
@@ -283,9 +388,11 @@ class QrScanBoxPainter extends CustomPainter {
 
     canvas.drawPath(path, borderPaint);
 
-    canvas.clipRRect(BorderRadius.all(Radius.circular(12)).toRRect(Offset.zero & size));
+    canvas.clipRRect(
+      BorderRadius.all(Radius.circular(12)).toRRect(Offset.zero & size),
+    );
 
-    // 绘制扫描线
+    // 扫描线
     final linePaint = Paint()
       ..color = boxLineColor
       ..strokeWidth = 2.0;
@@ -298,8 +405,10 @@ class QrScanBoxPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(QrScanBoxPainter oldDelegate) => animationValue != oldDelegate.animationValue;
+  bool shouldRepaint(QrScanBoxPainter oldDelegate) =>
+      animationValue != oldDelegate.animationValue;
 
   @override
-  bool shouldRebuildSemantics(QrScanBoxPainter oldDelegate) => animationValue != oldDelegate.animationValue;
+  bool shouldRebuildSemantics(QrScanBoxPainter oldDelegate) =>
+      animationValue != oldDelegate.animationValue;
 }
