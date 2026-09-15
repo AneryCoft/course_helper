@@ -19,8 +19,8 @@ subprojects {
             if (currentNamespace.isNullOrEmpty()) {
                 androidExtension.namespace = project.group.toString()
             }
-            // 强制设置 compileSdk 为 34 以支持 lStar 属性
-            androidExtension.compileSdk = 34
+            // 强制设置 compileSdk 以支持新版本 API（permission_handler 需要 37）
+            androidExtension.compileSdk = 37
             // 禁用 lint 检查
             androidExtension.lint {
                 checkDependencies = false
@@ -44,6 +44,18 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+// Flutter 插件若为 AGP 9 内置 Kotlin 风格，其 build.gradle.kts 仅有顶层 kotlin {}
+// 而未 apply kotlin-android，本项目使用 AGP 8.x，需在脚本编译前补上 Kotlin 插件。
+subprojects {
+    if (name != "app") {
+        pluginManager.withPlugin("com.android.library") {
+            if (!pluginManager.hasPlugin("org.jetbrains.kotlin.android")) {
+                pluginManager.apply("org.jetbrains.kotlin.android")
+            }
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

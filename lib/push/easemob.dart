@@ -30,7 +30,7 @@ class EasemobIM {
 
   Future<void> initialize({
     Function(bool)? onConnectionChanged,
-    Function(EMMessage)? onMessageReceived
+    Function(ChatMessage)? onMessageReceived
   }) async {
     try {
       // 初始化本地通知插件
@@ -44,7 +44,7 @@ class EasemobIM {
         settings: const InitializationSettings(android: androidSettings, iOS: iosSettings)
       );
 
-      final options = EMOptions.withAppKey(_appKey, osType: 2);
+      final options = ChatOptions.withAppKey(_appKey, osType: 2);
       // 使用Linux登录 避免让移动设备掉线
 
       // deviceName: 'webim', osType: 16 无法使用网页登录
@@ -61,11 +61,11 @@ class EasemobIM {
         }
       },
       */
-      await EMClient.getInstance.init(options);
+      await ChatClient.getInstance.init(options);
 
-      EMClient.getInstance.addConnectionEventHandler(
+      ChatClient.getInstance.addConnectionEventHandler(
         'easemob_conn_handler',
-        EMConnectionEventHandler(
+        ConnectionEventHandler(
           onConnected: () {
             _isLoggedIn = true;
             debugPrint('已连接到环信服务器');
@@ -84,10 +84,10 @@ class EasemobIM {
         ),
       );
 
-      EMClient.getInstance.chatManager.addEventHandler(
+      ChatClient.getInstance.chatManager.addEventHandler(
         'easemob_msg_handler',
-        EMChatEventHandler(
-          onMessagesReceived: (List<EMMessage> messages) {
+        ChatEventHandler(
+          onMessagesReceived: (List<ChatMessage> messages) {
             debugPrint('收到 ${messages.length} 条新消息');
             for (var message in messages) {
               onMessageReceived?.call(message);
@@ -97,7 +97,7 @@ class EasemobIM {
         ),
       );
 
-      _isLoggedIn = await EMClient.getInstance.isLoginBefore();
+      _isLoggedIn = await ChatClient.getInstance.isLoginBefore();
     } catch (e) {
       debugPrint('初始化错误: $e');
       rethrow;
@@ -106,7 +106,7 @@ class EasemobIM {
 
   Future<void> login(String userName, String password) async {
     try {
-      await EMClient.getInstance.loginWithPassword(userName, password);
+      await ChatClient.getInstance.loginWithPassword(userName, password);
       _isLoggedIn = true;
       
       // 登录后检查并请求通知权限
@@ -128,7 +128,7 @@ class EasemobIM {
 
   Future<void> logout() async {
     try {
-      await EMClient.getInstance.logout(true);
+      await ChatClient.getInstance.logout(true);
       _isLoggedIn = false;
       _onConnectionChanged?.call(false);
     } catch (e) {
@@ -136,7 +136,7 @@ class EasemobIM {
     }
   }
 
-  Future<void> _handleMessage(EMMessage message) async {
+  Future<void> _handleMessage(ChatMessage message) async {
     if (message.attributes != null) {
       final attachment = message.attributes!['attachment'];
       final activeInfo = attachment['att_chat_course'];
@@ -249,8 +249,8 @@ class EasemobIM {
   }
 
   void dispose() {
-    EMClient.getInstance.chatManager.removeEventHandler('easemob_msg_handler');
-    EMClient.getInstance.removeConnectionEventHandler('easemob_conn_handler');
+    ChatClient.getInstance.chatManager.removeEventHandler('easemob_msg_handler');
+    ChatClient.getInstance.removeConnectionEventHandler('easemob_conn_handler');
     _isLoggedIn = false;
   }
 }

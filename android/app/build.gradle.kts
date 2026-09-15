@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.FileInputStream
 import java.util.Properties
 
@@ -16,19 +17,22 @@ if (keystorePropertiesFile.exists()) {
     println("key.properties not found. Please create it in the android directory.")
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_11)
+    }
+}
+
 android {
     namespace = "com.anerycoft.coursehelper"
-    compileSdk = flutter.compileSdkVersion
+    // 插件子项目被根 build.gradle.kts 强制 compileSdk 37，保持一致
+    compileSdk = maxOf(flutter.compileSdkVersion, 37)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
         isCoreLibraryDesugaringEnabled = true
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
     defaultConfig {
@@ -45,7 +49,7 @@ android {
         create("release") {
             keyAlias = keystoreProperties["keyAlias"] as String
             keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = file(keystoreProperties["storeFile"])
+            storeFile = file(keystoreProperties["storeFile"] as String)
             storePassword = keystoreProperties["storePassword"] as String
         }
     }
@@ -80,7 +84,7 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
-    implementation("com.baidu.lbsyun:BaiduMapSDK_Map:7.6.7")
+    implementation("com.baidu.lbsyun:BaiduMapSDK_Map:8.2.0")
     // flutter_bmflocation 插件已包含 BaiduMapSDK_Location_All
     implementation("com.baidu.lbsyun:BaiduMapSDK_Util:7.6.7")
 }
