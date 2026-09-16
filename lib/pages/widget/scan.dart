@@ -25,6 +25,9 @@ class _ScanPageState extends State<ScanPage>
   bool _handled = false;
   bool _torchOn = false;
 
+  double _baseZoom = 0.0;
+  double _currentZoom = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -86,6 +89,9 @@ class _ScanPageState extends State<ScanPage>
       await _controller?.start();
       if (!mounted) return;
 
+      await _resetZoom();
+      if (!mounted) return;
+
       setState(() => _isInitializing = false);
       startScan();
     } catch (e) {
@@ -113,6 +119,36 @@ class _ScanPageState extends State<ScanPage>
         }
       });
     }
+  }
+
+  Future<void> _resetZoom() async {
+    final controller = _controller;
+    if (controller == null) return;
+
+    _baseZoom = 0.0;
+    _currentZoom = 0.0;
+    try {
+      await controller.resetZoomScale();
+    } catch (e) {
+      debugPrint('resetZoomScale error: $e');
+    }
+  }
+
+  void _onScaleStart(ScaleStartDetails details) {
+    _baseZoom = _currentZoom;
+  }
+
+  void _onScaleUpdate(ScaleUpdateDetails details) {
+    final controller = _controller;
+    if (controller == null) return;
+
+    final target = (_baseZoom + (details.scale - 1.0)).clamp(0.0, 1.0);
+    if ((target - _currentZoom).abs() < 0.005) return;
+
+    _currentZoom = target;
+    controller.setZoomScale(target).catchError((Object e) {
+      debugPrint('setZoomScale error: $e');
+    });
   }
 
   Future<void> toggleTorch() async {
@@ -215,61 +251,67 @@ class _ScanPageState extends State<ScanPage>
 
         return Stack(
           children: [
-            MobileScanner(
-              controller: _controller,
-              scanWindow: scanWindow,
-              fit: BoxFit.contain,
-              tapToFocus: true,
-              onDetect: _onDetect,
-              placeholderBuilder: (context) => const Center(
-                child: CircularProgressIndicator(color: Colors.white),
-              ),
-              errorBuilder: (context, error) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: Colors.white,
-                        size: 48,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '相机启动失败：${error.errorCode}',
-                        style: const TextStyle(color: Colors.white),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onScaleStart: _onScaleStart,
+                onScaleUpdate: _onScaleUpdate,
+                child: MobileScanner(
+                  controller: _controller,
+                  scanWindow: scanWindow,
+                  fit: BoxFit.contain,
+                  tapToFocus: true,
+                  onDetect: _onDetect,
+                  placeholderBuilder: (context) => const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
                   ),
-                ),
-              ),
-
-              overlayBuilder: (context, overlayConstraints) {
-                return Center(
-                  child: SizedBox(
-                    width: scanWindow.width,
-                    height: scanWindow.height,
-                    child: AnimatedBuilder(
-                      animation: _animationController,
-                      builder: (context, child) {
-                        return CustomPaint(
-                          painter: QrScanBoxPainter(
-                            boxLineColor:
-                            Theme.of(context).colorScheme.primary,
-                            animationValue: _animationController.value,
-                            isForward: _animationController.status ==
-                                AnimationStatus.forward,
+                  errorBuilder: (context, error) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: Colors.white,
+                            size: 48,
                           ),
-                          child: child,
-                        );
-                      },
-                      child: const SizedBox.expand(),
+                          const SizedBox(height: 12),
+                          Text(
+                            '相机启动失败：${error.errorCode}',
+                            style: const TextStyle(color: Colors.white),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                );
-              },
+                  overlayBuilder: (context, overlayConstraints) {
+                    return Center(
+                      child: SizedBox(
+                        width: scanWindow.width,
+                        height: scanWindow.height,
+                        child: AnimatedBuilder(
+                          animation: _animationController,
+                          builder: (context, child) {
+                            return CustomPaint(
+                              painter: QrScanBoxPainter(
+                                boxLineColor:
+                                Theme.of(context).colorScheme.primary,
+                                animationValue: _animationController.value,
+                                isForward: _animationController.status ==
+                                    AnimationStatus.forward,
+                              ),
+                              child: child,
+                            );
+                          },
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
 
             if (_isInitializing)
@@ -392,7 +434,6 @@ class QrScanBoxPainter extends CustomPainter {
       BorderRadius.all(Radius.circular(12)).toRRect(Offset.zero & size),
     );
 
-    // 扫描线
     final linePaint = Paint()
       ..color = boxLineColor
       ..strokeWidth = 2.0;
