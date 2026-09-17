@@ -101,18 +101,19 @@ class SignInApi extends Api {
   }
 
   /// 检查手势 签到码
-  static Future<bool?> checkSignCode(String activeId, String signCode) async {
-    String url = 'https://mobilelearn.chaoxing.com/widget/sign/pcStuSignController/checkSignCode';
+  static Future<String?> checkSignCode(String activeId, String signCode) async {
+    final url = 'https://mobilelearn.chaoxing.com/widget/sign/pcStuSignController/checkSignCode';
 
     final params = {
       'activeId': activeId,
       'signCode': signCode
     };
 
-    final response = await ApiService.sendRequest(url, method: "GET", params: params);
-    return response?.data['result'] == 1;
+    final response = await ApiService.sendRequest(url, params: params);
+    return response?.data['errorMsg'];
     // {"result":1,"msg":"验证成功","data":null,"errorMsg":null}
     // {"result":0,"msg":null,"data":null,"errorMsg":"手势不正确"}
+    // {"result":-1,"msg":null,"data":null,"errorMsg":"验证失败次数过多，本次签到已锁定，请 1 小时后重试"}
   }
 
   /// 手势 签到码签到
@@ -262,10 +263,11 @@ class SignInApi extends Api {
 
   /// 获取参与详细
   /// 仅签到活动可用
-  static Future<Map<String, dynamic>?> getAttendInfoWeb(String activeId) async {
+  /// 可通过 userId 指定账号查询（使用对应账号的 Cookie）
+  static Future<Map<String, dynamic>?> getAttendInfoWeb(String activeId, {String? userId}) async {
     final url = 'https://mobilelearn.chaoxing.com/v2/apis/sign/getAttendInfo?activeId=$activeId&moreClassAttendEnc=';
 
-    final response = await ApiService.sendRequest(url);
+    final response = await ApiService.sendRequest(url, userId: userId);
     if (response == null) return null;
     
     final data = response.data;

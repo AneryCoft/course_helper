@@ -41,48 +41,9 @@ class CodeSign implements SignStrategy {
           Text('请输入 ${state.signParams.numberCount} 位签到码'),
           const SizedBox(height: 16),
           _CodeInputField(state: state),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: state.getCodeInput().length == state.signParams.numberCount
-                  ? () => _verifyAndSign(state)
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: const Text('确认签到'),
-            ),
-          ),
         ];
       },
     );
-  }
-
-  static Future<void> _verifyAndSign(SignInPageState state) async {
-    final code = state.signParams.code;
-
-    // 验证签到码是否正确
-    bool? isValid = await SignInApi.checkSignCode(
-      state.widget.active.id,
-      code,
-    );
-
-    if (isValid == true) {
-      // 验证通过，执行签到
-      state.performMultiSign();
-    } else {
-      // 验证失败，清空输入并提示错误
-      state.showErrorMessage('签到码不正确，请重新输入');
-      state.signParams.code = '';
-
-      // 刷新UI，清除输入框
-      if (state.mounted) {
-        (state.context as Element).markNeedsBuild();
-      }
-    }
   }
 }
 
@@ -116,6 +77,8 @@ class _CodeInputFieldState extends State<_CodeInputField> {
   
   void _onPinChanged() {
     widget.state.signParams.code = _pinController.text;
+    // 刷新按钮启用状态
+    setState(() {});
   }
   
   @override
@@ -137,53 +100,72 @@ class _CodeInputFieldState extends State<_CodeInputField> {
       ),
     );
 
-    return SizedBox(
-      height: 68,
-      child: Pinput(
-        length: numberCount,
-        controller: _pinController,
-        focusNode: _pinFocusNode,
-        defaultPinTheme: defaultPinTheme,
-        keyboardType: TextInputType.number,
-        autofillHints: null,
-        showCursor: true,
-        focusedPinTheme: defaultPinTheme.copyWith(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
           height: 68,
-          width: 64,
-          decoration: defaultPinTheme.decoration!.copyWith(
-            border: Border.all(color: Theme.of(context).colorScheme.primary),
+          child: Pinput(
+            length: numberCount,
+            controller: _pinController,
+            focusNode: _pinFocusNode,
+            defaultPinTheme: defaultPinTheme,
+            keyboardType: TextInputType.number,
+            autofillHints: null,
+            showCursor: true,
+            focusedPinTheme: defaultPinTheme.copyWith(
+              height: 68,
+              width: 64,
+              decoration: defaultPinTheme.decoration!.copyWith(
+                border: Border.all(color: Theme.of(context).colorScheme.primary),
+              ),
+            ),
+            errorPinTheme: defaultPinTheme.copyWith(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onCompleted: (pin) {
+              widget.state.signParams.code = pin;
+              _verifyAndSign();
+            },
           ),
         ),
-        errorPinTheme: defaultPinTheme.copyWith(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.errorContainer,
-            borderRadius: BorderRadius.circular(8),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _pinController.text.length == numberCount
+                ? _verifyAndSign
+                : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child: const Text('确认签到'),
           ),
         ),
-        onCompleted: (pin) {
-          widget.state.signParams.code = pin;
-          _verifyAndAutoSign();
-        },
-      ),
+      ],
     );
   }
   
-  Future<void> _verifyAndAutoSign() async {
-    bool? isValid = await SignInApi.checkSignCode(
+  Future<void> _verifyAndSign() async {
+    final errorMsg = await SignInApi.checkSignCode(
       widget.state.widget.active.id,
-      widget.state.signParams.code
+      widget.state.signParams.code,
     );
-    
-    if (isValid == true) {
+
+    if (errorMsg == null) {
       // 验证通过，执行签到
       widget.state.performMultiSign();
     } else {
-      widget.state.showErrorMessage('签到码不正确，请重新输入');
-      
+      widget.state.showErrorMessage(errorMsg);
+
       // 清空输入
       _pinController.clear();
-      widget.state.signParams.code = '';
-      
+
       // 焦点回到输入框
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {

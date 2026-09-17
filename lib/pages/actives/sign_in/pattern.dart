@@ -55,17 +55,19 @@ class PatternSign implements SignStrategy {
                 final pattern1to9 = pattern.map((p) => p + 1).toList().join('');
                 state.signParams.pattern = pattern1to9;
 
-                bool? isValid = await SignInApi.checkSignCode(
+                final errorMsg = await SignInApi.checkSignCode(
                     state.widget.active.id,
                     pattern1to9
                 );
 
-                if (isValid == true) {
+                if (errorMsg == null) {
                   state.performMultiSign();
-                } else {
-                  state.showErrorMessage('手势不正确，请重新绘制');
-                  state.signParams.pattern = '';
+                  return true;
                 }
+
+                state.showErrorMessage(errorMsg);
+                state.signParams.pattern = '';
+                return false;
               },
             ),
           ),
