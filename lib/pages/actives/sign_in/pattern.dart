@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:pattern_lock/pattern_lock.dart';
 
+import '../../widget/pattern_lock.dart';
 import '../../../../models/user.dart';
 import '../../../../api/sign_in.dart';
 import 'sign_in.dart';
