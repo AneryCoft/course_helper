@@ -4,8 +4,6 @@ import '../../api/course.dart';
 import '../../models/active.dart';
 import 'list.dart';
 import 'settings.dart';
-import '../../platform.dart';
-
 
 class CourseContentPage extends StatefulWidget {
   final String courseId;
@@ -107,7 +105,7 @@ class _CourseContentPageState extends State<CourseContentPage> {
           : _activeList.isEmpty
           ? Center(
         child: Text(
-          PlatformManager().isRainClassroom ? '暂无正在上课的课程' : '暂无内容',
+          '暂无内容',
           style: const TextStyle(fontSize: 18, color: Colors.grey)
         ),
       )
