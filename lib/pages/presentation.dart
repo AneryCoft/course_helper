@@ -1049,6 +1049,9 @@ class _PresentationPageState extends State<PresentationPage> {
             bgColor = Colors.orange;
             icon = Icons.stop_circle;
             break;
+          case 'LESSON_FINISH':
+            bgColor = Colors.red;
+            icon = Icons.school;
           default:
             bgColor = Colors.grey;
             icon = Icons.info;
