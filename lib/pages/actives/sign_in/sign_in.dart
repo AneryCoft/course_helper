@@ -177,7 +177,22 @@ class SignInPageState extends State<SignInPage> {
   User? _currentUser;
   final GlobalKey<AccountsSelectorState> _accountsSelectorKey = GlobalKey<AccountsSelectorState>();
 
+  // 账号状态（uid -> 状态信息），用于初始化选择器并同步更新
+  final Map<String, AccountStatusInfo> _accountStatuses = {};
 
+  // 签到状态文字描述
+  static const Map<int, String> _statusTexts = {
+    1: '签到成功',
+    2: '教师代签',
+    4: '请假',
+    5: '缺勤',
+    7: '病假',
+    8: '事假',
+    9: '迟到',
+    10: '早退',
+    11: '签到已过期',
+    12: '公假'
+  };
 
   // UserId -> {Validate, enc2}
   final Map<String, Map<String, String>> _userCaptchaValidate = {};
@@ -211,6 +226,12 @@ class SignInPageState extends State<SignInPage> {
 
   void setUserUploadFailed(String uid) {
     _accountsSelectorKey.currentState?.setUploadFailed(uid);
+  }
+
+  /// 设置账号状态图标（同时写入本地状态与选择器）
+  void setUserStatus(String uid, AccountStatus status, {String? message}) {
+    _accountStatuses[uid] = AccountStatusInfo(status, message: message);
+    _accountsSelectorKey.currentState?.setUserStatus(uid, status, message: message);
   }
 
   void refresh() {
@@ -310,15 +331,23 @@ class SignInPageState extends State<SignInPage> {
       }
       if (attendInfo != null){
         _status = attendInfo['status'];
-        // TODO 支持其他状态
         if (_status == 1){
+          setUserStatus(_currentUser!.uid, AccountStatus.completed);
           _showSuccessMessage('当前用户已签到');
           if (_currentUser != null) {
             setState(() {
               _selectedAccounts.removeWhere((user) => user.uid == _currentUser!.uid);
             });
           }
+        } else if (_status == 0) {
+          setUserStatus(_currentUser!.uid, AccountStatus.incomplete);
+        } else {
+          // 请假、缺勤等其他状态均视为已处理
+          setUserStatus(_currentUser!.uid, AccountStatus.completed,
+              message: _statusTexts[_status] ?? '已完成');
         }
+      } else {
+        setUserStatus(_currentUser!.uid, AccountStatus.error, message: '获取签到状态失败');
       }
 
       // 为已选中的账号分配图片
@@ -343,6 +372,11 @@ class SignInPageState extends State<SignInPage> {
       _isLoading = false;
       _isDataLoaded = true;
     });
+
+    // 查询其他账号的签到状态（选择器挂载后执行）
+    if (!isGroupSign) {
+      _checkOtherAccountsStatus();
+    }
 
     if (_currentStrategy != null && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -409,6 +443,7 @@ class SignInPageState extends State<SignInPage> {
                     }
                   },
                   title: '选择签到账号',
+                  initialStatuses: _accountStatuses,
                 ),
 
                 const SizedBox(height: 20),
@@ -476,9 +511,6 @@ class SignInPageState extends State<SignInPage> {
       _isMultiSigning = true;
     });
 
-    final failedAccounts = <String>[];
-    final totalCount = _selectedAccounts.length;
-
     final isQrCodeSign = widget.active.signType == SignType.qrCode;
 
     // 除二维码签到以外 其他签到预先处理验证码
@@ -494,6 +526,7 @@ class SignInPageState extends State<SignInPage> {
             });
           }
           _showErrorMessage('验证码取消或失败');
+          setUserStatus(user.uid, AccountStatus.error, message: '验证码取消或失败');
           return;
         }
       }
@@ -511,7 +544,7 @@ class SignInPageState extends State<SignInPage> {
     for (int i = 0; i < _selectedAccounts.length; i++) {
       final user = _selectedAccounts[i];
       final result = results[i];
-      await _handleSignResult(result, user, failedAccounts);
+      await _handleSignResult(result, user);
     }
   
     if (mounted) {
@@ -520,13 +553,50 @@ class SignInPageState extends State<SignInPage> {
         _isMultiSigning = false;
       });
     }
-  
-    _showMultiSignResult(totalCount, failedAccounts);
   }
 
-  Future<void> _handleSignResult(String? result, User user, List<String> failedAccounts) async {
+  /// 其他所有账号的签到状态
+  Future<void> _checkOtherAccountsStatus() async {
+    final otherAccounts = AccountManager.allAccounts
+        .where((user) => user != _currentUser)
+        .toList();
+    if (otherAccounts.isEmpty) return;
+
+    // 查询完成前状态未知
+    for (var user in otherAccounts) {
+      setUserStatus(user.uid, AccountStatus.unknown, message: '查询中...');
+    }
+
+    final results = await ApiService.sendForEachUser<Map<String, dynamic>>(
+      otherAccounts,
+      (user) => SignInApi.getAttendInfoWeb(widget.active.id, userId: user.uid),
+    );
+
+    for (int i = 0; i < otherAccounts.length; i++) {
+      final user = otherAccounts[i];
+      final result = results[i];
+      if (result == null) {
+        setUserStatus(user.uid, AccountStatus.error, message: '请求失败，请检查账号登录状态');
+        continue;
+      }
+
+      final status = result['status'];
+      if (status == 0) {
+        setUserStatus(user.uid, AccountStatus.incomplete);
+      } else if (status == 1) {
+        setUserStatus(user.uid, AccountStatus.completed);
+      } else if (status is int) {
+        setUserStatus(user.uid, AccountStatus.completed,
+            message: _statusTexts[status] ?? '已完成');
+      } else {
+        setUserStatus(user.uid, AccountStatus.unknown, message: '无法解析签到状态');
+      }
+    }
+  }
+
+  Future<void> _handleSignResult(String? result, User user) async {
     if (result == null) {
-      failedAccounts.add('${user.name} (无响应)');
+      setUserStatus(user.uid, AccountStatus.error, message: '签到请求无响应');
       return;
     }
 
@@ -542,19 +612,21 @@ class SignInPageState extends State<SignInPage> {
             });
           }
           _showErrorMessage('验证码取消或失败');
+          setUserStatus(user.uid, AccountStatus.error, message: '验证码取消或失败');
           return;
         }
         final resignResult = await _currentStrategy!.signForAccount(user, _signParams, this);
-        await _handleSignResult(resignResult, user, failedAccounts);
+        await _handleSignResult(resignResult, user);
       }
     } else if (result == 'success') {
       // 签到成功
+      setUserStatus(user.uid, AccountStatus.completed);
     } else if (result == 'success2') {
-      failedAccounts.add('${user.name} (已过截止时间)');
+      setUserStatus(user.uid, AccountStatus.error, message: '已过截止时间');
     } else if (result == '签到失败，请重新扫描。') {
-      failedAccounts.add('${user.name} (二维码过期)');
+      setUserStatus(user.uid, AccountStatus.error, message: '二维码过期');
     } else {
-      failedAccounts.add('${user.name} ($result)');
+      setUserStatus(user.uid, AccountStatus.error, message: result);
     }
   }
 
@@ -575,37 +647,6 @@ class SignInPageState extends State<SignInPage> {
       _showErrorMessage('验证码处理失败: $e');
       return false; // 处理异常
     }
-  }
-
-  void _showMultiSignResult(int totalCount, List<String> failedAccounts) {
-    if (!mounted) return;
-
-    final successCount = totalCount - failedAccounts.length;
-    String message = '签到完成！\n成功: $successCount/$totalCount';
-    if (failedAccounts.isNotEmpty) {
-      message += '\n\n失败账号:\n${failedAccounts.join('\n')}';
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          successCount == totalCount ? '全部签到成功' : '部分失败',
-          style: TextStyle(
-            color: successCount == totalCount ? Colors.green : Colors.orange,
-          ),
-        ),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showSuccessMessage(String message) {

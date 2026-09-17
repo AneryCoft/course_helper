@@ -10,6 +10,8 @@ class AccountsSelector extends StatefulWidget {
   final String title;
   final bool initiallyExpanded;
   final List<User>? initialSelected;
+  /// uid -> 状态信息
+  final Map<String, AccountStatusInfo>? initialStatuses;
 
   const AccountsSelector({
     super.key,
@@ -17,10 +19,27 @@ class AccountsSelector extends StatefulWidget {
     this.title = '选择参加的账号',
     this.initiallyExpanded = true,
     this.initialSelected,
+    this.initialStatuses,
   });
 
   @override
   State<AccountsSelector> createState() => AccountsSelectorState();
+}
+
+/// 账号操作状态
+enum AccountStatus {
+  incomplete,
+  completed,
+  unknown,
+  error
+}
+
+/// 账号状态信息
+class AccountStatusInfo {
+  final AccountStatus status;
+  final String? message;
+
+  const AccountStatusInfo(this.status, {this.message});
 }
 
 class AccountsSelectorState extends State<AccountsSelector> {
@@ -33,6 +52,7 @@ class AccountsSelectorState extends State<AccountsSelector> {
   final Map<String, String> _userObjectIds = {}; // uid -> objectId
   final Set<String> _uploadingUsers = {};
   final Set<String> _failedUsers = {};
+  final Map<String, AccountStatusInfo> _userStatuses = {};
 
   // 为tristate创造条件
   bool get _hasSelectableAccounts => _allAccounts.any((user) => user != _currentUser);
@@ -56,6 +76,11 @@ class AccountsSelectorState extends State<AccountsSelector> {
         _selectedAccounts = List.from(widget.initialSelected!);
       } else {
         _selectedAccounts = List.from(_allAccounts);
+      }
+
+      // 初始状态（来自外部）
+      if (widget.initialStatuses != null) {
+        _userStatuses.addAll(widget.initialStatuses!);
       }
 
       final currentUserId = AccountManager.currentSessionId;
@@ -141,6 +166,43 @@ class AccountsSelectorState extends State<AccountsSelector> {
       _uploadingUsers.remove(uid);
       _failedUsers.add(uid);
     });
+  }
+
+  void setUserStatus(String uid, AccountStatus status, {String? message}) {
+    setState(() {
+      _userStatuses[uid] = AccountStatusInfo(status, message: message);
+    });
+  }
+
+  (IconData, Color, String) _getStatusDisplay(String uid) {
+    final info = _userStatuses[uid]!;
+    final scheme = Theme.of(context).colorScheme;
+    switch (info.status) {
+      case AccountStatus.completed:
+        return (Icons.check_circle, scheme.primary, info.message ?? '已完成');
+      case AccountStatus.incomplete:
+        return (Icons.assignment_late, scheme.onSurfaceVariant, info.message ?? '未完成');
+      case AccountStatus.unknown:
+        return (Icons.help_outline, scheme.outline, info.message ?? '未知');
+      case AccountStatus.error:
+        final reason = info.message;
+        return (Icons.error_outline, scheme.error,
+            reason == null || reason.isEmpty ? '发生错误' : '错误：$reason');
+    }
+  }
+
+  /// 账号状态图标
+  Widget _buildStatusIcon(String uid) {
+    final (icon, color, message) = _getStatusDisplay(uid);
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Tooltip(
+        triggerMode: TooltipTriggerMode.tap,
+        message: message,
+        showDuration: const Duration(seconds: 5),
+        child: Icon(icon, size: 25, color: color)
+      ),
+    );
   }
 
   /// 放大图片对话框
@@ -358,6 +420,9 @@ class AccountsSelectorState extends State<AccountsSelector> {
                               ],
                             ),
                           ),
+                        // 状态图标
+                        if (_userStatuses.containsKey(user.uid))
+                          _buildStatusIcon(user.uid),
                       ],
                     ),
                     value: isSelected,

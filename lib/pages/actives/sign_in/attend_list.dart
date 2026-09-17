@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../api/image.dart';
 import '../../../api/sign_in.dart';
 import '../../../api/api_service.dart';
+import '../../../session/account.dart';
+import '../../widget/accounts_selector.dart';
 import '../../widget/avatar.dart';
 import 'sign_in.dart';
 
@@ -35,6 +37,17 @@ class _AttendListWidgetState extends State<AttendListWidget> {
       final attendListData = await SignInApi.getGroupAttendList(widget.state.widget.active.id);
       if (attendListData != null && mounted) {
         widget.state.signParams.groupSignedList = List<Map<String, dynamic>>.from(attendListData['yiqianList'] ?? []);
+        // 根据签到列表更新各账号状态
+        final signedUids = <String>{};
+        for (final item in widget.state.signParams.groupSignedList!) {
+          signedUids.add((item['uid'] ?? '').toString());
+        }
+        for (var user in AccountManager.allAccounts) {
+          widget.state.setUserStatus(
+            user.uid,
+            signedUids.contains(user.uid) ? AccountStatus.completed : AccountStatus.incomplete,
+          );
+        }
         widget.state.refresh();
       }
     } catch (e) {
