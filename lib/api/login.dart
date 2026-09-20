@@ -182,7 +182,7 @@ class RCLoginApi extends Api {
 
   /// 验证验证码
   static Future<Map<String, dynamic>?> verifyCaptcha(String phone, String code) async {
-    final url = 'https://www.yuketang.cn/api/v3/user/code/verify';
+    final url = '/api/v3/user/code/verify';
 
     final jsonData = {
       'phoneNumber': phone,
