@@ -672,6 +672,7 @@ class _QuizPageState extends State<QuizPage> {
           final optionLabel = _getOptionLabel(option, quiz['type']);
           final isAnswer = option['isanswer'] == true;
           final isSelected = quiz['personAnswer']['myoption'] == option['name'];
+          final scheme = Theme.of(context).colorScheme;
 
           return RadioListTile<String>(
             title: Html(
@@ -693,20 +694,17 @@ class _QuizPageState extends State<QuizPage> {
             secondary: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.grey[300],
+                color: isSelected ?
+                scheme.primary : scheme.inversePrimary,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 optionLabel,
                 style: TextStyle(
-                  color: isSelected
-                      ? Colors.white 
-                      : isAnswer
-                          ? Theme.of(context).colorScheme.primary 
-                          : Colors.grey[700],
-                  fontWeight: FontWeight.bold,
+                  color: isSelected ?
+                  scheme.onPrimary : isAnswer ?
+                  scheme.primary : scheme.secondaryFixed,
+                  fontWeight: isAnswer ? FontWeight.w900 : FontWeight.bold,
                   fontSize: 14,
                 ),
               ),
@@ -733,6 +731,7 @@ class _QuizPageState extends State<QuizPage> {
         final isAnswer = option['isanswer'] == true;
         final selectedOptions = (quiz['personAnswer']['myoption'] as String?)?.split('') ?? [];
         final isSelected = selectedOptions.contains(option['name']);
+        final scheme = Theme.of(context).colorScheme;
         
         return CheckboxListTile(
           title: Html(
@@ -754,18 +753,17 @@ class _QuizPageState extends State<QuizPage> {
           secondary: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.grey[300],
+              color: isSelected ?
+              scheme.primary : scheme.inversePrimary,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               optionLabel,
               style: TextStyle(
                 color: isSelected ?
-                Colors.white : isAnswer ?
-                Theme.of(context).colorScheme.primary : Colors.grey[700],
-                fontWeight: FontWeight.bold,
+                scheme.onPrimary : isAnswer ?
+                scheme.primary : scheme.secondaryFixed,
+                fontWeight: isAnswer ? FontWeight.w900 : FontWeight.bold,
                 fontSize: 14,
               ),
             ),
