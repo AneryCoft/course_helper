@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'package:flutter_baidu_mapapi_map/flutter_baidu_mapapi_map.dart';
 import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 import 'package:flutter_baidu_mapapi_search/flutter_baidu_mapapi_search.dart';
@@ -31,7 +30,19 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
   BMFCoordinate? _markerPosition;
   String _locationInfo = '正在获取位置...';
   bool _isLoading = true;
-  
+  bool _isDisposed = false;
+  bool _isLocating = false;
+
+  /// 是否已经移动过地图
+  bool _hasMovedToLocation = false;
+
+  /// 是否为用户主动触发
+  bool _isManualRelocate = false;
+
+  /// 本次定位请求是否已收到首次回调结果
+  /// Android 端 singleLocation 底层复用连续定位回调
+  bool _hasReceivedFirstFix = false;
+
   final LocationFlutterPlugin _locationPlugin = LocationFlutterPlugin();
 
   @override
@@ -44,41 +55,46 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
   /// 初始化定位
   Future<void> _initLocation() async {
     final hasPermission = await _checkPermissions();
+    if (_isDisposed) return;
+
     if (!hasPermission) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
       return;
     }
-    
+
     await _initBaiduLocation();
-    await _getCurrentLocation();
-    
+    if (_isDisposed) return;
+
+    await _getCurrentLocation(manual: false);
+    if (_isDisposed) return;
+
     if (mounted) {
       setState(() => _isLoading = false);
     }
   }
 
-  /// 初始化百度定位插件
   Future<void> _initBaiduLocation() async {
-    // Android 端设置连续定位回调
-    if (Platform.isAndroid) {
-      _locationPlugin.seriesLocationCallback(callback: (BaiduLocation result) {
-        if (result.locType != null && result.locType! > 0) {
-          final coord = BMFCoordinate(result.latitude!, result.longitude!);
-          _handleLocationUpdate(coord, result);
+    _locationPlugin.singleLocationCallback(callback: (BaiduLocation result) {
+      if (_isDisposed) return;
+
+      if (result.locType != null && result.locType! > 0) {
+        final coord = BMFCoordinate(result.latitude!, result.longitude!);
+        _handleLocationUpdate(coord, result);
+      } else {
+        if (mounted) {
+          setState(() {
+            _locationInfo = '定位失败，请重试';
+            _isLocating = false;
+            _isManualRelocate = false;
+          });
         }
-      });
-    } else if (Platform.isIOS) {
-      _locationPlugin.singleLocationCallback(callback: (BaiduLocation result) {
-        if (result.locType != null && result.locType! > 0) {
-          final coord = BMFCoordinate(result.latitude!, result.longitude!);
-          _handleLocationUpdate(coord, result);
-        }
-      });
-    }
+      }
+    });
+
     await _prepareHighAccuracyLocation();
   }
-  
-  /// 配置高精度定位参数
+
+  /// 配置定位参数
   Future<void> _prepareHighAccuracyLocation() async {
     try {
       final androidOptions = BaiduLocationAndroidOption(
@@ -91,77 +107,125 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
         openGps: true,
         locationPurpose: BMFLocationPurpose.signIn
       );
-      
+
       final iosOptions = BaiduLocationIOSOption(
         coordType: BMFLocationCoordType.bd09ll,
         locationTimeout: 15,
         reGeocodeTimeout: 15,
         desiredAccuracy: BMFDesiredAccuracy.best,
-        distanceFilter: 3.0
+        distanceFilter: 3.0,
       );
-      
-      await _locationPlugin.prepareLoc(androidOptions.getMap(), iosOptions.getMap());
+
+      await _locationPlugin.prepareLoc(
+        androidOptions.getMap(),
+        iosOptions.getMap(),
+      );
     } catch (e) {
       debugPrint('配置定位参数失败：$e');
     }
   }
 
-  /// 处理定位更新
+  /// 处理定位结果
   void _handleLocationUpdate(BMFCoordinate coordinate, BaiduLocation location) {
+    if (_isDisposed || !mounted) return;
+
+    // 忽略重复定位回调
+    if (_hasReceivedFirstFix) {
+      return;
+    }
+    _hasReceivedFirstFix = true;
+
     setState(() {
       _currentPosition = coordinate;
-      _locationInfo = '地址：${location.address ?? ''}\n纬度：${coordinate.latitude.toStringAsFixed(6)}, 经度：${coordinate.longitude.toStringAsFixed(6)}';
+      _isLocating = false;
+      _locationInfo =
+      '地址：${location.address ?? ''}\n纬度：${coordinate.latitude.toStringAsFixed(6)}, 经度：${coordinate.longitude.toStringAsFixed(6)}';
     });
 
     if (_mapController != null) {
       _updateMarkerToPosition(coordinate, triggerCallback: true).then((_) {
-        _moveToMarkerPosition();
+        if (_isDisposed || !mounted) return;
+
+        // 只在首次定位 或 用户主动重新定位时移动地图，避免"左右横跳"
+        if (!_hasMovedToLocation || _isManualRelocate) {
+          _moveToMarkerPosition();
+          _hasMovedToLocation = true;
+          _isManualRelocate = false;
+        }
       });
     }
   }
 
-  Future<void> _getCurrentLocation() async {
+  /// 发起定位
+  Future<void> _getCurrentLocation({bool manual = true}) async {
+    if (_isDisposed || _isLocating) return;
+
     setState(() {
-      _locationInfo = '正在重新定位...';
+      _isLocating = true;
+      _hasReceivedFirstFix = false; // 重置单次定位守卫
+      _isManualRelocate = manual; // 用户主动时才允许再次移动地图
+      _locationInfo = '正在定位...';
     });
-      
+
     try {
-      // iOS 使用单次定位
-      if (Platform.isIOS) {
-        await _locationPlugin.singleLocation({'isReGeocode': true, 'isNetworkState': true});
-      } else if (Platform.isAndroid) {
-        // Android 先停止再启动，避免冲突
-        await _locationPlugin.stopLocation();
-        await _locationPlugin.startLocation();
-      }
+      // 避免残留
+      await _locationPlugin.stopLocation();
+      if (_isDisposed) return;
+
+      await _locationPlugin.singleLocation({
+        'isReGeocode': true,
+        'isNetworkState': true,
+      });
+
+      Future.delayed(const Duration(seconds: 15), () {
+        if (_isDisposed || !mounted) return;
+        if (_isLocating) {
+          setState(() {
+            _isLocating = false;
+            _isManualRelocate = false;
+            _locationInfo = '定位超时，请重试';
+          });
+        }
+      });
     } catch (e) {
       debugPrint('定位失败：$e');
-      setState(() {
-        _locationInfo = '定位失败：$e';
-      });
+      if (!_isDisposed && mounted) {
+        setState(() {
+          _locationInfo = '定位失败：$e';
+          _isLocating = false;
+          _isManualRelocate = false;
+        });
+      }
     }
   }
 
+  /// 权限检查（保留 permission_handler 实现，可区分"永久拒绝"）
   Future<bool> _checkPermissions() async {
     var status = await Permission.location.status;
-    
+
     if (status.isDenied) {
       await Permission.location.request();
       status = await Permission.location.status;
     }
-    
+
+    if (_isDisposed) return false;
+
     if (status.isPermanentlyDenied) {
-      setState(() => _locationInfo = '定位权限被永久拒绝');
+      if (mounted) setState(() => _locationInfo = '定位权限被永久拒绝，请前往设置手动开启');
       return false;
     }
-    
+
     return status.isGranted || PermissionStatus.limited == status;
   }
 
-  Future<String> _updateMarkerToPosition(BMFCoordinate position, {bool triggerCallback = false}) async {
-    if (_mapController == null) return '';
+  Future<String> _updateMarkerToPosition(
+      BMFCoordinate position, {
+        bool triggerCallback = false,
+      }) async {
+    if (_isDisposed || _mapController == null) return '';
 
     await _mapController!.cleanAllMarkers();
+    if (_isDisposed || _mapController == null) return '';
 
     BMFMarker marker = BMFMarker.icon(
       position: position,
@@ -171,8 +235,10 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
       scaleY: 0.3
     );
     await _mapController!.addMarker(marker);
+    if (_isDisposed || _mapController == null) return '';
 
     String address = await _getAddressFromCoordinate(position);
+    if (_isDisposed || !mounted) return address;
 
     setState(() {
       _markerPosition = position;
@@ -195,44 +261,53 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
   }
 
   void _moveToMarkerPosition() {
-    if (_mapController == null || _markerPosition == null) return;
-    _mapController!.setCenterCoordinate(_markerPosition!, true, animateDurationMs: 1000);
+    if (_isDisposed || _mapController == null || _markerPosition == null) return;
+    _mapController!
+        .setCenterCoordinate(_markerPosition!, true, animateDurationMs: 1000);
     _mapController!.setZoomTo(20.0, animateDurationMs: 1000);
   }
 
   Future<String> _getAddressFromCoordinate(BMFCoordinate coordinate) async {
+    if (_isDisposed) return '未知位置';
     try {
-      BMFReverseGeoCodeSearchOption option = BMFReverseGeoCodeSearchOption(location: coordinate);
+      BMFReverseGeoCodeSearchOption option =
+      BMFReverseGeoCodeSearchOption(location: coordinate);
       BMFReverseGeoCodeSearch search = BMFReverseGeoCodeSearch();
       Completer<String> completer = Completer<String>();
 
-      search.onGetReverseGeoCodeSearchResult(callback: (BMFReverseGeoCodeSearchResult? result, BMFSearchErrorCode errorCode) {
-        String address = '';
-        if (result != null) {
-          address = result.address ?? '';
-          if (address.isEmpty && result.poiList != null && result.poiList!.isNotEmpty) {
-            address = result.poiList!.first.name ?? '';
-          }
-        }
-
-        if (address.isNotEmpty) {
-          completer.complete(address);
-        } else {
-          completer.complete('未知位置');
-        }
-      });
+      search.onGetReverseGeoCodeSearchResult(
+          callback: (BMFReverseGeoCodeSearchResult? result,
+              BMFSearchErrorCode errorCode) {
+            if (completer.isCompleted) return;
+            String address = '';
+            if (result != null) {
+              address = result.address ?? '';
+              if (address.isEmpty &&
+                  result.poiList != null &&
+                  result.poiList!.isNotEmpty) {
+                address = result.poiList!.first.name ?? '';
+              }
+            }
+            completer.complete(address.isNotEmpty ? address : '未知位置');
+          });
 
       await search.reverseGeoCodeSearch(option);
-      return await completer.future;
+
+      return await completer.future.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => '未知位置',
+      );
     } catch (e) {
       return '未知位置';
     }
   }
 
   void _onMapTap(BMFCoordinate coordinate) async {
-    if (_mapController == null) return;
+    if (_isDisposed || _mapController == null) return;
 
     await _updateMarkerToPosition(coordinate, triggerCallback: true);
+    if (_isDisposed || _mapController == null) return;
+
     _mapController!.setCenterCoordinate(coordinate, true, animateDurationMs: 500);
     _mapController!.setZoomTo(20.0, animateDurationMs: 500);
   }
@@ -246,12 +321,21 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
               ? const Center(child: CircularProgressIndicator())
               : BMFMapWidget(
             onBMFMapCreated: (controller) {
+              if (_isDisposed) return;
               _mapController = controller;
+
               if (_currentPosition != null) {
-                _updateMarkerToPosition(_currentPosition!, triggerCallback: true).then((_) {
-                  _moveToMarkerPosition();
+                _updateMarkerToPosition(_currentPosition!,
+                    triggerCallback: true)
+                    .then((_) {
+                  if (_isDisposed || !mounted) return;
+                  if (!_hasMovedToLocation) {
+                    _moveToMarkerPosition();
+                    _hasMovedToLocation = true;
+                  }
                 });
               }
+
               _mapController!.setMapOnClickedMapBlankCallback(
                 callback: (coordinate) => _onMapTap(coordinate),
               );
@@ -282,14 +366,24 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
               children: [
                 Text('位置信息', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
-                Text(_locationInfo, style: Theme.of(context).textTheme.bodyMedium),
+                Text(_locationInfo,
+                    style: Theme.of(context).textTheme.bodyMedium),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     ElevatedButton.icon(
-                      onPressed: _getCurrentLocation,
-                      icon: const Icon(Icons.my_location, size: 18),
-                      label: const Text('重新定位'),
+                      onPressed: _isLocating ? null : () => _getCurrentLocation(manual: true),
+                      icon: _isLocating
+                          ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                          : const Icon(Icons.my_location, size: 18),
+                      label: Text(_isLocating ? '定位中...' : '重新定位'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
@@ -302,7 +396,8 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
                         icon: const Icon(Icons.center_focus_strong, size: 18),
                         label: const Text('回到中心'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.secondary,
+                          backgroundColor:
+                          Theme.of(context).colorScheme.secondary,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -317,7 +412,9 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
 
   @override
   void dispose() {
-    _mapController?.cleanAllMarkers();
+    _isDisposed = true;
+    _locationPlugin.stopLocation();
+    _mapController = null;
     super.dispose();
   }
 }
