@@ -35,6 +35,15 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
+    // 兼容百度地图定位
+    packaging {
+        jniLibs {
+            keepDebugSymbols += "*/arm64-v8a/liblocSDK8b.so"
+            keepDebugSymbols += "*/armeabi-v7a/liblocSDK8b.so"
+            pickFirsts += "**/liblocSDK8b.so"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.anerycoft.coursehelper"
         // You can update the following values to match your application needs.
