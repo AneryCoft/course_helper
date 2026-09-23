@@ -43,10 +43,43 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  SnackBarThemeData _snackBarTheme(ColorScheme scheme) {
+    return SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: scheme.secondaryContainer,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      contentTextStyle: TextStyle(
+        color: scheme.onSecondaryContainer,
+        fontSize: 14,
+        height: 1.4
+      ),
+      actionTextColor: scheme.primary,
+      showCloseIcon: false,
+      dismissDirection: DismissDirection.horizontal
+    );
+  }
+
+  ThemeData _buildTheme(ColorScheme scheme) {
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      snackBarTheme: _snackBarTheme(scheme)
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
+        final lightScheme = lightDynamic ??
+            ColorScheme.fromSeed(seedColor: Colors.deepPurple);
+        final darkScheme = darkDynamic ??
+            ColorScheme.fromSeed(seedColor: Colors.deepPurple, brightness: Brightness.dark,);
+
         return MaterialApp(
           navigatorKey: navigatorKey,
           title: '课程助手',
@@ -60,18 +93,8 @@ class MyApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate
           ],
-          theme: ThemeData(
-            // Material You
-            useMaterial3: true,
-            colorScheme: lightDynamic ?? ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-          ),
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            colorScheme: darkDynamic ?? ColorScheme.fromSeed(
-              seedColor: Colors.deepPurple,
-              brightness: Brightness.dark,
-            ),
-          ),
+          theme: _buildTheme(lightScheme),
+          darkTheme: _buildTheme(darkScheme),
           themeMode: ThemeMode.system,
           home: const MyHomePage(),
           routes: {
