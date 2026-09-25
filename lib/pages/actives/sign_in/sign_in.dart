@@ -304,9 +304,11 @@ class SignInPageState extends State<SignInPage> {
         // 根据 otherId 确定签到类型
         if (widget.active.signType == null) {
           widget.active.signType = getSignTypeFromIndex(_signTypeId);
-        } else if (widget.active.signType != SignType.normal) {
-          _locationRange = activeInfo['locationRange'];
-          _designatedPlace = activeInfo['locationText'];
+        }
+        
+        if (widget.active.signType != SignType.normal) {
+          _locationRange = activeInfo['locationRange']?.toString();
+          _designatedPlace = activeInfo['locationText']?.toString();
         }
 
         switch (widget.active.signType) {
