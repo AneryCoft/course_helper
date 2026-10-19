@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 
 class PatternLock extends StatefulWidget {
   const PatternLock({
@@ -150,31 +151,37 @@ class _PatternLockState extends State<PatternLock> {
     return LayoutBuilder(
       builder: (context, constraints) {
         _size = Size(constraints.maxWidth, constraints.maxHeight);
-        return Listener(
+        return RawGestureDetector(
           behavior: HitTestBehavior.opaque,
-          onPointerDown: (e) {
-            if (_activePointer != null || _resolving) return;
-            _activePointer = e.pointer;
-            _onPointerDown(e.localPosition);
+          gestures: <Type, GestureRecognizerFactory>{_ClaimGestureRecognizer:
+          GestureRecognizerFactoryWithHandlers<_ClaimGestureRecognizer>(_ClaimGestureRecognizer.new, (r) {})
           },
-          onPointerMove: (e) {
-            if (e.pointer != _activePointer) return;
-            _onPointerMove(e.localPosition);
-          },
-          onPointerUp: (e) => _onPointerEnd(e.pointer),
-          onPointerCancel: (e) => _onPointerEnd(e.pointer),
-          child: CustomPaint(
-            size: _size,
-            painter: _PatternPainter(
-              dimension: widget.dimension,
-              cellSize: _cellSize,
-              gridOrigin: _gridOrigin,
-              drawRadius: _drawRadius,
-              selectedColor: widget.selectedColor,
-              notSelectedColor: widget.notSelectedColor,
-              selected: List<int>.of(_selected),
-              current: _current,
-              resultColor: _resultColor,
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: (e) {
+              if (_activePointer != null || _resolving) return;
+              _activePointer = e.pointer;
+              _onPointerDown(e.localPosition);
+            },
+            onPointerMove: (e) {
+              if (e.pointer != _activePointer) return;
+              _onPointerMove(e.localPosition);
+            },
+            onPointerUp: (e) => _onPointerEnd(e.pointer),
+            onPointerCancel: (e) => _onPointerEnd(e.pointer),
+            child: CustomPaint(
+              size: _size,
+              painter: _PatternPainter(
+                dimension: widget.dimension,
+                cellSize: _cellSize,
+                gridOrigin: _gridOrigin,
+                drawRadius: _drawRadius,
+                selectedColor: widget.selectedColor,
+                notSelectedColor: widget.notSelectedColor,
+                selected: List<int>.of(_selected),
+                current: _current,
+                resultColor: _resultColor,
+              ),
             ),
           ),
         );
@@ -261,4 +268,30 @@ class _PatternPainter extends CustomPainter {
       old.current != current ||
       old.resultColor != resultColor ||
       !listEquals(old.selected, selected);
+}
+
+class _ClaimGestureRecognizer extends OneSequenceGestureRecognizer {
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    startTrackingPointer(event.pointer, event.transform);
+    resolve(GestureDisposition.accepted);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerUpEvent || event is PointerCancelEvent) {
+      stopTrackingPointer(event.pointer);
+    }
+  }
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {}
+
+  @override
+  void rejectGesture(int pointer) {
+    stopTrackingPointer(pointer);
+  }
+
+  @override
+  String get debugDescription => 'PatternLockClaim';
 }
