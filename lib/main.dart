@@ -1,7 +1,11 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
+import 'package:flutter_bmflocation/flutter_bmflocation.dart';
 
 import './pages/accounts.dart';
 import './pages/courses/list.dart';
@@ -18,8 +22,22 @@ import 'push/update.dart';
 // 赞助对话框显示状态键
 const _hasSponsoredKey = 'has_sponsored';
 
+const _baiduMapIosAk = 'GFD9Q6U7IruCWDvlNUMcCZIlYPPtv6gt';
+
 // 全局Navigator Key,用于在无context时显示dialog
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> _initBaiduMapForIOS() async {
+  if (!Platform.isIOS) return;
+
+  BMFMapSDK.setAgreePrivacy(true);
+  BMFMapSDK.setApiKeyAndCoordType(_baiduMapIosAk, BMF_COORD_TYPE.BD09LL);
+
+  // 定位 SDK 为独立鉴权
+  final locationPlugin = LocationFlutterPlugin();
+  await locationPlugin.setAgreePrivacy(true);
+  await locationPlugin.authAK(_baiduMapIosAk);
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +47,8 @@ void main() async {
   FlutterError.onError = (details) {
     logger.e('FlutterError', error: details.exception, stackTrace: details.stack);
   };
+
+  await _initBaiduMapForIOS();
 
   await StorageManager.initialize();
 

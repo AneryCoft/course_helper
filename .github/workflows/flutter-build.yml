@@ -11,17 +11,16 @@ env:
 
 jobs:
   build:
-    name: Build All Platforms
+    name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        # os: [ubuntu-latest, macos-latest]
         include:
           - os: ubuntu-latest
             platform: android
-          # - os: macos-latest
-          #   platform: ios
+          - os: macos-latest
+            platform: ios
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -41,7 +40,14 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          cache: "true"
+          cache: true
+
+      - name: Toolchain versions (iOS only)
+        if: matrix.platform == 'ios'
+        run: |
+          flutter --version
+          xcodebuild -version
+          pod --version || true
 
       - name: Install dependencies
         run: flutter pub get
@@ -62,9 +68,20 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
           echo "storeFile=../anerycoft.jks" >> android/key.properties
 
+      - name: Align deployment target (iOS only)
+        if: matrix.platform == 'ios'
+        working-directory: ios
+        run: |
+          sed -i '' -E "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g" \
+            Runner.xcodeproj/project.pbxproj
+
       - name: Build Android APK (split-per-abi)
         if: matrix.platform == 'android'
         run: flutter build apk --release --split-per-abi
+
+      - name: Build iOS release (no codesign)
+        if: matrix.platform == 'ios'
+        run: flutter build ios --release --no-codesign
 
       - name: Rename APKs
         if: matrix.platform == 'android'
@@ -77,30 +94,35 @@ jobs:
           done
           ls -l
 
+      - name: Package unsigned IPA
+        if: matrix.platform == 'ios'
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.APP_VERSION }}"
+          APP="build/ios/iphoneos/Runner.app"
+          rm -rf Payload && mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry "CourseHelper_${VERSION}_unsigned.ipa" Payload
+          ls -lh "CourseHelper_${VERSION}_unsigned.ipa"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" "$APP/Info.plist" || true
+
       - name: Upload Android artifacts
         if: matrix.platform == 'android'
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: build/app/outputs/flutter-apk/CourseHelper_*.apk   # 匹配重命名后的文件
+          path: build/app/outputs/flutter-apk/CourseHelper_*.apk
           if-no-files-found: error
 
-      # - name: Build iOS
-      #   if: matrix.platform == 'ios'
-      #   run: |
-      #     flutter build ios --release --no-codesign
-      #     cd build/ios/iphoneos
-      #     mkdir Payload
-      #     cp -r Runner.app Payload/
-      #     zip -r CourseHelper.ipa Payload
-
-      # - name: Upload iOS artifacts
-      #   if: matrix.platform == 'ios'
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: ios-ipa
-      #     path: build/ios/iphoneos/CourseHelper.ipa
-      #     if-no-files-found: error
+      - name: Upload iOS artifacts
+        if: matrix.platform == 'ios'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: CourseHelper_*_unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
 
   release:
     name: Create GitHub Release
@@ -140,7 +162,7 @@ jobs:
         with:
           files: |
             release-assets/android-apk/*.apk
-            # release-assets/ios-ipa/CourseHelper.ipa
+            release-assets/ios-ipa/*.ipa
           name: Release ${{ steps.get_version.outputs.VERSION }}
           tag_name: ${{ steps.get_version.outputs.VERSION }}
           body: ${{ env.TAG_MSG }}
