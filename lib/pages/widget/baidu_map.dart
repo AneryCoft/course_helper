@@ -79,13 +79,18 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
     _locationPlugin.singleLocationCallback(callback: (BaiduLocation result) {
       if (_isDisposed) return;
 
-      if (result.locType != null && result.locType! > 0) {
+      // locType 仅 Android 端返回，iOS 恒为 null；
+      // 因此 iOS 用经纬度 + errorCode 判定，Android 行为保持不变。
+      if (result.latitude != null &&
+          result.longitude != null &&
+          (result.locType == null || result.locType! > 0) &&
+          (result.errorCode == null || result.errorCode == 0)) {
         final coord = BMFCoordinate(result.latitude!, result.longitude!);
         _handleLocationUpdate(coord, result);
       } else {
         if (mounted) {
           setState(() {
-            _locationInfo = '定位失败，请重试';
+            _locationInfo = '定位失败(code=${result.errorCode}, info=${result.errorInfo})，请重试';
             _isLocating = false;
             _isManualRelocate = false;
           });
@@ -233,8 +238,11 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
       position: position,
       icon: 'images/placeholder.png',
       title: '当前位置',
-      scaleX: 0.3,
-      scaleY: 0.3
+      // placeholder.png 为 512x512，0.3 约 154pt，过大且会遮挡地图点击；
+      // enabled: false 让图钉忽略触摸，保证点哪里都能重新选点。
+      scaleX: 0.08,
+      scaleY: 0.08,
+      enabled: false
     );
     await _mapController!.addMarker(marker);
     if (_isDisposed || _mapController == null) return '';

@@ -1,0 +1,85 @@
+name: Build unsigned iOS IPA
+
+# 在 macOS runner 上编译未签名的 iOS 包（Payload/Runner.app），
+# 供 Sideloadly / AltStore / SideStore 在非 macOS 环境下签名安装。
+#
+# 百度地图 AK 通过 --dart-define 注入，仓库中不保存任何密钥。
+# 需在 Settings -> Secrets and variables -> Actions 配置：
+#   BAIDU_IOS_AK  = 你的 iOS 类型 AK
+# 可选变量：
+#   IOS_BUNDLE_ID = 覆盖 Bundle ID（必须与百度控制台申请 AK 时填写的一致）
+
+on:
+  workflow_dispatch:
+    inputs:
+      bundle_id:
+        description: "可选：覆盖 Bundle ID（需与 AK 绑定一致）"
+        required: false
+        type: string
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/ios-ipa.yml"
+
+jobs:
+  build-ipa:
+    name: flutter build ios (no codesign)
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.8"
+          channel: stable
+          cache: true
+
+      - name: Toolchain versions
+        run: |
+          flutter --version
+          xcodebuild -version
+          pod --version || true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      # 工程里的 IPHONEOS_DEPLOYMENT_TARGET 仍是模板值，需与 Podfile 的 platform 对齐；
+      # 本地构建时请直接在 Xcode 的 Runner -> Deployment Info 里改。
+      - name: Align deployment target
+        working-directory: ios
+        run: |
+          sed -i '' -E "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g" \
+            Runner.xcodeproj/project.pbxproj
+
+      - name: Override bundle identifier
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.bundle_id != '' }}
+        working-directory: ios
+        run: |
+          sed -i '' "s/com.example.chaoxingSignin/${{ inputs.bundle_id }}/g" \
+            Runner.xcodeproj/project.pbxproj
+          grep "PRODUCT_BUNDLE_IDENTIFIER" Runner.xcodeproj/project.pbxproj | sort -u
+
+      - name: Build iOS release (no codesign)
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=BAIDU_IOS_AK=${{ secrets.BAIDU_IOS_AK }}
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP="build/ios/iphoneos/Runner.app"
+          rm -rf Payload && mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry CourseHelper-unsigned.ipa Payload
+          ls -lh CourseHelper-unsigned.ipa
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" "$APP/Info.plist" || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CourseHelper-unsigned-ipa
+          path: CourseHelper-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30

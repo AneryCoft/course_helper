@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:dynamic_color/dynamic_color.dart';
@@ -14,6 +16,8 @@ import './utils/storage.dart';
 import './utils/logger.dart';
 import 'push/easemob.dart';
 import 'push/update.dart';
+import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
+import 'package:flutter_bmflocation/flutter_bmflocation.dart';
 
 // 赞助对话框显示状态键
 const _hasSponsoredKey = 'has_sponsored';
@@ -21,8 +25,27 @@ const _hasSponsoredKey = 'has_sponsored';
 // 全局Navigator Key,用于在无context时显示dialog
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+/// iOS 端百度地图/定位 SDK 需要显式鉴权；Android 由 AndroidManifest 中的
+/// meta-data（com.baidu.lbsapi.API_KEY）自动完成，这里无需处理。
+const String _baiduIosAk = String.fromEnvironment('BAIDU_IOS_AK');
+
+Future<void> _initBaiduSdkForIOS() async {
+  if (!Platform.isIOS || _baiduIosAk.isEmpty) return;
+
+  BMFMapSDK.setAgreePrivacy(true);
+  BMFMapSDK.setApiKeyAndCoordType(_baiduIosAk, BMF_COORD_TYPE.BD09LL);
+
+  // 定位 SDK 为独立鉴权：隐私协议与 AK 需要单独过一遍
+  final locationPlugin = LocationFlutterPlugin();
+  await locationPlugin.setAgreePrivacy(true);
+  await locationPlugin.authAK(_baiduIosAk);
+  await LocationFlutterPlugin.setApiKey(_baiduIosAk);
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await _initBaiduSdkForIOS();
 
   await initLogger();
 
