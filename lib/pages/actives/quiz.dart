@@ -11,6 +11,7 @@ import '../../../api/quiz.dart';
 import '../../../api/image.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
+import '../../../session/account.dart';
 import '../../../utils/logger.dart';
 import '../widget/accounts_selector.dart';
 
@@ -103,51 +104,18 @@ class _QuizPageState extends State<QuizPage> {
   
   // 账号选择
   List<User> _selectedAccounts = [];
+  User? _currentUser;
+  List<User>? _initialSelectedAccounts;
   
   @override
   void initState() {
     super.initState();
+    _currentUser = AccountManager.currentUser;
     _initialize();
   }
   
   Future<void> _initialize() async {
-    // 先请求HTML并检查活动状态
-    try {
-      final response = await ApiService.sendRequest(widget.active.url, responseType: ResponseType.plain);
-      if (response == null) {
-        setState(() {
-          _errorMessage = '获取数据失败';
-          _isLoading = false;
-        });
-        return;
-      }
-      String htmlContent = response.data.toString();
-      
-      // 使用正则表达式匹配activeStatus
-      RegExp activeStatusRegex = RegExp(r'activeStatus: (.+?),');
-      Match? statusMatch = activeStatusRegex.firstMatch(htmlContent);
-      
-      if (statusMatch != null) {
-        String status = statusMatch.group(1)!;
-
-        if (status == 'undefined') {
-          await _loadQuizDataFromHtml(htmlContent);
-        } else {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = '您已提交过本次测验';
-          });
-        }
-      } else {
-        // 没有找到activeStatus，正常加载
-        await _loadQuizDataFromHtml(htmlContent);
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = '检查活动状态失败: $e';
-        _isLoading = false;
-      });
-    }
+    await _loadQuizData();
   }
 
   void _startCountdown() {
@@ -209,8 +177,8 @@ class _QuizPageState extends State<QuizPage> {
 
   Future<void> _loadQuizDataFromHtml(String htmlContent) async {
     try {
-      RegExp quizListRegex = RegExp(r'quizList = (\[.*\]);');
-      RegExp activeRegex = RegExp(r'active = (\{.*\});');
+      RegExp quizListRegex = RegExp(r'(?:questionList|quizList)\s*=\s*(\[.*?\]);');
+      RegExp activeRegex = RegExp(r'active\s*=\s*(\{.*?\});');
         
       Match? quizListMatch = quizListRegex.firstMatch(htmlContent);
       Match? activeMatch = activeRegex.firstMatch(htmlContent);
@@ -222,12 +190,22 @@ class _QuizPageState extends State<QuizPage> {
         // 解析JSON数据
         List<dynamic> quizList = json.decode(quizListJson);
         Map<String, dynamic> activeData = json.decode(activeJson);
-        
+
+        // 当前用户是否已提交
+        final bool hasStudentAnswer = quizList.any((quiz) => quiz['studentAnswer'] != null);
+
         setState(() {
           _quizList = quizList;
           _activeData = activeData;
           _isLoading = false;
-          
+
+          // 从账号选择中排除当前用户
+          if (hasStudentAnswer && _currentUser != null) {
+            _initialSelectedAccounts = AccountManager.allAccounts
+                .where((user) => user.uid != _currentUser!.uid)
+                .toList();
+          }
+
           // 初始化每个题目的答题数据
           for (var quiz in _quizList) {
             if (quiz['personAnswer'] == null) {
@@ -276,6 +254,11 @@ class _QuizPageState extends State<QuizPage> {
             _startCountdown();
           }
         });
+        if (hasStudentAnswer && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('当前用户已提交'))
+          );
+        }
       } else {
         setState(() {
           _errorMessage = '解析测验数据失败';
@@ -300,84 +283,8 @@ class _QuizPageState extends State<QuizPage> {
         });
         return;
       }
-      
-      // 解析HTML中的JavaScript数据
-      String htmlContent = response.data.toString();
-        
-        // 提取 quizList 数据
-        RegExp quizListRegex = RegExp(r'quizList\s*=\s*(\[.*?\]);', multiLine: true, dotAll: true);
-        RegExp activeRegex = RegExp(r'active\s*=\s*(\{.*?\});', multiLine: true, dotAll: true);
-        
-        Match? quizListMatch = quizListRegex.firstMatch(htmlContent);
-        Match? activeMatch = activeRegex.firstMatch(htmlContent);
-        
-        if (quizListMatch != null && activeMatch != null) {
-          String quizListJson = quizListMatch.group(1)!;
-          String activeJson = activeMatch.group(1)!;
-          
-          // 解析JSON数据
-          List<dynamic> quizList = json.decode(quizListJson);
-          Map<String, dynamic> activeData = json.decode(activeJson);
-          
-          setState(() {
-            _quizList = quizList;
-            _activeData = activeData;
-            _isLoading = false;
-            
-            // 初始化每个题目的答题数据
-            for (var quiz in _quizList) {
-              if (quiz['personAnswer'] == null) {
-                quiz['personAnswer'] = {};
-              }
-              
-              // 根据题目类型初始化答题数据
-              switch (quiz['type']) {
-                case 0: // 单选题
-                case 1: // 多选题
-                case 3: // 判断题
-                case 16: // 判断题
-                  quiz['personAnswer']['myoption'] = '';
-                  break;
-                case 2: // 填空题
-                case 9: // 分录题
-                case 10: // 资料题
-                  if (quiz['personAnswer']['blankAnswer'] == null) {
-                    quiz['personAnswer']['blankAnswer'] = [];
-                    // 初始化填空题的空格
-                    if (quiz['answer'] != null) {
-                      for (int i = 0; i < quiz['answer'].length; i++) {
-                        quiz['personAnswer']['blankAnswer'].add({'content': ''});
-                      }
-                    }
-                  }
-                  break;
-                case 4: // 简答题
-                case 5: // 名词解释
-                case 6: // 论述题
-                case 7: // 计算题
-                case 18: // 口语题
-                  quiz['personAnswer']['content'] = '';
-                  if (quiz['personAnswer']['recs'] == null) {
-                    quiz['personAnswer']['recs'] = [];
-                  }
-                  if (quiz['personAnswer']['imgs'] == null) {
-                    quiz['personAnswer']['imgs'] = [];
-                  }
-                  break;
-              }
-            }
-            
-            // 启动倒计时
-            if (_activeData != null) {
-              _startCountdown();
-            }
-          });
-        } else {
-          setState(() {
-            _errorMessage = '解析测验数据失败';
-            _isLoading = false;
-          });
-        }
+
+      await _loadQuizDataFromHtml(response.data.toString());
     } catch (e) {
       setState(() {
         _errorMessage = '加载数据出错: $e';
@@ -1255,6 +1162,7 @@ class _QuizPageState extends State<QuizPage> {
                             });
                           },
                           initiallyExpanded: false,
+                          initialSelected: _initialSelectedAccounts,
                         ),
                         
                         const SizedBox(height: 16),
