@@ -110,7 +110,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - images/placeholder.png
+    - images/location_on_120dp.png
     - images/logo.png
     - images/mm_reward_qrcode.png
 
