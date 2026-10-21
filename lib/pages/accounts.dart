@@ -396,7 +396,7 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                       onPressed: () async {
                         Navigator.of(dialogContext).pop();
                         final success = await exportLog();
-                        if (mounted) {
+                        if (mounted && success != null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(success ? '日志已分享' : '日志分享失败')),
                           );

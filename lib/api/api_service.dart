@@ -69,12 +69,9 @@ class HeadersManager {
 class DioLoggerInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    logger.i('→ ${options.method} ${options.uri}');
+    logger.i('${options.method} ${options.uri}');
     if (options.data != null) {
-      logger.d('请求体: ${_format(options.data)}');
-    }
-    if (options.queryParameters.isNotEmpty) {
-      logger.d('Query: ${options.queryParameters}');
+      logger.d('Body: ${_format(options.data)}');
     }
     handler.next(options);
   }
@@ -82,11 +79,11 @@ class DioLoggerInterceptor extends Interceptor {
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     final options = response.requestOptions;
-    logger.i('← ${response.statusCode} ${options.method} ${options.uri}');
+    logger.i('${response.statusCode} ${options.method} ${options.uri}');
     final data = response.data;
     // 跳过二进制
     if (data != null && data is! List<int>) {
-      logger.d('响应体: ${_format(data)}');
+      logger.d('Body: ${_format(data)}');
     }
     handler.next(response);
   }
@@ -94,13 +91,12 @@ class DioLoggerInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     logger.e(
-      '✗ ${err.response?.statusCode ?? '-'} ${err.requestOptions.method} '
-          '${err.requestOptions.uri}',
-      error: err,
+      '✗ ${err.response?.statusCode ?? '-'} ${err.requestOptions.method} ''${err.requestOptions.uri}',
+      error: err
     );
     final data = err.response?.data;
     if (data != null && data is! List<int>) {
-      logger.d('错误响应体: ${_format(data)}');
+      logger.d('Error body: ${_format(data)}');
     }
     handler.next(err);
   }

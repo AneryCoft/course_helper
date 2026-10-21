@@ -14,20 +14,17 @@ class AvatarCache {
   static Future<Uint8List?> getImage(String url) async {
     // 检查是否已有缓存
     if (_cache.containsKey(url)) {
-      logger.d('使用缓存的头像: $url');
       return _cache[url]!;
     }
     
     // 检查是否正在加载
     if (_loadingUrls.contains(url)) {
-      logger.d('等待进行中的头像请求: $url');
       // 等待一小段时间后重试
       await Future.delayed(const Duration(milliseconds: 50));
       return getImage(url);
     }
     
     // 创建新的请求
-    logger.d('发起新的头像请求: $url');
     _loadingUrls.add(url);
     
     final future = _fetchImage(url).whenComplete(() {
@@ -48,7 +45,6 @@ class AvatarCache {
         logger.w('头像请求失败: $url');
         return null;
       }
-      logger.d('头像请求成功: $url');
       return response.data;
     } catch (e) {
       logger.e('头像请求失败: $url, 错误: $e');

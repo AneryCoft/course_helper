@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -21,22 +22,27 @@ final Logger logger = Logger(
 
 Future<void> initLogger() => appLogOutput.init();
 
-Future<bool> exportLog() async {
+
+Future<bool?> exportLog() async {
   try {
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}${Platform.pathSeparator}${_logFileName()}');
     await file.writeAsString(appLogOutput.content);
 
-    await SharePlus.instance.share(
+    final shareResult = await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path, mimeType: 'text/plain')],
         subject: 'CourseHelper log',
-        text: 'CourseHelper log',
+        text: 'CourseHelper log'
       ),
     );
 
+    if (shareResult.status == ShareResultStatus.dismissed) {
+      return null;
+    } // 取消分享
     return true;
-  } catch (_) {
+  } catch (e) {
+    logger.e('导出日志失败: $e');
     return false;
   }
 }
@@ -52,7 +58,6 @@ class AppLogOutput extends LogOutput {
   static const int maxLines = 3000;
 
   final List<String> _buffer = [];
-  final ConsoleOutput _console = ConsoleOutput();
   File? _file;
 
   @override
@@ -68,7 +73,9 @@ class AppLogOutput extends LogOutput {
 
   @override
   void output(OutputEvent event) {
-    _console.output(event);
+    for (final line in event.lines) {
+      debugPrint(line);
+    }
     _buffer.addAll(event.lines);
     if (_buffer.length > maxLines) {
       _buffer.removeRange(0, _buffer.length - maxLines);
