@@ -22,7 +22,7 @@ import 'push/update.dart';
 // 赞助对话框显示状态键
 const _hasSponsoredKey = 'has_sponsored';
 
-const _baiduMapIosAk = 'GFD9Q6U7IruCWDvlNUMcCZIlYPPtv6gt';
+const _baiduMapIosAk = 'ctB8LatQK24AeNLvBo2upeKtmTsYthdQ';
 
 // 全局Navigator Key,用于在无context时显示dialog
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
