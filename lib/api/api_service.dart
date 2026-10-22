@@ -69,48 +69,55 @@ class HeadersManager {
 class DioLoggerInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    logger.i('${options.method} ${options.uri}');
-    if (options.data != null) {
-      logger.d('Body: ${_format(options.data)}');
-    }
+    logger.i('${options.method} ${_HttpLogPrivacy.safeUri(options.uri)}');
     handler.next(options);
   }
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     final options = response.requestOptions;
-    logger.i('${response.statusCode} ${options.method} ${options.uri}');
-    final data = response.data;
-    // 跳过二进制
-    if (data != null && data is! List<int>) {
-      logger.d('Body: ${_format(data)}');
-    }
+    logger.i(
+      '${response.statusCode ?? '-'} ${options.method} '
+      '${_HttpLogPrivacy.safeUri(options.uri)}',
+    );
     handler.next(response);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    final options = err.requestOptions;
     logger.e(
-      '✗ ${err.response?.statusCode ?? '-'} ${err.requestOptions.method} ''${err.requestOptions.uri}',
-      error: err
+      '✗ ${err.response?.statusCode ?? '-'} ${options.method} '
+      '${_HttpLogPrivacy.safeUri(options.uri)} (${err.type.name})',
     );
-    final data = err.response?.data;
-    if (data != null && data is! List<int>) {
-      logger.d('Error body: ${_format(data)}');
-    }
     handler.next(err);
   }
+}
 
-  static String _format(dynamic data) {
-    if (data is Map || data is List) {
-      try {
-        return const JsonEncoder.withIndent('  ').convert(data);
-      } catch (_) {
-        return data.toString();
-      }
+class _HttpLogPrivacy {
+  static String safeUri(Uri uri) {
+    try {
+      return Uri(
+        scheme: uri.scheme.isEmpty ? null : uri.scheme,
+        host: uri.hasAuthority ? uri.host : null,
+        port: uri.hasPort ? uri.port : null,
+        pathSegments: uri.pathSegments,
+      ).toString();
+    } catch (_) {
+      return '<invalid-uri>';
     }
-    return data.toString();
   }
+
+  static String safeUrl(String url) {
+    try {
+      final uri = Uri.tryParse(url);
+      return uri == null ? '<invalid-uri>' : safeUri(uri);
+    } catch (_) {
+      return '<invalid-uri>';
+    }
+  }
+
+  static String errorType(Object error) => error.runtimeType.toString();
 }
 
 
@@ -236,8 +243,11 @@ class ApiService {
       } // dio 的 json 解析有问题
 
       return response;
-    } catch (e, stackTrace) {
-      logger.e('HTTP Exception [$url]: $e\n$stackTrace');
+    } catch (e) {
+      logger.e(
+        'HTTP request failed [$method ${_HttpLogPrivacy.safeUrl(url)}] '
+        '(${_HttpLogPrivacy.errorType(e)})',
+      );
     }
     return null;
   }
@@ -255,7 +265,9 @@ class ApiService {
       try {
         return await apiFunction(user);
       } catch (e) {
-        logger.e('用户 ${user.name} 请求失败: $e');
+        logger.e(
+          '用户请求失败 (${_HttpLogPrivacy.errorType(e)})',
+        );
         return null;
       }
     }).toList();
