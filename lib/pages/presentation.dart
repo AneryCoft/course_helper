@@ -1688,17 +1688,9 @@ class _PresentationPageState extends State<PresentationPage> {
 
   Widget _buildFillBlankInputs() {
     if (_currentProblem == null) return const SizedBox.shrink();
-    
-    // 解析题目中的填空位置
-    final body = _currentProblem!.body;
-    final blanks = <String>[];
-    final pattern = RegExp(r'\[填空\d*\]');
-    final matches = pattern.allMatches(body);
-    
-    for (var match in matches) {
-      blanks.add(match.group(0) ?? '');
-    }
-    
+
+    final blanks = _currentProblem!.blanks;
+
     if (blanks.isEmpty) {
       return TextField(
         decoration: const InputDecoration(
@@ -1706,21 +1698,22 @@ class _PresentationPageState extends State<PresentationPage> {
           border: OutlineInputBorder(),
         ),
         onChanged: (value) {
-          _textAnswer = value;
+          _answer = [value];
         },
       );
     }
-    
+
     // 多个填空，显示多个输入框
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(blanks.length, (index) {
+        final blank = blanks[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: TextField(
             decoration: InputDecoration(
-              labelText: '填空${index + 1}',
-              hintText: '请输入第${index + 1}个空的答案',
+              labelText: '填空${blank.num}',
+              hintText: '请输入第${blank.num}个空的答案',
               border: const OutlineInputBorder(),
             ),
             onChanged: (value) {

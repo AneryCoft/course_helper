@@ -199,6 +199,7 @@ class Problem {
   final List<ProblemOption>? options;
   final int? pollingCount;
   final int? dt;
+  final List<ProblemBlank> blanks;
 
   Problem({
     required this.problemId,
@@ -211,6 +212,7 @@ class Problem {
     this.options,
     this.pollingCount,
     this.dt,
+    this.blanks = const [],
   });
 
   factory Problem.fromJson(Map<String, dynamic> json) {
@@ -225,6 +227,7 @@ class Problem {
       options: (json['options'] as List?)?.map((o) => ProblemOption.fromJson(o)).toList(),
       pollingCount: json['pollingCount'],
       dt: json['dt'],
+      blanks: (json['blanks'] as List?)?.map((b) => ProblemBlank.fromJson(b)).toList() ?? []
     );
   }
 
@@ -240,6 +243,33 @@ class Problem {
       options: options,
       pollingCount: pollingCount,
       dt: dt ?? this.dt,
+      blanks: blanks,
+    );
+  }
+}
+
+class ProblemBlank {
+  final int num;
+  final int score;
+  final List<String> answers;
+  final bool caseSensitive;
+  final bool fuzzyMatch;
+
+  ProblemBlank({
+    required this.num,
+    required this.score,
+    required this.answers,
+    required this.caseSensitive,
+    required this.fuzzyMatch,
+  });
+
+  factory ProblemBlank.fromJson(Map<String, dynamic> json) {
+    return ProblemBlank(
+      num: json['num'] ?? 0,
+      score: json['score'] ?? 0,
+      answers: (json['answers'] as List?)?.map((a) => a.toString()).toList() ?? [],
+      caseSensitive: json['caseSensitive'] ?? false,
+      fuzzyMatch: json['fuzzyMatch'] ?? false,
     );
   }
 }
