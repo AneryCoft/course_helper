@@ -51,9 +51,9 @@ class CookieInterceptor extends Interceptor {
       for (var header in setCookieHeaders) {
         try {
           cookies.add(Cookie.fromSetCookieValue(header));
-        } catch (e) {
+        } catch (_) {
           // sso_schooltime 存在非法字符 解析器存在问题
-          logger.w('忽略错误Cookie: $header');
+          logger.w('忽略无法解析的 Set-Cookie 响应头');
         }
       }
 
