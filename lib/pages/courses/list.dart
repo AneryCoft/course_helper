@@ -12,6 +12,7 @@ import '../../models/active.dart';
 import '../../utils/logger.dart';
 import '../widget/scan.dart';
 import '../widget/avatar.dart';
+import '../widget/image_viewer.dart';
 import '../actives/sign_in/sign_in.dart';
 import '../actives/topic_discuss.dart';
 import '../actives/quiz.dart';
@@ -562,6 +563,9 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                   final course = courses[index];
                   final count = ActivityMessageStore().countOf(course.courseId, course.classId);
 
+                  // 标记头像点击，避免点击头像时同时进入课程详情
+                  var avatarViewing = false;
+
                   Widget avatar;
                   if (course.image.isNotEmpty) {
                     avatar = AvatarWidget(
@@ -569,6 +573,14 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                       size: 50,
                       borderRadius: 6,
                       iconSize: 25,
+                      onTap: () {
+                        avatarViewing = true;
+                        showImageViewer(
+                          context,
+                          imageUrl: course.image,
+                          title: course.teacher,
+                        );
+                      },
                     );
                   } else {
                     avatar = Container(
@@ -590,8 +602,12 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
 
                   final card = Card(
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: InkWell(
+                    child:                     InkWell(
                       onTap: () {
+                        if (avatarViewing) {
+                          avatarViewing = false;
+                          return;
+                        }
                         ActivityMessageStore().clear(course.courseId, course.classId);
                         Navigator.push(
                           context,

@@ -10,6 +10,8 @@ import 'package:flutter_bmflocation/flutter_bmflocation.dart';
 import './pages/accounts.dart';
 import './pages/courses/list.dart';
 import './pages/login.dart';
+import './pages/settings_page.dart';
+import './theme_mode_manager.dart';
 import './api/api_service.dart';
 import './session/cookie.dart';
 import './session/account.dart';
@@ -52,6 +54,8 @@ void main() async {
 
   await StorageManager.initialize();
 
+  await ThemeModeManager.init();
+
   await ApiService.initialize();
 
   await PlatformManager().initialize();
@@ -92,42 +96,146 @@ class MyApp extends StatelessWidget {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      snackBarTheme: _snackBarTheme(scheme)
+      // ===== Material 3 组件主题，全局统一视觉语言 =====
+      appBarTheme: AppBarTheme(
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        centerTitle: false,
+        backgroundColor: scheme.surface,
+        foregroundColor: scheme.onSurface,
+        surfaceTintColor: scheme.surfaceTint,
+      ),
+      cardTheme: CardThemeData(
+        elevation: 1,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+      listTileTheme: const ListTileThemeData(
+        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 72,
+        indicatorColor: scheme.secondaryContainer,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: scheme.surfaceContainerHighest,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: scheme.primary, width: 2),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        showDragHandle: true,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+      ),
+      dividerTheme: DividerThemeData(
+        thickness: 1,
+        space: 0,
+        color: scheme.outlineVariant,
+      ),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      snackBarTheme: _snackBarTheme(scheme),
+      visualDensity: VisualDensity.adaptivePlatformDensity,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return DynamicColorBuilder(
-      builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
-        final lightScheme = lightDynamic ??
-            ColorScheme.fromSeed(seedColor: Colors.deepPurple);
-        final darkScheme = darkDynamic ??
-            ColorScheme.fromSeed(seedColor: Colors.deepPurple, brightness: Brightness.dark,);
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeModeManager.notifier,
+      builder: (context, themeMode, _) {
+        return DynamicColorBuilder(
+          builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
+            final lightScheme = lightDynamic ??
+                ColorScheme.fromSeed(seedColor: Colors.deepPurple);
+            final darkScheme = darkDynamic ??
+                ColorScheme.fromSeed(seedColor: Colors.deepPurple, brightness: Brightness.dark,);
 
-        return MaterialApp(
-          navigatorKey: navigatorKey,
-          title: '课程助手',
-          locale: const Locale('zh', 'CN'),
-          supportedLocales: const [
-            Locale('zh', 'CN'),
-            Locale('en', 'US')
-          ],
-          localizationsDelegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate
-          ],
-          theme: _buildTheme(lightScheme),
-          darkTheme: _buildTheme(darkScheme),
-          themeMode: ThemeMode.system,
-          home: const MyHomePage(),
-          routes: {
-            '/accounts': (context) => const AccountsPage(),
-            '/login': (context) => const LoginPage(),
+            return MaterialApp(
+              navigatorKey: navigatorKey,
+              title: '课程助手',
+              locale: const Locale('zh', 'CN'),
+              supportedLocales: const [
+                Locale('zh', 'CN'),
+                Locale('en', 'US')
+              ],
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate
+              ],
+              theme: _buildTheme(lightScheme),
+              darkTheme: _buildTheme(darkScheme),
+              themeMode: themeMode,
+              home: const MyHomePage(),
+              routes: {
+                '/accounts': (context) => const AccountsPage(),
+                '/login': (context) => const LoginPage(),
+              },
+            );
           },
         );
-      }
+      },
     );
   }
 }
@@ -243,26 +351,34 @@ class _MainPageState extends State<MainPage> {
         children: [
           CoursesPage(key: coursesPageKey),
           const AccountsPage(),
+          const SettingsPage(),
         ]
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.school),
-            label: '课程',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.account_circle),
-            label: '账号',
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        onTap: (index) {
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) {
           setState(() {
             _selectedIndex = index;
           });
           (coursesPageKey.currentState as dynamic)?.onVisibilityChanged(index == 0);
         },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.school_outlined),
+            selectedIcon: Icon(Icons.school),
+            label: '课程',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_circle_outlined),
+            selectedIcon: Icon(Icons.account_circle),
+            label: '账号',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: '设置',
+          ),
+        ],
       ),
     );
   }

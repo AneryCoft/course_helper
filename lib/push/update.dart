@@ -35,10 +35,20 @@ class Update {
     }
   }
 
+  static List<int> _parseVersion(String v) {
+    // 去掉 pre-release(-) 与 build(+)，仅保留主版本号数字，避免 1.2.2-Beta 这类版本解析失败
+    var clean = v.trim();
+    final dash = clean.indexOf('-');
+    if (dash >= 0) clean = clean.substring(0, dash);
+    final plus = clean.indexOf('+');
+    if (plus >= 0) clean = clean.substring(0, plus);
+    return clean.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+  }
+
   static bool _isNewerVersion(String latest, String current) {
     try {
-      final latestParts = latest.split('.').map(int.parse).toList();
-      final currentParts = current.split('.').map(int.parse).toList();
+      final latestParts = _parseVersion(latest);
+      final currentParts = _parseVersion(current);
 
       for (int i = 0; i < 3; i++) {
         final latestNum = i < latestParts.length ? latestParts[i] : 0;

@@ -105,6 +105,9 @@ class AvatarWidget extends StatefulWidget {
   /// 加载指示器的线宽，默认2
   final double loadingStrokeWidth;
 
+  /// 点击回调。当提供该回调且存在可显示的图片时，头像可点击查看。
+  final VoidCallback? onTap;
+
   const AvatarWidget({
     super.key,
     this.imageUrl,
@@ -115,6 +118,7 @@ class AvatarWidget extends StatefulWidget {
     this.iconSize = 40,
     this.iconColor,
     this.loadingStrokeWidth = 2,
+    this.onTap,
   });
 
   @override
@@ -135,9 +139,14 @@ class _AvatarWidgetState extends State<AvatarWidget> {
     }
   }
   
+  /// 是否存在可显示的图片来源
+  bool get _hasImageSource =>
+      (widget.imageUrl != null && widget.imageUrl!.isNotEmpty) ||
+      widget.imageFuture != null;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final container = Container(
       width: widget.size,
       height: widget.size,
       decoration: BoxDecoration(
@@ -149,6 +158,16 @@ class _AvatarWidgetState extends State<AvatarWidget> {
         child: _buildAvatarContent(),
       ),
     );
+
+    if (widget.onTap != null && _hasImageSource) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: container,
+      );
+    }
+
+    return container;
   }
 
   Widget _buildAvatarContent() {

@@ -900,6 +900,15 @@ class _PresentationPageState extends State<PresentationPage> {
       setState(() {
         _isFullScreen = !_isFullScreen;
       });
+      // 全屏切换会改变 PageView 视口宽度，而 PageController 按「像素」保存页码，
+      // 横竖屏切换后页码会错位（退回到第一张）。因此在视图挂载后按页码显式跳转到
+      // 当前讲解页；老师切换幻灯片时仍由 _toSlide 负责跳转。
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_pageController.hasClients) return;
+        if ((_pageController.page?.round() ?? 0) != _currentSlideIndex) {
+          _pageController.jumpToPage(_currentSlideIndex);
+        }
+      });
     }
   }
 
