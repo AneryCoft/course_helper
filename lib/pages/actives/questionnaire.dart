@@ -7,6 +7,7 @@ import '../../../api/image.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
 import '../../../session/account.dart';
+import '../../../utils/problem_type.dart';
 import '../widget/accounts_selector.dart';
 
 class QuestionnairePage extends StatefulWidget {
@@ -271,7 +272,7 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '[${_getQuestionTypeName(questionType)}] ',
+                        '[${problemTypeName(questionType)}] ',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       Html(
@@ -465,16 +466,6 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
         });
       },
     );
-  }
-
-  String _getQuestionTypeName(int type) {
-    const typeNames = {
-      0: '单选题',
-      1: '多选题',
-      4: '简答题',
-      16: '判断题'
-    };
-    return typeNames[type] ?? '未知题型';
   }
 
   Future<void> _submitAnswersForAllAccounts() async {

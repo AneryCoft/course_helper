@@ -133,6 +133,10 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
       qrState.dispose();
     });
 
+    if (!mounted) {
+      qrState.dispose();
+      return;
+    }
     await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -379,6 +383,9 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
                             onChanged: (RainClassroomServerType? value) async {
                               if (value != null) {
                                 await PlatformManager().setServer(value);
+                                // 此处的 context 是 builder 提供的局部 BuildContext，
+                                // 需用 context.mounted 而非 State.mounted
+                                if (!context.mounted) return;
                                 Navigator.pop(context);
                                 // 延迟执行以确保弹窗关闭后再刷新
                                 Future.microtask(() => setState(() {}));

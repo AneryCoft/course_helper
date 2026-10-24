@@ -19,6 +19,7 @@
     <application
         android:label="Course Helper"
         android:name=".MyApplication"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:icon="@mipmap/ic_launcher">
         
         <!-- 百度地图API Key -->

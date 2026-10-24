@@ -29,7 +29,7 @@ class CoursesPage extends StatefulWidget {
   const CoursesPage({super.key});
 
   @override
-  State<CoursesPage> createState() => _CoursesPageState();
+  CoursesPageState createState() => CoursesPageState();
 
   static void navigateToActive(BuildContext context, Active active, String courseId, String classId, String cpi) {
     if (!active.status) {
@@ -127,9 +127,12 @@ class CoursesPage extends StatefulWidget {
   }
 }
 
-final GlobalKey coursesPageKey = GlobalKey();
+/// 课程页的全局 Key，类型化后可安全访问 [CoursesPageState] 的公开方法。
+final GlobalKey<CoursesPageState> coursesPageKey = GlobalKey<CoursesPageState>();
 
-class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
+/// 公开 State 类型，便于外部（如底部导航切换）直接调用 [onVisibilityChanged]，
+/// 避免 `(key.currentState as dynamic)` 这种丢失类型检查的写法。
+class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   List<Course> _courses = [];
   bool _isLoading = true;
   StreamSubscription? _accountChangeSubscription;
@@ -467,7 +470,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
       _isLoading = false;
     });
   
-    _showMultiScanResult(context, successCount, allAccounts.length, failedAccounts);
+    _showMultiScanResult(this.context, successCount, allAccounts.length, failedAccounts);
   }
 
   /// 显示所有签到结果

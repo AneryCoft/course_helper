@@ -254,7 +254,7 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     qrState.startPolling((bool success) async {
-      if (success) {
+      if (success && mounted) {
         final loginSuccess = await handleLoginSuccess(context);
         if (loginSuccess && mounted) {
           Navigator.pop(context, true);
@@ -263,6 +263,10 @@ class _LoginPageState extends State<LoginPage> {
       qrState.dispose();
     });
 
+    if (!mounted) {
+      qrState.dispose();
+      return;
+    }
     await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -409,7 +413,8 @@ class _LoginPageState extends State<LoginPage> {
         },
       );
 
-      return completer.future;
+      // await 让 verify 抛出的异常能被下方 catch 捕获
+      return await completer.future;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -442,6 +447,7 @@ class _LoginPageState extends State<LoginPage> {
               await _showSecurityVerificationDialog();
             }
   
+            if (!mounted) return;
             final success = await handleLoginSuccess(context);
             if (success && mounted) {
               Navigator.pop(context, true);
@@ -497,6 +503,7 @@ class _LoginPageState extends State<LoginPage> {
           late String errorMessage;
           if (result != null) {
             if (result['code'] == 0) {
+              if (!mounted) return;
               final success = await handleLoginSuccess(context);
               if (success && mounted) {
                 Navigator.pop(context, true);

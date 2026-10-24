@@ -11,6 +11,7 @@ import './pages/accounts.dart';
 import './pages/courses/list.dart';
 import './pages/login.dart';
 import './pages/settings_page.dart';
+import './setting/ai_setting.dart';
 import './theme_mode_manager.dart';
 import './api/api_service.dart';
 import './session/cookie.dart';
@@ -55,6 +56,8 @@ void main() async {
   await StorageManager.initialize();
 
   await ThemeModeManager.init();
+
+  await AiSetting.init();
 
   await ApiService.initialize();
 
@@ -268,7 +271,7 @@ class _MainPageState extends State<MainPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      (coursesPageKey.currentState as dynamic)?.onVisibilityChanged(true);
+      coursesPageKey.currentState?.onVisibilityChanged(true);
       Update.checkUpdate();
       _showSponsorDialog();
     });
@@ -360,7 +363,7 @@ class _MainPageState extends State<MainPage> {
           setState(() {
             _selectedIndex = index;
           });
-          (coursesPageKey.currentState as dynamic)?.onVisibilityChanged(index == 0);
+          coursesPageKey.currentState?.onVisibilityChanged(index == 0);
         },
         destinations: const [
           NavigationDestination(

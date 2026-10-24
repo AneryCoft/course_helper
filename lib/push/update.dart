@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,15 +11,26 @@ import '../utils/storage.dart';
 class Update {
   static const _skipVersionKey = 'skip_version';
 
-  static const _latestReleaseUrl = 'https://api.github.com/repos/AneryCoft/course_helper/releases/latest';
-  static const _latestReleasePageUrl = 'https://github.com/AneryCoft/course_helper/releases/latest';
+  /// 更新发布渠道（GanPengZx 的 GitHub 仓库）
+  static const String repoOwner = 'GanPengZx';
+  static const String repoName = 'course_helper';
+
+  static const _latestReleaseUrl =
+      'https://api.github.com/repos/$repoOwner/$repoName/releases/latest';
+  static const _latestReleasePageUrl =
+      'https://github.com/$repoOwner/$repoName/releases/latest';
 
   static Future<void> checkUpdate({bool ignoreSkip = false}) async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
 
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+        // GitHub API 要求携带 User-Agent
+        headers: {'User-Agent': 'CourseHelper/$currentVersion'},
+      ));
       final response = await dio.get(_latestReleaseUrl);
       final data = response.data;
       final latestVersion = data['tag_name']?.toString().replaceAll('v', '') ?? '';
@@ -27,12 +40,68 @@ class Update {
         _showUpdateDialog(
           latestVersion: latestVersion,
           releaseNotes: data['body'] ?? '暂无更新说明',
-          downloadUrl: data['html_url'] ?? _latestReleasePageUrl
+          downloadUrl: _pickDownloadUrl(data),
         );
       }
     } catch (e) {
       // 忽略更新检查错误
     }
+  }
+
+  /// 优先选择与当前 CPU 架构匹配的 APK，其次通用 APK，最后回落到 Release 页面。
+  static String _pickDownloadUrl(dynamic data) {
+    final assets = data is Map ? data['assets'] : null;
+    if (assets is List) {
+      final apks = assets
+          .whereType<Map>()
+          .where((a) => (a['name']?.toString() ?? '').toLowerCase().endsWith('.apk'))
+          .toList();
+
+      if (apks.isNotEmpty) {
+        String nameOf(Map apk) => apk['name']?.toString().toLowerCase() ?? '';
+        String urlOf(Map apk) =>
+            apk['browser_download_url']?.toString() ?? _latestReleasePageUrl;
+
+        // 1. 匹配设备 CPU 架构的拆分包
+        final abi = _currentAbi();
+        if (abi != null) {
+          for (final apk in apks) {
+            if (nameOf(apk).contains(abi)) return urlOf(apk);
+          }
+        }
+        // 2. 通用包（文件名不含任何架构标记）
+        for (final apk in apks) {
+          final name = nameOf(apk);
+          if (!name.contains('arm') && !name.contains('x86') && !name.contains('universal')) {
+            return urlOf(apk);
+          }
+        }
+        // 3. 兜底取第一个
+        return urlOf(apks.first);
+      }
+    }
+    return data is Map
+        ? (data['html_url']?.toString() ?? _latestReleasePageUrl)
+        : _latestReleasePageUrl;
+  }
+
+  /// 当前设备的 ABI 关键字，用于匹配 `CourseHelper_x.y.z_arm64-v8a.apk` 这类文件名。
+  ///
+  /// 优先通过原生库路径判断（Flutter 引擎的 libflutter.so 位于 ABI 子目录下），
+  /// 判断不出来时返回 null，回落到通用包/第一个 APK。
+  static String? _currentAbi() {
+    if (!Platform.isAndroid) return null;
+    try {
+      final libraries = Platform.executableArguments;
+      for (final arg in libraries) {
+        for (final abi in const ['arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86']) {
+          if (arg.contains(abi)) return abi;
+        }
+      }
+    } catch (_) {
+      // 忽略
+    }
+    return null;
   }
 
   static List<int> _parseVersion(String v) {

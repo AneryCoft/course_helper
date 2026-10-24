@@ -57,5 +57,13 @@
 	<string>需要访问相册以上传图片和课件</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>需要访问相册以保存 PPT 图片</string>
+	<!-- AI 服务地址由用户自行填写，可能为 http 明文地址，故允许 Web 内容加载非安全请求 -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

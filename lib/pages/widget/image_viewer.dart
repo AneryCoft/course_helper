@@ -91,16 +91,12 @@ class _ImageViewerPage extends StatelessWidget {
 
       final fileName =
           'course_helper_${DateTime.now().millisecondsSinceEpoch}.png';
-      final asset = await PhotoManager.editor.saveImage(
-        bytes,
-        filename: fileName,
-      );
+      // saveImage 返回非空 AssetEntity，失败会抛异常（由下方 catch 处理）
+      await PhotoManager.editor.saveImage(bytes, filename: fileName);
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(asset != null ? '已保存到相册' : '保存失败'),
-          ),
+          const SnackBar(content: Text('已保存到相册')),
         );
       }
     } catch (e) {

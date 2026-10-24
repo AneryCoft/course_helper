@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AI 服务地址由用户自行填写，可能使用 http 明文地址。
+  Android 9+ 默认禁止明文流量，这里整体放行 HTTP，但保留系统 CA 校验；
+  若只使用 https 服务，可删除 base-config 中的 cleartextTrafficPermitted。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
