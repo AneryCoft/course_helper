@@ -5,6 +5,7 @@ import 'dart:async';
 import '../api/login.dart';
 import '../models/user.dart';
 import '../session/account.dart';
+import '../ui/design_tokens.dart';
 import '../utils/encrypt.dart';
 import '../platform.dart';
 import '../utils/logger.dart';
@@ -695,185 +696,208 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isPassword = _currentLoginType == '1';
+    final isCaptcha = _currentLoginType == '2';
+
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: cs.surface,
       appBar: AppBar(
-        title: Text(_currentLoginType == '1'
-            ? '密码登录'
-            : _currentLoginType == '2'
-            ? '验证码登录'
-            : '二维码登录'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
+        title: Text(
+          isPassword ? '密码登录' : isCaptcha ? '验证码登录' : '二维码登录',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+        ),
       ),
       body: SingleChildScrollView(
-        child: Container(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: TextFormField(
-                    controller: _usernameController,
-                    keyboardType: TextInputType.number,
-                    autofocus: true,
-                    autofillHints: [AutofillHints.username, AutofillHints.telephoneNumber],
-                    decoration: InputDecoration(
-                      labelText: '账号',
-                      hintText: PlatformManager().isChaoxing ? '手机号/超星号' : '手机号/邮箱',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                          width: 2,
-                        ),
-                      ),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xl,
+          AppSpacing.lg,
+          AppSpacing.xl,
+          AppSpacing.xxl,
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ---------- 头部标识 ----------
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      gradient: AppGradients.primary(cs),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return '请输入账号';
-                      }
-                      return null;
-                    },
+                    child: Icon(
+                      PlatformManager().isChaoxing
+                          ? Icons.school_rounded
+                          : Icons.cloud_rounded,
+                      color: cs.onPrimary,
+                      size: 26,
+                    ),
                   ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          PlatformManager().isChaoxing ? '学习通' : '雨课堂',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        Text(
+                          '登录以同步你的课程与活动',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xl),
+
+              // ---------- 账号 ----------
+              TextFormField(
+                controller: _usernameController,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                autofillHints: [
+                  AutofillHints.username,
+                  AutofillHints.telephoneNumber,
+                ],
+                decoration: InputDecoration(
+                  labelText: '账号',
+                  hintText: PlatformManager().isChaoxing ? '手机号 / 超星号' : '手机号 / 邮箱',
+                  prefixIcon: const Icon(Icons.person_outline_rounded),
                 ),
-                Container(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _currentLoginType == '1'
-                      ? TextFormField(
-                    controller: _passwordController,
-                    obscureText: !_showPassword,
-                    autofillHints: [AutofillHints.password],
-                    decoration: InputDecoration(
-                      labelText: '密码',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return '请输入账号';
+                  return null;
+                },
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // ---------- 凭据 ----------
+              if (isPassword)
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: !_showPassword,
+                  autofillHints: const [AutofillHints.password],
+                  decoration: InputDecoration(
+                    labelText: '密码',
+                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _showPassword
+                            ? Icons.visibility_rounded
+                            : Icons.visibility_off_rounded,
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                          width: 2,
+                      onPressed: () => setState(() => _showPassword = !_showPassword),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return '请输入密码';
+                    return null;
+                  },
+                )
+              else if (isCaptcha)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: TextFormField(
+                        controller: _captchaController,
+                        focusNode: _captchaFocusNode,
+                        keyboardType: TextInputType.number,
+                        autofillHints: const [AutofillHints.oneTimeCode],
+                        decoration: const InputDecoration(
+                          labelText: '验证码',
+                          prefixIcon: Icon(Icons.sms_outlined),
                         ),
-                      ),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _showPassword ? Icons.visibility : Icons.visibility_off,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _showPassword = !_showPassword;
-                          });
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return '请输入验证码';
+                          return null;
                         },
                       ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return '请输入密码';
-                      }
-                      return null;
-                    },
-                  )
-                      : Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: TextFormField(
-                          controller: _captchaController,
-                          focusNode: _captchaFocusNode,
-                          keyboardType: TextInputType.number,
-                          autofillHints: [AutofillHints.oneTimeCode],
-                          decoration: InputDecoration(
-                            labelText: '验证码',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(
-                                color: Theme.of(context).colorScheme.primary,
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return '请输入验证码';
-                            }
-                            return null;
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: ElevatedButton(
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      flex: 2,
+                      child: SizedBox(
+                        height: 56,
+                        child: OutlinedButton(
                           onPressed: () {
                             if (_countdownSeconds == 0 && !_isLoading) {
                               _sendCaptcha();
                               FocusScope.of(context).requestFocus(_captchaFocusNode);
                             }
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _countdownSeconds > 0 ?
-                            Colors.grey : Theme.of(context).colorScheme.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(56),
+                            padding: EdgeInsets.zero,
+                            textStyle: const TextStyle(fontSize: 13),
                           ),
                           child: Text(
-                            _countdownSeconds > 0 ?
-                            '${_countdownSeconds}s' : '获取验证码',
-                            style: const TextStyle(color: Colors.white),
+                            _countdownSeconds > 0
+                                ? '${_countdownSeconds}s'
+                                : '获取验证码',
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: ElevatedButton(
-                    onPressed: _isLoading
-                        ? null
-                        : _currentLoginType == '3'
+
+              const SizedBox(height: AppSpacing.xl),
+
+              // ---------- 提交 ----------
+              FilledButton(
+                onPressed: _isLoading
+                    ? null
+                    : _currentLoginType == '3'
                         ? _showQRCodeLogin
                         : _login,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        isPassword
+                            ? '登录'
+                            : isCaptcha
+                                ? '验证码登录'
+                                : '二维码登录',
                       ),
-                      //padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
+              ),
+
+              const SizedBox(height: AppSpacing.lg),
+
+              // ---------- 提示 ----------
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.shield_outlined, size: 13, color: cs.outline),
+                  const SizedBox(width: 5),
+                  Flexible(
                     child: Text(
-                      _currentLoginType == '1'
-                          ? '登录'
-                          : _currentLoginType == '2'
-                          ? '验证码登录'
-                          : '二维码登录',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      '账号信息仅保存在本机，不会上传到第三方服务器',
+                      style: TextStyle(fontSize: 11, color: cs.outline),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
         ),
       ),

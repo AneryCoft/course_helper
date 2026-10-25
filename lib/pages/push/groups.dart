@@ -103,8 +103,6 @@ class _GroupsPageState extends State<GroupsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('群聊'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       body: RefreshIndicator(
         onRefresh: _loadGroups,
@@ -369,8 +367,6 @@ class _GroupMessagesPageState extends State<GroupMessagesPage> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       body: RefreshIndicator(
         onRefresh: _loadMessages,

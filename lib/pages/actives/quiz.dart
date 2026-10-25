@@ -13,6 +13,8 @@ import '../../../api/image.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
 import '../../../setting/ai_setting.dart';
+import '../../../ui/design_tokens.dart';
+import '../../../ui/widgets.dart';
 import '../../../utils/logger.dart';
 import '../../../utils/problem_type.dart';
 import '../ai_setting_page.dart';
@@ -793,119 +795,315 @@ class _QuizPageState extends State<QuizPage> {
       ),
     );
   }
+  // ==================== 渲染层 ====================
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      backgroundColor: cs.surface,
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.active.name,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (_quizList.isNotEmpty)
+              Text(
+                '共 ${_quizList.length} 题 · ${problemTypeSummary()}',
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              ),
+          ],
+        ),
+        actions: [
+          if (_aiAnswers.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.sm),
+              child: MetaChip(
+                label: 'AI 已解 ${_aiAnswers.length}',
+                icon: Icons.auto_awesome,
+                color: cs.primary,
+              ),
+            ),
+        ],
+      ),
+      body: _isLoading
+          ? const ListSkeleton(count: 3, itemHeight: 180)
+          : _errorMessage != null
+              ? EmptyState(
+                  icon: Icons.error_outline_rounded,
+                  title: '加载失败',
+                  description: _errorMessage,
+                  actionLabel: '重新加载',
+                  onAction: _loadQuizData,
+                )
+              : _quizList.isEmpty
+                  ? const EmptyState(
+                      icon: Icons.quiz_outlined,
+                      title: '暂无题目',
+                      description: '老师尚未发布题目',
+                    )
+                  : Column(
+                      children: [
+                        if (_activeData != null)
+                          CountdownDisplay(
+                            timeNotifier: _remainingTimeNotifier,
+                            isManualEnd: _isManualEnd,
+                          ),
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.only(
+                              top: AppSpacing.sm,
+                              bottom: AppSpacing.sm,
+                            ),
+                            itemCount: _quizList.length,
+                            itemBuilder: (context, index) =>
+                                _buildQuizItem(_quizList[index], index),
+                          ),
+                        ),
+                        _buildBottomBar(context),
+                      ],
+                    ),
+    );
+  }
+
+  /// 题型概览，如「3 选择题 · 2 填空题」
+  String problemTypeSummary() {
+    final counts = <String, int>{};
+    for (final quiz in _quizList) {
+      final name = problemTypeName(quiz['type'] as int? ?? -1);
+      counts[name] = (counts[name] ?? 0) + 1;
+    }
+    return counts.entries.map((e) => '${e.value} ${e.key}').join(' · ');
+  }
+
+  Widget _buildBottomBar(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.xl),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.md,
+            AppSpacing.lg,
+            AppSpacing.md,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                child: AccountsSelector(
+                  onSelectionChanged: (selected) {
+                    setState(() => _selectedAccounts = selected);
+                  },
+                  initiallyExpanded: false,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ValueListenableBuilder<bool>(
+                valueListenable: AiSetting.enabledNotifier,
+                builder: (context, aiEnabled, _) {
+                  if (!aiEnabled) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: FilledButton.tonalIcon(
+                      onPressed: _isGeneratingAi || _isSubmitting
+                          ? null
+                          : _generateAiAnswers,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                      ),
+                      icon: _isGeneratingAi
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.auto_awesome, size: 20),
+                      label: Text(
+                        _isGeneratingAi ? 'AI 正在解题…' : 'AI 一键生成答案与解析',
+                        style: const TextStyle(fontSize: 15),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              FilledButton(
+                onPressed: _isSubmitting ? null : _submitAnswersForAllAccounts,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                ),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        _selectedAccounts.isEmpty
+                            ? '提交'
+                            : '提交（${_selectedAccounts.length} 个账号）',
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildQuizItem(dynamic quiz, int index) {
-    final quizType = quiz['type'];
+    final quizType = quiz['type'] as int? ?? -1;
     final isMust = quiz['ismust'] == 1;
-    final hasAiAnswer = _aiAnswers.containsKey(index);
-    
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 题目标题
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${index + 1}. ',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                if (isMust)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.error,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      '必答',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '[${problemTypeName(quizType)}] ',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      SelectionArea(
-                        child: Html(
-                          data: quiz['content'] ?? '',
-                          extensions: [
-                            ImageExtension(
-                              builder: (context) {
-                                final imageUrl = CXImageApi.toNewImageUrl(context.attributes['src'] ?? '');
-                                return Image.network(
-                                  imageUrl,
-                                  headers: HeadersManager.chaoxingHeaders,
-                                  width: 80,
-                                  alignment: Alignment.bottomCenter
-                                );
-                              }
-                            )
-                          ]
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (hasAiAnswer)
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    icon: Icon(
-                      Icons.auto_awesome,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    tooltip: '查看 AI 解析',
-                    onPressed: () => _showExplanation(index),
-                  ),
-              ],
-            ),
-            
-            // 题目选项或输入框
-            _buildQuizContent(quiz, index),
+    final aiAnswer = _aiAnswers[index];
+    final hasAi = aiAnswer != null;
+    final cs = Theme.of(context).colorScheme;
 
-            // AI 解析
-            if (hasAiAnswer)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: InkWell(
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.page,
+        vertical: AppSpacing.sm - 2,
+      ),
+      child: Material(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ---- 题头 ----
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _QuestionBadge(index: index + 1, highlighted: hasAi),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        MetaChip(
+                          label: problemTypeName(quizType),
+                          color: cs.primary,
+                        ),
+                        if (isMust) MetaChip(label: '必答', color: cs.error),
+                        if (hasAi)
+                          MetaChip(
+                            label: 'AI 已解',
+                            icon: Icons.auto_awesome,
+                            color: cs.tertiary,
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (hasAi)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: Icon(Icons.lightbulb_outline_rounded,
+                          color: cs.tertiary, size: 22),
+                      tooltip: '查看解析',
+                      onPressed: () => _showExplanation(index),
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // ---- 题干 ----
+              SelectionArea(
+                child: Html(
+                  data: quiz['content'] ?? '',
+                  style: {
+                    'body': Style(
+                      margin: Margins.zero,
+                      padding: HtmlPaddings.zero,
+                      fontSize: FontSize(15.5),
+                      lineHeight: const LineHeight(1.55),
+                      color: cs.onSurface,
+                    ),
+                  },
+                  extensions: [
+                    ImageExtension(
+                      builder: (context) {
+                        final imageUrl = CXImageApi.toNewImageUrl(
+                          context.attributes['src'] ?? '',
+                        );
+                        return Image.network(
+                          imageUrl,
+                          headers: HeadersManager.chaoxingHeaders,
+                          width: 80,
+                          alignment: Alignment.bottomCenter,
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // ---- 作答区 ----
+              _buildQuizContent(quiz, index),
+
+              // ---- AI 解析 ----
+              if (hasAi && aiAnswer.explanation.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                InkWell(
                   onTap: () => _showExplanation(index),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.secondaryContainer,
-                      borderRadius: BorderRadius.circular(8),
+                      color: cs.tertiaryContainer.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
-                          Icons.lightbulb_outline,
-                          size: 16,
-                          color: Theme.of(context).colorScheme.onSecondaryContainer,
+                          Icons.auto_awesome,
+                          size: 15,
+                          color: cs.onTertiaryContainer,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            _aiAnswers[index]!.explanation.isEmpty
-                                ? 'AI 已生成答案（点击查看）'
-                                : _aiAnswers[index]!.explanation,
+                            aiAnswer.explanation,
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 12.5,
                               height: 1.5,
-                              color: Theme.of(context).colorScheme.onSecondaryContainer,
+                              color: cs.onTertiaryContainer,
                             ),
                           ),
                         ),
@@ -913,8 +1111,9 @@ class _QuizPageState extends State<QuizPage> {
                     ),
                   ),
                 ),
-              ),
-          ],
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -922,157 +1121,254 @@ class _QuizPageState extends State<QuizPage> {
 
   Widget _buildQuizContent(dynamic quiz, int index) {
     final quizType = quiz['type'];
-    
+
     switch (quizType) {
       case 0: // 单选题
       case 3: // 判断题
       case 16: // 判断题
         return _buildSingleChoiceOptions(quiz, index);
-      
       case 1: // 多选题
         return _buildMultipleChoiceOptions(quiz, index);
-      
       case 2: // 填空题
         return _buildBlankAnswerInputs(quiz, index);
-      
       case 4: // 简答题
         return _buildShortAnswerInput(quiz, index);
-      
       default:
-        return const Text('暂不支持此题型');
+        return Text(
+          '暂不支持此题型',
+          style: TextStyle(
+            fontSize: 13,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+        );
     }
+  }
+
+  /// 选项行（单选/多选共用外观）
+  Widget _optionTile({
+    required String label,
+    required Widget content,
+    required bool selected,
+    required bool isAnswer,
+    required VoidCallback onTap,
+    Widget? control,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+
+    final Color bg;
+    final Color border;
+    if (selected) {
+      bg = cs.primaryContainer.withValues(alpha: 0.7);
+      border = cs.primary;
+    } else {
+      bg = cs.surfaceContainerHighest.withValues(alpha: 0.4);
+      border = Colors.transparent;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: AnimatedContainer(
+            duration: AppDuration.fast,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.md - 2,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(color: border, width: selected ? 1.6 : 1),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected ? cs.primary : cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(AppRadius.xs - 2),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? cs.onPrimary : cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(child: content),
+                if (control != null) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  control,
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildSingleChoiceOptions(dynamic quiz, int quizIndex) {
     final answers = quiz['answer'] as List?;
     if (answers == null || answers.isEmpty) {
-      return const Text('无选项');
+      return Text(
+        '无选项',
+        style: TextStyle(color: Theme.of(context).colorScheme.outline),
+      );
     }
 
-    return RadioGroup<String>(
-      groupValue: quiz['personAnswer']['myoption'],
-      onChanged: (String? value) {
-        setState(() {
-          quiz['personAnswer']['myoption'] = value ?? '';
-        });
-      },
-      child: Column(
-        children: answers.map((option) {
-          final optionLabel = _getOptionLabel(option, quiz['type']);
-          final isAnswer = option['isanswer'] == true;
-          final isSelected = quiz['personAnswer']['myoption'] == option['name'];
-          final scheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final current = quiz['personAnswer']['myoption'] as String?;
 
-          return RadioListTile<String>(
-            title: Html(
-              data: option['content'] ?? '',
-              extensions: [
-                ImageExtension(
-                  builder: (context) {
-                    final imageUrl = CXImageApi.toNewImageUrl(context.attributes['src'] ?? '');
-                    return Image.network(
-                      imageUrl,
-                      headers: HeadersManager.chaoxingHeaders,
-                      width: 60,
-                      alignment: Alignment.bottomCenter
-                    );
-                  }
-                )
-              ]
-            ),
-            secondary: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected ?
-                scheme.primary : scheme.inversePrimary,
-                borderRadius: BorderRadius.circular(12),
+    return Column(
+      children: answers.map((option) {
+        final optionLabel = _getOptionLabel(option, quiz['type']);
+        final isAnswer = option['isanswer'] == true;
+        final isSelected = current == option['name'];
+
+        return _optionTile(
+          label: optionLabel,
+          selected: isSelected,
+          isAnswer: isAnswer,
+          onTap: () {
+            setState(() {
+              // 再次点击已选项可取消
+              quiz['personAnswer']['myoption'] =
+                  isSelected ? '' : (option['name'] ?? '');
+            });
+          },
+          content: Html(
+            data: option['content'] ?? '',
+            style: {
+              'body': Style(
+                margin: Margins.zero,
+                padding: HtmlPaddings.zero,
+                fontSize: FontSize(15),
+                color: cs.onSurface,
               ),
-              child: Text(
-                optionLabel,
-                style: TextStyle(
-                  color: isSelected ?
-                  scheme.onPrimary : isAnswer ?
-                  scheme.primary : scheme.secondaryFixed,
-                  fontWeight: isAnswer ? FontWeight.w900 : FontWeight.bold,
-                  fontSize: 14,
-                ),
+            },
+            extensions: [
+              ImageExtension(
+                builder: (context) {
+                  final imageUrl =
+                      CXImageApi.toNewImageUrl(context.attributes['src'] ?? '');
+                  return Image.network(
+                    imageUrl,
+                    headers: HeadersManager.chaoxingHeaders,
+                    width: 60,
+                    alignment: Alignment.bottomCenter,
+                  );
+                },
+              ),
+            ],
+          ),
+          control: AnimatedContainer(
+            duration: AppDuration.fast,
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isSelected ? cs.primary : Colors.transparent,
+              border: Border.all(
+                color: isSelected ? cs.primary : cs.outline,
+                width: 2,
               ),
             ),
-            value: option['name'],
-            activeColor: Theme.of(context).colorScheme.primary,
-            controlAffinity: ListTileControlAffinity.trailing,
-            toggleable: true,
-          );
-        }).toList(),
-      ),
+            child: isSelected
+                ? Icon(Icons.circle, size: 8, color: cs.onPrimary)
+                : null,
+          ),
+        );
+      }).toList(),
     );
   }
 
   Widget _buildMultipleChoiceOptions(dynamic quiz, int quizIndex) {
     final answers = quiz['answer'] as List?;
     if (answers == null || answers.isEmpty) {
-      return const Text('无选项');
+      return Text(
+        '无选项',
+        style: TextStyle(color: Theme.of(context).colorScheme.outline),
+      );
     }
-    
+
+    final cs = Theme.of(context).colorScheme;
+    final selectedOptions =
+        (quiz['personAnswer']['myoption'] as String?)?.split('') ?? [];
+
     return Column(
       children: answers.map((option) {
         final optionLabel = _getOptionLabel(option, quiz['type']);
         final isAnswer = option['isanswer'] == true;
-        final selectedOptions = (quiz['personAnswer']['myoption'] as String?)?.split('') ?? [];
         final isSelected = selectedOptions.contains(option['name']);
-        final scheme = Theme.of(context).colorScheme;
-        
-        return CheckboxListTile(
-          title: Html(
+
+        return _optionTile(
+          label: optionLabel,
+          selected: isSelected,
+          isAnswer: isAnswer,
+          onTap: () {
+            setState(() {
+              if (isSelected) {
+                selectedOptions.remove(option['name']);
+              } else {
+                if (!selectedOptions.contains(option['name'])) {
+                  selectedOptions.add(option['name']);
+                }
+              }
+              selectedOptions.sort();
+              quiz['personAnswer']['myoption'] = selectedOptions.join();
+            });
+          },
+          content: Html(
             data: option['content'] ?? '',
+            style: {
+              'body': Style(
+                margin: Margins.zero,
+                padding: HtmlPaddings.zero,
+                fontSize: FontSize(15),
+                color: cs.onSurface,
+              ),
+            },
             extensions: [
               ImageExtension(
                 builder: (context) {
-                  final imageUrl = CXImageApi.toNewImageUrl(context.attributes['src'] ?? '');
+                  final imageUrl =
+                      CXImageApi.toNewImageUrl(context.attributes['src'] ?? '');
                   return Image.network(
                     imageUrl,
                     headers: HeadersManager.chaoxingHeaders,
                     width: 60,
-                    alignment: Alignment.bottomCenter
+                    alignment: Alignment.bottomCenter,
                   );
-                }
-              )
-            ]
+                },
+              ),
+            ],
           ),
-          secondary: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          control: AnimatedContainer(
+            duration: AppDuration.fast,
+            width: 20,
+            height: 20,
             decoration: BoxDecoration(
-              color: isSelected ?
-              scheme.primary : scheme.inversePrimary,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              optionLabel,
-              style: TextStyle(
-                color: isSelected ?
-                scheme.onPrimary : isAnswer ?
-                scheme.primary : scheme.secondaryFixed,
-                fontWeight: isAnswer ? FontWeight.w900 : FontWeight.bold,
-                fontSize: 14,
+              borderRadius: BorderRadius.circular(5),
+              color: isSelected ? cs.primary : Colors.transparent,
+              border: Border.all(
+                color: isSelected ? cs.primary : cs.outline,
+                width: 2,
               ),
             ),
+            child: isSelected
+                ? Icon(Icons.check, size: 14, color: cs.onPrimary)
+                : null,
           ),
-          value: isSelected,
-          onChanged: (value) {
-            setState(() {
-              if (value == true) {
-                if (!selectedOptions.contains(option['name'])) {
-                  selectedOptions.add(option['name']);
-                }
-              } else {
-                selectedOptions.remove(option['name']);
-              }
-              // 按字母顺序排序后拼接
-              selectedOptions.sort();
-              quiz['personAnswer']['myoption'] = selectedOptions.join('');
-            });
-          },
-          activeColor: Theme.of(context).colorScheme.primary,
         );
       }).toList(),
     );
@@ -1094,13 +1390,10 @@ class _QuizPageState extends State<QuizPage> {
     final urls = <String>[];
     try {
       final regex = RegExp("<img[^>]+src=[\"']([^\"']+)[\"']");
-      final matches = regex.allMatches(html);
-      for (final match in matches) {
-        if (match.groupCount >= 1) {
-          final url = match.group(1);
-          if (url != null && url.isNotEmpty) {
-            urls.add(CXImageApi.toNewImageUrl(url));
-          }
+      for (final match in regex.allMatches(html)) {
+        final url = match.group(1);
+        if (url != null && url.isNotEmpty) {
+          urls.add(CXImageApi.toNewImageUrl(url));
         }
       }
     } catch (e) {
@@ -1116,7 +1409,7 @@ class _QuizPageState extends State<QuizPage> {
       builder: (context) => GestureDetector(
         onTap: () => Navigator.of(context).pop(),
         child: Container(
-          color: Colors.black12,
+          color: Colors.black26,
           child: InteractiveViewer(
             minScale: 0.5,
             maxScale: 4.0,
@@ -1124,9 +1417,9 @@ class _QuizPageState extends State<QuizPage> {
               child: Hero(
                 tag: heroTag,
                 child: Image.network(
-                    url,
-                    headers: HeadersManager.chaoxingHeaders,
-                    fit: BoxFit.contain
+                  url,
+                  headers: HeadersManager.chaoxingHeaders,
+                  fit: BoxFit.contain,
                 ),
               ),
             ),
@@ -1139,55 +1432,50 @@ class _QuizPageState extends State<QuizPage> {
   /// 为简答题选择并上传图片
   Future<void> _pickImages(dynamic quiz, int quizIndex) async {
     try {
-      final ImagePicker picker = ImagePicker();
+      final picker = ImagePicker();
+      final images = await picker.pickMultiImage(imageQuality: 80);
 
-      final List<XFile> images = await picker.pickMultiImage(imageQuality: 80);
+      if (images.isEmpty) return;
 
-      if (images.isNotEmpty) {
-        final uploadFutures = images.map((image) async {
-          try {
-            final file = File(image.path);
-            final api = CXImageApi();
-            // FIXME 所有的图片都是当前账号上传的（学习通目前没有对于图片的权鉴）
-            final objectId = await api.uploadImage(file);
-            if (objectId != null) {
-              return {'image': image, 'objectId': objectId};
-            }
-            return null;
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('图片上传失败：${image.path}')),
-              );
-            }
-            return null;
+      final uploadFutures = images.map((image) async {
+        try {
+          final file = File(image.path);
+          final api = CXImageApi();
+          // FIXME 所有的图片都是当前账号上传的（学习通目前没有对于图片的权鉴）
+          final objectId = await api.uploadImage(file);
+          if (objectId != null) {
+            return {'image': image, 'objectId': objectId};
           }
-        }).toList();
-
-        // 等待所有上传完成
-        final results = await Future.wait(uploadFutures);
-
-        // 更新状态
-        if (mounted) {
-          setState(() {
-            for (final result in results) {
-              if (result != null && result['objectId'] != null) {
-                final xfile = result['image'] as XFile;
-                final objectId = result['objectId'] as String;
-
-                quiz['personAnswer']['recs'].add({
-                  'name': xfile.name, // 这里应该是上传的名字 但是没有校验
-                  'objectid': objectId,
-                  'suffix': xfile.path.split('.').last,
-                  'type': '1',
-                  "preview": "",
-                  "thumbnail": ""
-                });
-              }
-            }
-          });
+          return null;
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('图片上传失败：${image.path}')),
+            );
+          }
+          return null;
         }
-      }
+      }).toList();
+
+      final results = await Future.wait(uploadFutures);
+
+      if (!mounted) return;
+      setState(() {
+        for (final result in results) {
+          if (result != null && result['objectId'] != null) {
+            final xfile = result['image'] as XFile;
+            final objectId = result['objectId'] as String;
+            quiz['personAnswer']['recs'].add({
+              'name': xfile.name,
+              'objectid': objectId,
+              'suffix': xfile.path.split('.').last,
+              'type': '1',
+              'preview': '',
+              'thumbnail': '',
+            });
+          }
+        }
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1208,34 +1496,63 @@ class _QuizPageState extends State<QuizPage> {
     final blankAnswers = quiz['personAnswer']['blankAnswer'] as List?;
     final correctAnswers = quiz['answer'] as List?;
     if (blankAnswers == null || blankAnswers.isEmpty) {
-      return const Text('无填空');
+      return Text(
+        '无填空',
+        style: TextStyle(color: Theme.of(context).colorScheme.outline),
+      );
     }
-      
+
+    final cs = Theme.of(context).colorScheme;
+
     return Column(
       children: blankAnswers.asMap().entries.map((entry) {
         final index = entry.key;
         final blank = entry.value;
-        final correctAnswer = correctAnswers != null && index < correctAnswers.length 
+        final correctAnswer = correctAnswers != null && index < correctAnswers.length
             ? correctAnswers[index]['content'] ?? ''
             : '';
-        
-        // 提取纯文本并处理分号分隔
-        final hintText = correctAnswer.isNotEmpty ?
-        _extractTextFromHtml(correctAnswer).split(';').first.trim() : '请输入答案';
-        // 提取图片
-        final imageUrls = correctAnswer.isNotEmpty ? _extractImageUrls(correctAnswer) : <String>[];
-        
-        // 为每个输入框创建唯一的 key
+
+        final hintText = correctAnswer.isNotEmpty
+            ? _extractTextFromHtml(correctAnswer).split(';').first.trim()
+            : '请输入答案';
+        final imageUrls =
+            correctAnswer.isNotEmpty ? _extractImageUrls(correctAnswer) : <String>[];
+
         final controllerKey = 'blank_${quizIndex}_$index';
-        final controller = _controllers.putIfAbsent(controllerKey, 
-          () => TextEditingController(text: blank['content'] ?? ''));
-          
+        final controller = _controllers.putIfAbsent(
+          controllerKey,
+          () => TextEditingController(text: blank['content'] ?? ''),
+        );
+
         return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('第${index + 1}空：', style: const TextStyle(color: Colors.grey)),
+              Padding(
+                padding: const EdgeInsets.only(left: 2, bottom: 6),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 3,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: cs.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '第 ${index + 1} 空',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Stack(
                 children: [
                   TextField(
@@ -1243,15 +1560,13 @@ class _QuizPageState extends State<QuizPage> {
                     maxLines: imageUrls.isNotEmpty ? 2 : 1,
                     decoration: InputDecoration(
                       hintText: hintText,
-                      border: const OutlineInputBorder(),
-                      contentPadding: imageUrls.isNotEmpty ?
-                      const EdgeInsets.fromLTRB(12, 12, 12, 60) : const EdgeInsets.all(12),
+                      contentPadding: imageUrls.isNotEmpty
+                          ? const EdgeInsets.fromLTRB(14, 14, 14, 60)
+                          : const EdgeInsets.all(14),
                     ),
                     controller: controller,
                     onChanged: (value) {
-                      setState(() {
-                        blank['content'] = value;
-                      });
+                      setState(() => blank['content'] = value);
                     },
                   ),
                   if (imageUrls.isNotEmpty)
@@ -1271,7 +1586,10 @@ class _QuizPageState extends State<QuizPage> {
                               return Padding(
                                 padding: const EdgeInsets.only(right: 6),
                                 child: GestureDetector(
-                                  onTap: () => _showImageDialog(url, 'blank_image_${quizIndex}_${index}_$imgIndex'),
+                                  onTap: () => _showImageDialog(
+                                    url,
+                                    'blank_image_${quizIndex}_${index}_$imgIndex',
+                                  ),
                                   child: Hero(
                                     tag: 'blank_image_${quizIndex}_${index}_$imgIndex',
                                     child: Image.network(
@@ -1299,25 +1617,24 @@ class _QuizPageState extends State<QuizPage> {
   }
 
   Widget _buildShortAnswerInput(dynamic quiz, int quizIndex) {
-    // 获取简答题的正确答案
     final correctAnswers = quiz['answer'] as List?;
     final correctAnswer = correctAnswers != null && correctAnswers.isNotEmpty
         ? correctAnswers[0]['answer'] ?? ''
         : '';
-      
-    // 为简答题创建唯一的 key
+
     final controllerKey = 'short_$quizIndex';
-    // 获取或创建 controller
-    final controller = _controllers.putIfAbsent(controllerKey,
-      () => TextEditingController(text: quiz['personAnswer']['content'] ?? ''));
-    
-    // 分离HTML中的文本和图片
-    final hintText = correctAnswer.isNotEmpty ? _extractTextFromHtml(correctAnswer) : '请输入答案';
-    final imageUrls = correctAnswer.isNotEmpty ? _extractImageUrls(correctAnswer) : <String>[];
-    
-    // 获取已上传的图片列表
+    final controller = _controllers.putIfAbsent(
+      controllerKey,
+      () => TextEditingController(text: quiz['personAnswer']['content'] ?? ''),
+    );
+
+    final hintText =
+        correctAnswer.isNotEmpty ? _extractTextFromHtml(correctAnswer) : '请输入答案';
+    final imageUrls =
+        correctAnswer.isNotEmpty ? _extractImageUrls(correctAnswer) : <String>[];
     final uploadedImages = quiz['personAnswer']['recs'] as List? ?? [];
-      
+    final cs = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1326,21 +1643,19 @@ class _QuizPageState extends State<QuizPage> {
           children: [
             Expanded(
               child: SizedBox(
-                height: 150,
+                height: 160,
                 child: Stack(
                   children: [
                     TextField(
                       key: ValueKey(controllerKey),
-                      maxLines: 5,
+                      maxLines: 6,
                       decoration: InputDecoration(
                         hintText: hintText,
-                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.all(14),
                       ),
                       controller: controller,
                       onChanged: (value) {
-                        setState(() {
-                          quiz['personAnswer']['content'] = value;
-                        });
+                        setState(() => quiz['personAnswer']['content'] = value);
                       },
                     ),
                     if (imageUrls.isNotEmpty)
@@ -1360,7 +1675,10 @@ class _QuizPageState extends State<QuizPage> {
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 8),
                                   child: GestureDetector(
-                                    onTap: () => _showImageDialog(url, 'quiz_image_${quizIndex}_$index'),
+                                    onTap: () => _showImageDialog(
+                                      url,
+                                      'quiz_image_${quizIndex}_$index',
+                                    ),
                                     child: Hero(
                                       tag: 'quiz_image_${quizIndex}_$index',
                                       child: Image.network(
@@ -1368,7 +1686,7 @@ class _QuizPageState extends State<QuizPage> {
                                         headers: HeadersManager.chaoxingHeaders,
                                         width: 60,
                                         height: 60,
-                                        fit: BoxFit.cover
+                                        fit: BoxFit.cover,
                                       ),
                                     ),
                                   ),
@@ -1382,16 +1700,28 @@ class _QuizPageState extends State<QuizPage> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.add_photo_alternate_outlined, size: 32),
-              onPressed: () => _pickImages(quiz, quizIndex),
-              tooltip: '添加图片',
+            const SizedBox(width: AppSpacing.sm),
+            Material(
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: InkWell(
+                onTap: () => _pickImages(quiz, quizIndex),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Icon(
+                    Icons.add_photo_alternate_outlined,
+                    color: cs.onSurfaceVariant,
+                    size: 22,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
         if (uploadedImages.isNotEmpty) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.md),
           SizedBox(
             height: 80,
             child: ListView.builder(
@@ -1405,13 +1735,16 @@ class _QuizPageState extends State<QuizPage> {
                 }
                 final imageUrl = CXImageApi.getImageUrl(objectId);
                 return Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.only(right: AppSpacing.sm),
                   child: Stack(
                     children: [
                       GestureDetector(
-                        onTap: () => _showImageDialog(imageUrl, 'short_answer_image_${quizIndex}_$index'),
+                        onTap: () => _showImageDialog(
+                          imageUrl,
+                          'short_answer_image_${quizIndex}_$index',
+                        ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
                           child: Hero(
                             tag: 'short_answer_image_${quizIndex}_$index',
                             child: Image.network(
@@ -1432,13 +1765,13 @@ class _QuizPageState extends State<QuizPage> {
                           child: Container(
                             padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.8),
+                              color: cs.error,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.close,
                               size: 14,
-                              color: Colors.white,
+                              color: cs.onError,
                             ),
                           ),
                         ),
@@ -1461,147 +1794,39 @@ class _QuizPageState extends State<QuizPage> {
     }
     return option['name'] ?? '';
   }
+}
+
+/// 题号徽章
+class _QuestionBadge extends StatelessWidget {
+  final int index;
+  final bool highlighted;
+
+  const _QuestionBadge({required this.index, required this.highlighted});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.active.name),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      width: 30,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: highlighted
+              ? [cs.tertiary, Color.lerp(cs.tertiary, cs.primary, 0.5)!]
+              : [cs.primary, Color.lerp(cs.primary, cs.tertiary, 0.5)!],
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.xs + 2),
       ),
-      body: Column(
-        children: [
-          // 倒计时显示区域
-          if (_activeData != null)
-            CountdownDisplay(
-              timeNotifier: _remainingTimeNotifier,
-              isManualEnd: _isManualEnd,
-            ),
-          
-          // 主要内容
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage!,
-                        style: const TextStyle(fontSize: 16),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadQuizData,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('重新加载'),
-                      ),
-                    ],
-                  ),
-                )
-              : _quizList.isEmpty
-                  ? const Center(child: Text('暂无题目'))
-                  : Column(
-                      children: [
-                        // 题目列表
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: _quizList.length,
-                            itemBuilder: (context, index) {
-                              return _buildQuizItem(_quizList[index], index);
-                            },
-                          ),
-                        ),
-                        
-                        // 账号选择器
-                        AccountsSelector(
-                          onSelectionChanged: (selected) {
-                            setState(() {
-                              _selectedAccounts = selected;
-                            });
-                          },
-                          initiallyExpanded: false,
-                        ),
-                        
-                        const SizedBox(height: 16),
-                        
-                        // AI 一键生成答案与解析
-                        ValueListenableBuilder<bool>(
-                          valueListenable: AiSetting.enabledNotifier,
-                          builder: (context, aiEnabled, _) {
-                            if (!aiEnabled) return const SizedBox.shrink();
-                            return Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                              child: FilledButton.tonalIcon(
-                                onPressed: _isGeneratingAi || _isSubmitting
-                                    ? null
-                                    : _generateAiAnswers,
-                                style: FilledButton.styleFrom(
-                                  minimumSize: const Size(double.infinity, 48),
-                                ),
-                                icon: _isGeneratingAi
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      )
-                                    : const Icon(Icons.auto_awesome),
-                                label: Text(
-                                  _isGeneratingAi
-                                      ? 'AI 生成中...'
-                                      : 'AI 一键生成答案与解析',
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-
-                        // 提交按钮
-                        Container(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          child: ElevatedButton(
-                            onPressed: _isSubmitting ? null : _submitAnswersForAllAccounts,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.primary,
-                              foregroundColor: Colors.white,
-                              minimumSize: const Size(double.infinity, 48),
-                            ),
-                            child: _isSubmitting
-                                ? const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                        ),
-                                      ),
-                                      SizedBox(width: 12),
-                                      Text('提交中...'),
-                                    ],
-                                  )
-                                : const Text('提交', style: TextStyle(fontSize: 16)),
-                          ),
-                        ),
-                      ],
-                    ),
-          ),
-        ],
+      child: Text(
+        '$index',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: highlighted ? cs.onTertiary : cs.onPrimary,
+        ),
       ),
     );
   }

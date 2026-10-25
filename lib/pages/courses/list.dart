@@ -9,6 +9,8 @@ import '../../api/api_service.dart';
 import '../../session/account.dart';
 import '../../models/course.dart';
 import '../../models/active.dart';
+import '../../ui/design_tokens.dart';
+import '../../ui/widgets.dart';
 import '../../utils/logger.dart';
 import '../widget/scan.dart';
 import '../widget/avatar.dart';
@@ -24,7 +26,6 @@ import '../presentation.dart';
 import '../push/groups.dart';
 import '../../push/easemob.dart';
 
-
 class CoursesPage extends StatefulWidget {
   const CoursesPage({super.key});
 
@@ -39,99 +40,42 @@ class CoursesPage extends StatefulWidget {
       return;
     }
 
+    Widget page;
     switch (active.activeType) {
       case ActiveType.signIn:
       case ActiveType.signOut:
       case ActiveType.scheduledSignIn:
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SignInPage(
-              active: active,
-              courseId: courseId,
-              classId: classId,
-              cpi: cpi
-            ),
-          ),
-        );
+        page = SignInPage(active: active, courseId: courseId, classId: classId, cpi: cpi);
         break;
-      
       case ActiveType.topicDiscuss:
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TopicDiscussPage(active: active),
-          ),
-        );
+        page = TopicDiscussPage(active: active);
         break;
-      
       case ActiveType.quiz:
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => QuizPage(
-              active: active,
-              courseId: courseId,
-              classId: classId
-            ),
-          ),
-        );
+        page = QuizPage(active: active, courseId: courseId, classId: classId);
         break;
-      
       case ActiveType.evaluation:
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => EvaluatePage(
-              active: active,
-              courseId: courseId,
-              classId: classId
-            ),
-          ),
-        );
+        page = EvaluatePage(active: active, courseId: courseId, classId: classId);
         break;
-      
       case ActiveType.vote:
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VotePage(
-              active: active,
-              courseId: courseId,
-              classId: classId
-            ),
-          ),
-        );
+        page = VotePage(active: active, courseId: courseId, classId: classId);
         break;
-
       case ActiveType.questionnaire:
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => QuestionnairePage(
-              active: active,
-              courseId: courseId,
-              classId: classId
-            ),
-          ),
-        );
+        page = QuestionnairePage(active: active, courseId: courseId, classId: classId);
         break;
-      
       default:
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('该活动类型暂不支持'),
-          ),
+          const SnackBar(content: Text('该活动类型暂不支持')),
         );
+        return;
     }
+
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 }
 
 /// 课程页的全局 Key，类型化后可安全访问 [CoursesPageState] 的公开方法。
 final GlobalKey<CoursesPageState> coursesPageKey = GlobalKey<CoursesPageState>();
 
-/// 公开 State 类型，便于外部（如底部导航切换）直接调用 [onVisibilityChanged]，
-/// 避免 `(key.currentState as dynamic)` 这种丢失类型检查的写法。
 class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   List<Course> _courses = [];
   bool _isLoading = true;
@@ -154,7 +98,6 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 使用在线课堂数据更新课程列表
   void updateWithOnLessonCourses(List<Map<String, dynamic>>? onLessonCourses) {
     _loadCourses(onLessonCourses);
   }
@@ -166,22 +109,18 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     _isVisible = true;
     _loadCourses();
 
-    // 消息未读变化时重绘
-    _messageStoreSubscription =
-        ActivityMessageStore().changes.listen((_) {
-          if (mounted) setState(() {});
-        });
+    _messageStoreSubscription = ActivityMessageStore().changes.listen((_) {
+      if (mounted) setState(() {});
+    });
 
-    // 监听账户变更事件
-    _accountChangeSubscription =
-        AccountChangeNotifier().accountChanges.listen((_) {
-          ActivityMessageStore().clearAll();
-          if (mounted) {
-            _lastOnLessonCourses = [];
-            _loadCourses();
-          }
-          _startPeriodicRefresh();
-        });
+    _accountChangeSubscription = AccountChangeNotifier().accountChanges.listen((_) {
+      ActivityMessageStore().clearAll();
+      if (mounted) {
+        _lastOnLessonCourses = [];
+        _loadCourses();
+      }
+      _startPeriodicRefresh();
+    });
   }
 
   @override
@@ -194,12 +133,10 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
 
   void _startPeriodicRefresh() {
     if (!_isVisible || PlatformManager().isChaoxing) return;
-
     if (_refreshTimer != null && _refreshTimer!.isActive) return;
 
     _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       if (!mounted || !AccountManager.hasActiveSession()) return;
-
       try {
         final onLessonCourses = await RCCourseApi.getOnLesson();
         if (onLessonCourses != null && mounted) {
@@ -215,9 +152,7 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   }
 
   Future<void> _loadCourses([List<dynamic>? onLessonCourses]) async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     if (!AccountManager.hasActiveSession()) {
       setState(() {
@@ -228,24 +163,16 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     }
 
     try {
-      late List<Course>? coursesData;
+      List<Course>? coursesData;
       if (PlatformManager().isChaoxing) {
         coursesData = await CXCourseApi.getCoursesList();
       } else if (PlatformManager().isRainClassroom) {
         coursesData = await RCCourseApi.getCoursesList(onLessonCourses);
       }
-
-      if (coursesData != null && coursesData.isNotEmpty) {
-        setState(() {
-          _courses = coursesData!;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _courses = [];
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _courses = coursesData ?? [];
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
         _courses = [];
@@ -258,203 +185,170 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     if (!AccountManager.hasActiveSession()) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('二维码内容'),
-              content: SelectableText(result),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('关闭'),
-                ),
-              ],
-            );
-          },
-        );
+        _showRawResult('二维码内容', result);
       });
       return;
     }
-  
-    if (result.startsWith('http')) {
-      try {
-        final uri = Uri.parse(result);
-        final baseUrl = uri.origin + uri.path;
-        final params = uri.queryParameters;
-  
-        // 判断是否为签到 URL
-        if (baseUrl == 'https://mobilelearn.chaoxing.com/widget/sign/e') {
-          if (!PlatformManager().isChaoxing) {
-            await PlatformManager().setPlatform(PlatformType.chaoxing);
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('自动切换平台为学习通')),
-            );
-          }
-          if (!AccountManager.hasActiveSession()) {
-            if (!mounted) return;
-            showDialog(
-              context: context,
-              builder: (BuildContext context) {
-                return AlertDialog(
-                  title: const Text('提示'),
-                  content: const Text('没有可用账号'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('确定'),
-                    ),
-                  ],
-                );
-              },
-            );
-            return;
-          }
-  
-          final activeId = params['id'];
-          if (activeId != null) {
-            final response = await ApiService.sendRequest(result, responseType: ResponseType.plain, allowRedirects: false);
-            if (response == null) {
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请求失败')),
-              );
-              return;
-            }
-            final locationUrl = response.headers['location']?.first;
 
-            final uri = Uri.parse(locationUrl!);
-            final params = uri.queryParameters;
-
-            final classId = params['classId'] ?? '';
-            final decodedRcode = Uri.decodeComponent(params['rcode']!);
-            RegExp encRegex = RegExp(r'enc=([^&\s]+)');
-            Match? match = encRegex.firstMatch(decodedRcode);
-
-            if (match != null) {
-              final enc = match.group(1);
-
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SignInPage(
-                    active: Active(
-                        type: 2,
-                        id: activeId,
-                        name: '二维码签到',
-                        description: '',
-                        startTime: 0,
-                        url: '',
-                        attendNum: 0,
-                        status: true,
-                        signType: SignType.qrCode
-                    ),
-                    courseId: '',
-                    classId: classId,
-                    cpi: '',
-                    enc: enc
-                  ),
-                ),
-              );
-            } else {
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('未找到 enc 参数')),
-              );
-            }
-          }
-        } else if (baseUrl.contains('.yuketang.cn/api/v3/lesson/check-in/dynamic-qr-code')){
-          if (!PlatformManager().isRainClassroom) {
-            await PlatformManager().setPlatform(PlatformType.rainClassroom);
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('自动切换平台为雨课堂')),
-            );
-          }
-          if (!AccountManager.hasActiveSession()) {
-            if (!mounted) return;
-            showDialog(
-              context: context,
-              builder: (BuildContext context) {
-                return AlertDialog(
-                  content: const Text('没有可用账号'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('确定'),
-                    ),
-                  ],
-                );
-              },
-            );
-            return;
-          }
-  
-          await _multiScan(context, result);
-        } else {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            showDialog(
-              context: context,
-              builder: (BuildContext context) {
-                return AlertDialog(
-                  title: const Text('扫描到链接'),
-                  content: SelectableText(result),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('关闭'),
-                    ),
-                  ],
-                );
-              },
-            );
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('URL 解析失败：$e')),
-        );
-      }
-    } else {
+    if (!result.startsWith('http')) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('扫描结果：$result')),
       );
+      return;
+    }
+
+    try {
+      final uri = Uri.parse(result);
+      final baseUrl = uri.origin + uri.path;
+      final params = uri.queryParameters;
+
+      if (baseUrl == 'https://mobilelearn.chaoxing.com/widget/sign/e') {
+        if (!PlatformManager().isChaoxing) {
+          await PlatformManager().setPlatform(PlatformType.chaoxing);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('自动切换平台为学习通')),
+          );
+        }
+        if (!AccountManager.hasActiveSession()) {
+          if (!mounted) return;
+          _showRawResult('提示', '没有可用账号');
+          return;
+        }
+
+        final activeId = params['id'];
+        if (activeId == null) return;
+
+        final response = await ApiService.sendRequest(
+          result,
+          responseType: ResponseType.plain,
+          allowRedirects: false,
+        );
+        if (response == null) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('请求失败')),
+          );
+          return;
+        }
+
+        final locationUrl = response.headers['location']?.first;
+        if (locationUrl == null) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('未获取到签到跳转地址')),
+          );
+          return;
+        }
+
+        final locationUri = Uri.parse(locationUrl);
+        final locationParams = locationUri.queryParameters;
+        final classId = locationParams['classId'] ?? '';
+        final decodedRcode = Uri.decodeComponent(locationParams['rcode'] ?? '');
+        final match = RegExp(r'enc=([^&\s]+)').firstMatch(decodedRcode);
+
+        if (match == null) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('未找到 enc 参数')),
+          );
+          return;
+        }
+
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SignInPage(
+              active: Active(
+                type: 2,
+                id: activeId,
+                name: '二维码签到',
+                description: '',
+                startTime: 0,
+                url: '',
+                attendNum: 0,
+                status: true,
+                signType: SignType.qrCode,
+              ),
+              courseId: '',
+              classId: classId,
+              cpi: '',
+              enc: match.group(1),
+            ),
+          ),
+        );
+      } else if (baseUrl.contains('.yuketang.cn/api/v3/lesson/check-in/dynamic-qr-code')) {
+        if (!PlatformManager().isRainClassroom) {
+          await PlatformManager().setPlatform(PlatformType.rainClassroom);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('自动切换平台为雨课堂')),
+          );
+        }
+        if (!AccountManager.hasActiveSession()) {
+          if (!mounted) return;
+          _showRawResult('提示', '没有可用账号');
+          return;
+        }
+        await _multiScan(result);
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _showRawResult('扫描到链接', result);
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('URL 解析失败：$e')),
+      );
     }
   }
 
-  /// 为所有用户扫描
-  Future<void> _multiScan(BuildContext context, String qrCodeUrl) async {
+  void _showRawResult(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(child: SelectableText(content)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _multiScan(String qrCodeUrl) async {
     final allAccounts = AccountManager.allAccounts;
     if (allAccounts.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('没有可用的账号进行签到'))
+        const SnackBar(content: Text('没有可用的账号进行签到')),
       );
       return;
     }
-  
-    setState(() {
-      _isLoading = true;
-    });
-  
-    int successCount = 0;
-    final List<String> failedAccounts = [];
-  
+
+    setState(() => _isLoading = true);
+
+    var successCount = 0;
+    final failedAccounts = <String>[];
+
     final results = await ApiService.sendForEachUser(
       allAccounts,
-      (user) async {
-        final api = RCCourseApi(user);
-        return await api.scan(qrCodeUrl);
-      },
+      (user) async => await RCCourseApi(user).scan(qrCodeUrl),
     );
 
-    for (int i = 0; i < results.length; i++) {
+    for (var i = 0; i < results.length; i++) {
       final status = results[i];
       final user = allAccounts[i];
-      
       if (status == 0) {
         successCount++;
       } else if (status == 51203) {
@@ -463,42 +357,49 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         failedAccounts.add('${user.name} (错误码：$status)');
       }
     }
-    
-  
+
     if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-    });
-  
-    _showMultiScanResult(this.context, successCount, allAccounts.length, failedAccounts);
+    setState(() => _isLoading = false);
+    _showMultiScanResult(successCount, allAccounts.length, failedAccounts);
   }
 
-  /// 显示所有签到结果
-  void _showMultiScanResult(BuildContext context, int successCount, int totalCount, List<String> failedAccounts) {
-    String message = '签到完成！\n成功: $successCount/$totalCount';
-    if (failedAccounts.isNotEmpty) {
-      message += '\n\n失败账号:\n${failedAccounts.join('\n')}';
-    }
-
+  void _showMultiScanResult(int successCount, int totalCount, List<String> failedAccounts) {
+    final ok = successCount == totalCount;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          successCount == totalCount ? '全部签到成功' : '部分失败',
-          style: TextStyle(
-            color: successCount == totalCount ? Colors.green : Colors.orange,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          icon: Icon(
+            ok ? Icons.task_alt_rounded : Icons.report_problem_outlined,
+            color: ok ? cs.primary : cs.error,
+            size: 32,
           ),
-        ),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('确定'),
+          title: Text(ok ? '全部签到成功' : '部分签到失败'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('成功 $successCount / $totalCount'),
+                if (failedAccounts.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  ...failedAccounts.map((e) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text('• $e'),
+                      )),
+                ],
+              ],
+            ),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('确定'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -512,217 +413,130 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     return [...unread, ...rest];
   }
 
+  int get _totalUnread => _courses.fold<int>(
+        0,
+        (sum, c) => sum + ActivityMessageStore().countOf(c.courseId, c.classId),
+      );
+
   @override
   Widget build(BuildContext context) {
     final courses = _sortedCourses();
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('课程'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        actions: [
-          if (PlatformManager().isChaoxing)
-            IconButton(
-              icon: const Icon(Icons.group),
-              tooltip: '群聊',
+      backgroundColor: cs.surface,
+      floatingActionButton: PlatformManager().isChaoxing
+          ? FloatingActionButton(
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const GroupsPage(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const GroupsPage()),
                 );
               },
-            ),
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ScanPage(
-                    onScanResult: handleScanContent,
+              tooltip: '群聊',
+              elevation: 2,
+              child: const Icon(Icons.forum_outlined),
+            )
+          : null,
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _loadCourses,
+          edgeOffset: 80,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverPageHeader(
+                title: '课程',
+                subtitle: _isLoading
+                    ? '正在同步…'
+                    : courses.isEmpty
+                        ? (PlatformManager().isRainClassroom ? '暂无正在上课的课程' : '暂无课程')
+                        : '${courses.length} 门课程'
+                            '${_totalUnread > 0 ? ' · $_totalUnread 条新消息' : ''}',
+                actions: [
+                  IconButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ScanPage(onScanResult: handleScanContent),
+                        ),
+                      );
+                    },
+                    tooltip: '扫码',
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                  ),
+                  IconButton(
+                    onPressed: _loadCourses,
+                    tooltip: '刷新',
+                    icon: const Icon(Icons.refresh_rounded),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                ],
+              ),
+
+              if (_isLoading && _courses.isEmpty) const SliverToBoxAdapter(
+                child: ListSkeleton(count: 4),
+              ) else if (courses.isEmpty) ...[
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: EmptyState(
+                    icon: Icons.school_outlined,
+                    title: PlatformManager().isRainClassroom ? '暂无正在上课的课程' : '还没有课程',
+                    description: PlatformManager().isRainClassroom
+                        ? '老师开始上课后，课程会自动出现在这里'
+                        : '请先在账号页添加并登录账号',
+                    actionLabel: '刷新试试',
+                    onAction: _loadCourses,
                   ),
                 ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadCourses,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _courses.isEmpty
-            ? Center(
-                child: Text(
-                  PlatformManager().isRainClassroom ? '暂无正在上课的课程' : '暂无内容',
-                  style: const TextStyle(fontSize: 18, color: Colors.grey),
+              ] else
+                SliverPadding(
+                  padding: const EdgeInsets.only(
+                    top: AppSpacing.sm,
+                    bottom: AppSpacing.bottomInset,
+                  ),
+                  sliver: SliverList.builder(
+                    itemCount: courses.length,
+                    itemBuilder: (context, index) {
+                      final course = courses[index];
+                      return CourseCard(
+                        course: course,
+                        unread: ActivityMessageStore()
+                            .countOf(course.courseId, course.classId),
+                        index: index,
+                        onTap: () => _openCourse(course),
+                      );
+                    },
+                  ),
                 ),
-              )
-            : ListView.builder(
-                itemCount: courses.length,
-                itemBuilder: (context, index) {
-                  final course = courses[index];
-                  final count = ActivityMessageStore().countOf(course.courseId, course.classId);
-
-                  // 标记头像点击，避免点击头像时同时进入课程详情
-                  var avatarViewing = false;
-
-                  Widget avatar;
-                  if (course.image.isNotEmpty) {
-                    avatar = AvatarWidget(
-                      imageUrl: course.image,
-                      size: 50,
-                      borderRadius: 6,
-                      iconSize: 25,
-                      onTap: () {
-                        avatarViewing = true;
-                        showImageViewer(
-                          context,
-                          imageUrl: course.image,
-                          title: course.teacher,
-                        );
-                      },
-                    );
-                  } else {
-                    avatar = Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.school,
-                          color: Theme.of(context).colorScheme.onSecondaryContainer,
-                          size: 25,
-                        ),
-                      ),
-                    );
-                  }
-
-                  final card = Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child:                     InkWell(
-                      onTap: () {
-                        if (avatarViewing) {
-                          avatarViewing = false;
-                          return;
-                        }
-                        ActivityMessageStore().clear(course.courseId, course.classId);
-                        Navigator.push(
-                          context,
-                          PlatformManager().isChaoxing ?
-                          MaterialPageRoute(
-                            builder: (context) => CourseContentPage(
-                              courseId: course.courseId,
-                              courseName: course.name,
-                              classId: course.classId,
-                              cpi: course.cpi!
-                            ),
-                          ) : MaterialPageRoute(
-                            builder: (context) => PresentationPage(
-                              lessonId: course.lessonId!,
-                              title: course.name
-                            ),
-                          ),
-                        );
-                      },
-                      child: Stack(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (count > 0)
-                                      Badge(
-                                        label: Text('$count'),
-                                        child: avatar
-                                      )
-                                    else
-                                      avatar,
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            course.name,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            course.teacher,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-          
-                                const SizedBox(height: 5),
-                                if (course.note != null)
-                                  Text(
-                                    course.note!,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                if (course.schools != null)
-                                  Text(
-                                    course.schools!,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                if (course.beginDate != null && course.endDate != null)
-                                  Text(
-                                    '开课时间：${course.beginDate} 至 ${course.endDate}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          Positioned(
-                            right: 16,
-                            top: 0,
-                            bottom: 0,
-                            child: Align(
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.chevron_right,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                  return card;
-                },
-              ),
+            ],
+          ),
+        ),
       ),
+    );
+  }
+
+  void _openCourse(Course course) {
+    ActivityMessageStore().clear(course.courseId, course.classId);
+    Navigator.push(
+      context,
+      PlatformManager().isChaoxing
+          ? MaterialPageRoute(
+              builder: (_) => CourseContentPage(
+                courseId: course.courseId,
+                courseName: course.name,
+                classId: course.classId,
+                cpi: course.cpi!,
+              ),
+            )
+          : MaterialPageRoute(
+              builder: (_) => PresentationPage(
+                lessonId: course.lessonId!,
+                title: course.name,
+              ),
+            ),
     );
   }
 
@@ -733,5 +547,188 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     _messageStoreSubscription?.cancel();
     _refreshTimer?.cancel();
     super.dispose();
+  }
+}
+
+/// 课程卡片：左侧色块头像 + 标题 + 元信息 + 未读徽标。
+class CourseCard extends StatelessWidget {
+  final Course course;
+  final int unread;
+  final int index;
+  final VoidCallback onTap;
+
+  const CourseCard({
+    super.key,
+    required this.course,
+    required this.unread,
+    required this.index,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final accent = accentFromSeed(cs, course.name);
+    final hasUnread = unread > 0;
+
+    Widget leading = _CourseAvatar(course: course, accent: accent);
+    if (hasUnread) {
+      leading = Badge(
+        label: Text('$unread'),
+        largeSize: 18,
+        offset: const Offset(-2, -2),
+        child: leading,
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.page,
+        vertical: AppSpacing.sm - 2,
+      ),
+      child: Material(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: AppDuration.normal,
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              border: hasUnread
+                  ? Border.all(color: accent.withValues(alpha: 0.35), width: 1.2)
+                  : null,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                leading,
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        course.name,
+                        style: tt.titleMedium?.copyWith(fontSize: 16),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: AppSpacing.xs + 2),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person_outline_rounded,
+                            size: 13,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              course.teacher.isEmpty ? '未知教师' : course.teacher,
+                              style: tt.bodySmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_metaChips(context).isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: _metaChips(context),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: cs.outlineVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _metaChips(BuildContext context) {
+    final chips = <Widget>[];
+    if (course.schools != null && course.schools!.isNotEmpty) {
+      chips.add(MetaChip(label: course.schools!, icon: Icons.apartment_rounded));
+    }
+    if (course.note != null && course.note!.isNotEmpty) {
+      chips.add(MetaChip(label: course.note!, icon: Icons.info_outline_rounded));
+    }
+    if (course.beginDate != null && course.endDate != null) {
+      chips.add(MetaChip(
+        label: '${course.beginDate} ~ ${course.endDate}',
+        icon: Icons.event_outlined,
+      ));
+    }
+    return chips;
+  }
+}
+
+class _CourseAvatar extends StatelessWidget {
+  final Course course;
+  final Color accent;
+
+  const _CourseAvatar({required this.course, required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 52.0;
+
+    if (course.image.isNotEmpty) {
+      return GestureDetector(
+        onTap: () => showImageViewer(
+          context,
+          imageUrl: course.image,
+          title: course.teacher,
+        ),
+        child: AvatarWidget(
+          imageUrl: course.image,
+          size: size,
+          borderRadius: AppRadius.md,
+          iconSize: 26,
+        ),
+      );
+    }
+
+    // 无图片时用课程名首字 + 渐变底
+    final initial = course.name.trim().isEmpty
+        ? '课'
+        : course.name.trim().characters.first;
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: AppGradients.tint(accent),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 }

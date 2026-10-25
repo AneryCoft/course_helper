@@ -300,8 +300,6 @@ class _EvaluatePageState extends State<EvaluatePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.active.name),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -335,8 +333,6 @@ class _EvaluatePageState extends State<EvaluatePage> {
                           ElevatedButton(
                             onPressed: _initialize,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.primary,
-                              foregroundColor: Colors.white,
                             ),
                             child: const Text('重新加载'),
                           ),
@@ -436,8 +432,6 @@ class _EvaluatePageState extends State<EvaluatePage> {
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _submitForAllAccounts,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
                     minimumSize: const Size(double.infinity, 48),
                   ),
                   child: _isSubmitting

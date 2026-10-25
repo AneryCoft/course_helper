@@ -187,8 +187,6 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
         builder: (context) => Scaffold(
           appBar: AppBar(
             title: const Text('选择位置'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            foregroundColor: Colors.white,
           ),
           body: Column(
             children: [
@@ -324,8 +322,6 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('课程设置'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

@@ -136,8 +136,6 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.active.name),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       body: Column(
         children: [
@@ -165,8 +163,6 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
                       ElevatedButton(
                         onPressed: _loadQuestionnaireData,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
                         ),
                         child: const Text('重新加载'),
                       ),
@@ -206,8 +202,6 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
                           child: ElevatedButton(
                             onPressed: _isSubmitting ? null : _submitAnswersForAllAccounts,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.primary,
-                              foregroundColor: Colors.white,
                               minimumSize: const Size(double.infinity, 48),
                             ),
                             child: _isSubmitting

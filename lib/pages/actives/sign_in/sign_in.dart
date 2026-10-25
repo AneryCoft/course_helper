@@ -401,8 +401,6 @@ class SignInPageState extends State<SignInPage> {
       return Scaffold(
         appBar: AppBar(
           title: Text(widget.active.name),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Colors.white,
         ),
         body: const Center(
           child: CircularProgressIndicator()
@@ -413,8 +411,6 @@ class SignInPageState extends State<SignInPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.active.name),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       body: Stack(
         children: [
@@ -801,8 +797,6 @@ class SignLocationUi {
             icon: const Icon(Icons.location_on),
             label: const Text('选择签到位置'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
           ),
@@ -841,8 +835,6 @@ class SignLocationUi {
                       child: ElevatedButton(
                         onPressed: () => state.performMultiSign(),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
                         ),
                         child: const Text('签到'),
                       ),

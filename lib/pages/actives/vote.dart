@@ -215,8 +215,6 @@ class _VotePageState extends State<VotePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.active.name),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -250,8 +248,6 @@ class _VotePageState extends State<VotePage> {
                           ElevatedButton(
                             onPressed: _loadVoteData,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.primary,
-                              foregroundColor: Colors.white,
                             ),
                             child: const Text('重新加载'),
                           ),
@@ -347,8 +343,6 @@ class _VotePageState extends State<VotePage> {
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _submitForAllAccounts,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
                     minimumSize: const Size(double.infinity, 48),
                   ),
                   child: _isSubmitting

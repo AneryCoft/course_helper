@@ -432,8 +432,6 @@ class _TopicDiscussPageState extends State<TopicDiscussPage> {
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: const Text('主题讨论'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       body: Column(
         children: [
