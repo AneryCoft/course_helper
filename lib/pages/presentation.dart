@@ -985,7 +985,7 @@ class _PresentationPageState extends State<PresentationPage> {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 padding: EdgeInsets.zero,
               ),
-              icon: Icon(icon, color: Colors.white, size: 24),
+              icon: Icon(icon, color: Colors.white, size: 24, shadows: [Shadow(color: Colors.black, blurRadius: 4)]),
               tooltip: tooltip,
             ),
     );
