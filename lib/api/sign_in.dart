@@ -68,9 +68,13 @@ class SignInApi extends Api {
   String get _deviceCode => EncryptionUtil.getDeviceCode();
 
   /// 普通签到（可带照片）
-  Future<String?> normalSign(String courseId, String activeId,
-      {String? objectId, String? validate}) async {
-    final params = {
+  Future<String?> normalSign(
+      String courseId,
+      String activeId, {
+        String? objectId,
+        String? validate,
+      }) async {
+    final base = {
       'activeId': activeId,
       'courseId': courseId,
       'uid': user?.uid ?? '',
@@ -79,24 +83,25 @@ class SignInApi extends Api {
       'longitude': '-1',
       'appType': '15',
       'fid': '0',
-      'objectId': '',
       'name': user?.name ?? '',
-      'validate': '',
-      'deviceCode': _deviceCode
+      'deviceCode': _deviceCode,
+      'validate': ?validate,
     };
-    if (objectId == null) {
-      params.remove('objectId');
-    } else {
-      params['objectId'] = objectId;
-    }
 
-    if (validate == null) {
-      params.remove('validate');
-    } else {
-      params['validate'] = validate;
-    }
+    final withPhoto = objectId != null;
 
-    final response = await ApiService.sendRequest(_signUrl, params: params, responseType: ResponseType.plain, userId: user?.uid);
+    final params = withPhoto ? null : base;
+    final formData = withPhoto ?
+    <String, dynamic>{...base, 'objectId': objectId} : null;
+
+    final response = await ApiService.sendRequest(
+      _signUrl,
+      method: withPhoto ? 'POST' : 'GET',
+      params: params,
+      body: formData,
+      responseType: ResponseType.plain,
+      userId: user?.uid
+    );
     return response?.data;
   }
 
@@ -119,7 +124,7 @@ class SignInApi extends Api {
   /// 手势 签到码签到
   Future<String?> codeSign(String courseId, String activeId, String signCode,
       {String? address, double? latitude, double? longitude, String? validate}) async {
-    final params = {
+    final formData = {
       'activeId': activeId,
       'courseId': courseId,
       'uid': user?.uid ?? '',
@@ -134,27 +139,27 @@ class SignInApi extends Api {
       'deviceCode': _deviceCode
     };
     if (validate == null) {
-      params.remove('validate');
+      formData.remove('validate');
     } else {
-      params['validate'] = validate;
+      formData['validate'] = validate;
     }
     if (address != null && latitude != null && longitude != null) {
-      params['latitude'] = latitude.toStringAsFixed(6);
-      params['longitude'] = longitude.toStringAsFixed(6);
+      formData['latitude'] = latitude.toStringAsFixed(6);
+      formData['longitude'] = longitude.toStringAsFixed(6);
 
       final location = Location(user: user, address: address, latitude: latitude, longitude: longitude);
-      params['location'] = location.toJson();
-      params['locationResult'] = location.toResultJson();
+      formData['location'] = location.toJson();
+      formData['locationResult'] = location.toResultJson();
     }
 
-    final response = await ApiService.sendRequest(_signUrl, params: params, responseType: ResponseType.plain, userId: user?.uid);
+    final response = await ApiService.sendRequest(_signUrl, method: 'POST', body: formData, responseType: ResponseType.plain, userId: user?.uid);
     return response?.data;
   }
 
   /// 位置签到
   Future<String?> locationSign(String courseId, String activeId, String address,
       double latitude, double longitude, {String? validate, String? faceId, String? faceEnc}) async {
-    final data = {
+    final formData = {
       'name': user?.name ?? '',
       'address': address,
       'activeId': activeId,
@@ -176,23 +181,23 @@ class SignInApi extends Api {
     };
 
     if (validate == null) {
-      data.remove('validate');
+      formData.remove('validate');
     } else {
-      data['validate'] = validate;
+      formData['validate'] = validate;
     }
 
     if (faceId != null) {
-      data['currentFaceId'] = faceId;
-      data['ifCFP'] = '1';
+      formData['currentFaceId'] = faceId;
+      formData['ifCFP'] = '1';
     }
     if (faceEnc != null) {
-      data['faceEnc'] = faceEnc;
+      formData['faceEnc'] = faceEnc;
     }
 
     final location = Location(user: user, address: address, latitude: latitude, longitude: longitude);
-    data['locationResult'] = location.toResultJson();
+    formData['locationResult'] = location.toResultJson();
 
-    final response = await ApiService.sendRequest(_signUrl, method: 'POST', body: data, responseType: ResponseType.plain, userId: user?.uid);
+    final response = await ApiService.sendRequest(_signUrl, method: 'POST', body: formData, responseType: ResponseType.plain, userId: user?.uid);
     return response?.data;
   }
 
@@ -213,7 +218,7 @@ class SignInApi extends Api {
   /// enc2用于固定enc
   Future<String?> qrCodeSign(String courseId, String activeId, String enc,
       {String? address, double? latitude, double? longitude, String? enc2, String? validate, String? faceId, String? faceEnc}) async {
-    final params = {
+    final formData = {
       'enc': enc,
       'name': user?.name ?? '',
       'activeId': activeId,
@@ -237,27 +242,27 @@ class SignInApi extends Api {
 
     if (address != null && latitude != null && longitude != null) {
       final location = Location(user: user, address: address, latitude: latitude, longitude: longitude);
-      params['location'] = location.toJson();
-      params['locationResult'] = location.toResultJson();
+      formData['location'] = location.toJson();
+      formData['locationResult'] = location.toResultJson();
     }
 
     if (enc2 == null || validate == null) {
-      params.remove('enc2');
-      params.remove('validate');
+      formData.remove('enc2');
+      formData.remove('validate');
     } else {
-      params['enc2'] = enc2;
-      params['validate'] = validate;
+      formData['enc2'] = enc2;
+      formData['validate'] = validate;
     }
 
     if (faceId != null) {
-      params['currentFaceId'] = faceId;
-      params['ifCFP'] = '1';
+      formData['currentFaceId'] = faceId;
+      formData['ifCFP'] = '1';
     }
     if (faceEnc != null) {
-      params['faceEnc'] = faceEnc;
+      formData['faceEnc'] = faceEnc;
     }
 
-    final response = await ApiService.sendRequest(_signUrl, params: params, responseType: ResponseType.plain, userId: user?.uid);
+    final response = await ApiService.sendRequest(_signUrl, method: 'POST', body: formData, responseType: ResponseType.plain, userId: user?.uid);
     return response?.data;
   }
 
