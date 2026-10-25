@@ -762,69 +762,111 @@ class _PresentationPageState extends State<PresentationPage> {
     });
   }
 
+  /// 非全屏模式下的 PPT 展示区
+  Widget _buildSlideViewer() {
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Stack(
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            itemCount: _slides.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentSlideIndex = index;
+                _currentProblem = _slides[index]['problem'];
+              });
+            },
+            itemBuilder: (context, index) => _buildSlideImage(_slides[index]),
+          ),
+          Positioned(
+            left: 16,
+            top: 16,
+            child: _buildPageIndicator(),
+          ),
+          Positioned(
+            right: 12,
+            top: 16,
+            child: _buildDownloadButton(),
+          ),
+          Positioned(
+            right: 12,
+            bottom: 12,
+            child: _buildFullscreenButton(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 单张幻灯片图片 普通模式与全屏模式共用
+  Widget _buildSlideImage(Map<String, dynamic> slide) {
+    final cover = slide['coverAlt'] as String?;
+    if (cover == null) {
+      return const Center(
+        child: Text('暂无 PPT', style: TextStyle(color: Colors.grey)),
+      );
+    }
+    return Center(
+      child: Image.network(
+        cover,
+        fit: BoxFit.contain,
+        width: double.infinity,
+        height: double.infinity,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const Center(child: CircularProgressIndicator());
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return const Center(
+            child: Icon(Icons.error_outline, size: 48, color: Colors.grey),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 全屏模式下的 PPT 展示区
   Widget _buildFullScreenPPT() {
-    return Stack(
-      children: [
-        PageView.builder(
-          controller: _pageController,
-          itemCount: _slides.length,
-          onPageChanged: (index) {
-            setState(() {
-              _currentSlideIndex = index;
-              _currentProblem = _slides[index]['problem'];
-            });
-          },
-          itemBuilder: (context, index) {
-            final slide = _slides[index];
-            final cover = slide['coverAlt'] as String?;
-            return Center(
-              child: cover != null
-                  ? Image.network(
-                      cover,
-                      fit: BoxFit.contain,
-                      width: double.infinity,
-                      height: double.infinity,
-                      loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Icon(
-                            Icons.error_outline,
-                            size: 48,
-                            color: Colors.grey
-                          ),
-                        );
-                      },
-                    )
-                  : const Center(
-                      child: Text(
-                        '暂无 PPT',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-            );
-          },
-        ),
-        Positioned(
-          left: 16,
-          top: 16,
-          child: _buildPageIndicator()
-        ),
-        Positioned(
-          right: 12,
-          top: 16,
-          child: _buildDownloadButton()
-        ),
-        Positioned(
-          right: 12,
-          bottom: 12,
-          child: _buildFullscreenButton()
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SizedBox(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: _slides.length,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentSlideIndex = index;
+                      _currentProblem = _slides[index]['problem'];
+                    });
+                  },
+                  itemBuilder: (context, index) => _buildSlideImage(_slides[index]),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                top: 16,
+                child: _buildPageIndicator(),
+              ),
+              Positioned(
+                right: 12,
+                top: 16,
+                child: _buildDownloadButton(),
+              ),
+              Positioned(
+                right: 12,
+                bottom: 12,
+                child: _buildFullscreenButton(),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -900,6 +942,13 @@ class _PresentationPageState extends State<PresentationPage> {
       setState(() {
         _isFullScreen = !_isFullScreen;
       });
+      // 全屏切换会改变 PageView 视口宽度，而 PageController 按像素保存页码，
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_pageController.hasClients) return;
+        if ((_pageController.page?.round() ?? 0) != _currentSlideIndex) {
+          _pageController.jumpToPage(_currentSlideIndex);
+        }
+      });
     }
   }
 
@@ -954,8 +1003,6 @@ class _PresentationPageState extends State<PresentationPage> {
       child: Scaffold(
         appBar: _isFullScreen ? null : AppBar(
         title: Text(widget.title),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       body: _isLoading
           ? const Center(
@@ -992,73 +1039,7 @@ class _PresentationPageState extends State<PresentationPage> {
                     )
                   : Column(
                   children: [
-                    // PPT 区域 - 根据屏幕宽度自动计算高度（保持幻灯片比例）
-                    AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: Stack(
-                        children: [
-                          PageView.builder(
-                            controller: _pageController,
-                            itemCount: _slides.length,
-                            onPageChanged: (index) {
-                              setState(() {
-                                _currentSlideIndex = index;
-                                _currentProblem = _slides[index]['problem'];
-                              });
-                            },
-                            itemBuilder: (context, index) {
-                              final slide = _slides[index];
-                              final cover = slide['coverAlt'] as String?;
-                              return Center(
-                                child: cover != null
-                                    ? Image.network(
-                                        cover,
-                                        fit: BoxFit.contain,
-                                        width: double.infinity,
-                                        height: double.infinity,
-                                        loadingBuilder: (context, child, progress) {
-                                          if (progress == null) return child;
-                                          return const Center(
-                                            child: CircularProgressIndicator(),
-                                          );
-                                        },
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return const Center(
-                                            child: Icon(
-                                              Icons.error_outline,
-                                              size: 48,
-                                              color: Colors.grey,
-                                            ),
-                                          );
-                                        },
-                                      )
-                                    : const Center(
-                                        child: Text(
-                                          '暂无 PPT',
-                                          style: TextStyle(color: Colors.grey),
-                                        ),
-                                      ),
-                              );
-                            },
-                          ),
-                          Positioned(
-                            left: 16,
-                            top: 16,
-                            child: _buildPageIndicator()
-                          ),
-                          Positioned(
-                            right: 12,
-                            top: 16,
-                            child: _buildDownloadButton()
-                          ),
-                          Positioned(
-                            right: 12,
-                            bottom: 12,
-                            child: _buildFullscreenButton()
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildSlideViewer(),
                     Expanded(
                       child: SingleChildScrollView(
                         child: Column(
