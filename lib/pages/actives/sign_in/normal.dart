@@ -158,7 +158,8 @@ class NormalSign implements SignStrategy {
         final photoCount = neededCount - startIndex;
         // pickMultiImage 的 limit 不能小于 2
         if (photoCount <= 1) {
-          final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+          // 调整照片属性到接近于原软件的水平
+          final pickedFile = await picker.pickImage(source: ImageSource.gallery, maxHeight: 1920, maxWidth: 1440);
           if (pickedFile != null) {
             pickedFiles = [pickedFile];
           }
@@ -166,7 +167,7 @@ class NormalSign implements SignStrategy {
           pickedFiles = await picker.pickMultiImage(limit: photoCount);
         }
       } else {
-        final pickedFile = await picker.pickImage(source: ImageSource.camera);
+        final pickedFile = await picker.pickImage(source: ImageSource.camera, maxHeight: 1920, maxWidth: 1440);
         if (pickedFile != null) {
           pickedFiles = [pickedFile];
         }
