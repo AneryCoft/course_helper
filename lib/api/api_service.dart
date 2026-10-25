@@ -67,11 +67,46 @@ class HeadersManager {
 }
 
 class DioLoggerInterceptor extends Interceptor {
+  static const Set<String> _maskRequestKeys = {
+    'uname', 'to', 'phoneNumber', 'password', 'code', 'logininfo', 'uid', 'objectId', 'address', 'latitude', 'longitude', 'currentFaceId'
+  };
+
+  static const Set<String> _maskResponsePaths = {
+    // 'msg.schoolname',
+    'msg.uname',
+    'msg.fullpinyin',
+    'msg.simplepinyin',
+    'msg.name',
+    'msg.phone',
+    'msg.puid',
+    'msg.nick',
+    'msg.dept',
+    // 'msg.unitConfigInfos.uname',
+    // 'msg.unitConfigInfos.schoolname',
+    'msg.accountInfo.imAccount.uid',
+    'msg.accountInfo.imAccount.username',
+    'msg.accountInfo.imAccount.password',
+    'msg.accountInfo.cx_fanya.cxid',
+    'data.user_profile.name',
+    'data.user_profile.phone_number',
+    // 'data.user_profile.school',
+    'data.user_profile.school_number',
+    'data.user_profile.nickname',
+    'data.user_profile.user_id',
+    'data.id',
+    'data.name',
+    // 'data.school',
+    'data.schoolNumber',
+    'data.lessonToken',
+    'data.token',
+    '_token'
+  };
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    logger.i('${options.method} ${options.uri}');
+    logger.i('${options.method} ${_redactUri(options.uri)}');
     if (options.data != null) {
-      logger.d('Body: ${_format(options.data)}');
+      logger.d('Body: ${_format(_redactRequest(options.data))}');
     }
     handler.next(options);
   }
@@ -79,11 +114,11 @@ class DioLoggerInterceptor extends Interceptor {
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     final options = response.requestOptions;
-    logger.i('${response.statusCode} ${options.method} ${options.uri}');
+    logger.i('${response.statusCode} ${options.method} ${_redactUri(options.uri)}');
     final data = response.data;
     // 跳过二进制
     if (data != null && data is! List<int>) {
-      logger.d('Body: ${_format(data)}');
+      logger.d('Body: ${_format(_redactResponse(data))}');
     }
     handler.next(response);
   }
@@ -91,20 +126,78 @@ class DioLoggerInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     logger.e(
-      '✗ ${err.response?.statusCode ?? '-'} ${err.requestOptions.method} ''${err.requestOptions.uri}',
+      '✗ ${err.response?.statusCode ?? '-'} ${err.requestOptions.method} '
+      '${_redactUri(err.requestOptions.uri)}',
       error: err
     );
     final data = err.response?.data;
     if (data != null && data is! List<int>) {
-      logger.d('Error body: ${_format(data)}');
+      logger.d('Error body: ${_format(_redactResponse(data))}');
     }
     handler.next(err);
+  }
+
+  static dynamic _redactRequest(dynamic data) {
+    if (data is Map) {
+      return data.map((key, value) {
+        if (_maskRequestKeys.contains(key.toString())) {
+          return MapEntry(key, '*');
+        }
+        return MapEntry(key, _redactRequest(value));
+      });
+    }
+    if (data is List) {
+      return data.map(_redactRequest).toList();
+    }
+    if (data is FormData) {
+      final map = <String, dynamic>{};
+      for (final e in data.fields) {
+        map[e.key] = _maskRequestKeys.contains(e.key) ? '*' : e.value;
+      }
+      for (final e in data.files) {
+        map[e.key] = '<file>';
+      }
+      return map;
+    }
+    return data;
+  }
+
+  static dynamic _redactResponse(dynamic data, [String prefix = '']) {
+    if (data is String) {
+      try {
+        final decoded = jsonDecode(data);
+        if (decoded is Map || decoded is List) {
+          return jsonEncode(_redactResponse(decoded, prefix));
+        }
+      } catch (_) {}
+      return data;
+    }
+    if (data is Map) {
+      return data.map((key, value) {
+        final k = key.toString();
+        final path = prefix.isEmpty ? k : '$prefix.$k';
+        if (_maskResponsePaths.contains(path)) {
+          return MapEntry(key, '*');
+        }
+        return MapEntry(key, _redactResponse(value, path));
+      });
+    }
+    if (data is List) {
+      return data.map((e) => _redactResponse(e, prefix)).toList();
+    }
+    return data;
+  }
+
+  static String _redactUri(Uri uri) {
+    final q = uri.queryParameters.map((k, v) =>
+        MapEntry(k, _maskRequestKeys.contains(k) ? '*' : v));
+    return uri.replace(queryParameters: q).toString();
   }
 
   static String _format(dynamic data) {
     if (data is Map || data is List) {
       try {
-        return const JsonEncoder.withIndent('  ').convert(data);
+        return jsonEncode(data);
       } catch (_) {
         return data.toString();
       }
