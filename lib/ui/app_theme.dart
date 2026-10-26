@@ -73,9 +73,11 @@ class AppTheme {
       ),
 
       // ---------- 按钮 ----------
+      // 注意：这里不能使用 Size.fromHeight（宽度为无限），否则 AlertDialog 的
+      // actions 会被撑成竖排。需要通栏的按钮请在页面内显式指定 minimumSize。
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size(64, 52),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
@@ -85,7 +87,7 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size(64, 52),
           backgroundColor: cs.primary,
           foregroundColor: cs.onPrimary,
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -96,7 +98,7 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size(64, 52),
           side: BorderSide(color: cs.outlineVariant),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           shape: RoundedRectangleBorder(

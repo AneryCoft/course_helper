@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 
 import '../main.dart' show navigatorKey;
+import '../ui/design_tokens.dart';
 import '../utils/storage.dart';
 
 class Update {
@@ -139,56 +140,213 @@ class Update {
   }) {
     showDialog(
       context: navigatorKey.currentContext!,
-      builder: (context) => AlertDialog(
-        title: const Text('发现新版本'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return AlertDialog(
+          icon: Icon(Icons.system_update_rounded, color: cs.primary, size: 30),
+          title: const Text('发现新版本'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 版本号高亮
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm + 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.new_releases_outlined,
+                            size: 16, color: cs.onPrimaryContainer),
+                        const SizedBox(width: 6),
+                        Text(
+                          '最新版本  v$latestVersion',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                            color: cs.onPrimaryContainer,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    '更新内容',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      color: cs.primary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  // 渲染 Markdown：去掉标题符号、把 - 转为圆点
+                  ..._renderNotes(releaseNotes, cs),
+                ],
+              ),
+            ),
+          ),
+          actionsAlignment: MainAxisAlignment.spaceBetween,
+          actions: [
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await StorageManager.prefs.setString(_skipVersionKey, latestVersion);
+              },
+              child: const Text('跳过此版本'),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('稍后'),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                FilledButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    final uri = Uri.parse(downloadUrl);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(96, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  child: const Text('前往下载'),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 把 GitHub Release 的 Markdown 简单渲染为可读文本：
+  /// 去掉 ### 等标记，列表项转成带圆点的段落，跳过空行。
+  static List<Widget> _renderNotes(String raw, ColorScheme cs) {
+    final widgets = <Widget>[];
+    for (final line in raw.split('\n')) {
+      final text = line.trim();
+      if (text.isEmpty) continue;
+
+      // 跳过纯标题行（内容与弹窗标题重复）
+      if (RegExp(r'^#{1,6}\s').hasMatch(text)) {
+        final heading = text.replaceFirst(RegExp(r'^#{1,6}\s+'), '');
+        if (heading.trim().isEmpty) continue;
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.sm, bottom: 2),
+          child: Text(
+            heading,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
+          ),
+        ));
+        continue;
+      }
+
+      // 列表项
+      final isBullet = RegExp(r'^[-*+]\s').hasMatch(text);
+      final isOrdered = RegExp(r'^\d+[.)]\s').hasMatch(text);
+      if (isBullet || isOrdered) {
+        final content = isBullet
+            ? text.replaceFirst(RegExp(r'^[-*+]\s+'), '')
+            : text.replaceFirst(RegExp(r'^\d+[.)]\s+'), '');
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(bottom: 5),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '最新版本: v$latestVersion',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              Padding(
+                padding: const EdgeInsets.only(top: 5, right: 7),
+                child: Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.primary.withValues(alpha: 0.7),
+                    shape: BoxShape.circle,
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                '更新内容:',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Expanded(
+                child: Text(
+                  _stripInlineMarkdown(content),
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.5,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(releaseNotes),
             ],
+          ),
+        ));
+        continue;
+      }
+
+      // 引用块
+      if (text.startsWith('>')) {
+        widgets.add(Container(
+          margin: const EdgeInsets.only(bottom: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            _stripInlineMarkdown(text.replaceFirst(RegExp(r'^>\s*'), '')),
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.45,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ));
+        continue;
+      }
+
+      // 普通段落
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(bottom: 5),
+        child: Text(
+          _stripInlineMarkdown(text),
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.5,
+            color: cs.onSurfaceVariant,
           ),
         ),
-        actions: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  await StorageManager.prefs.setString(_skipVersionKey, latestVersion);
-                },
-                child: const Text('跳过该版本'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('稍后'),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  final uri = Uri.parse(downloadUrl);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
-                child: const Text('前往下载'),
-              ),
-            ],
-          ),
-        ],
-      ),
+      ));
+    }
+    return widgets;
+  }
+
+  /// 去掉行内 Markdown 标记：`code`、**bold**、[text](url) 等
+  static String _stripInlineMarkdown(String text) {
+    var result = text;
+    result = result.replaceAllMapped(
+      RegExp(r'\[([^\]]+)\]\(([^)]+)\)'),
+      (m) => m.group(1) ?? '',
     );
+    result = result.replaceAll(RegExp(r'`{1,3}'), '');
+    result = result.replaceAll(RegExp(r'\*\*|__'), '');
+    result = result.replaceAll(RegExp(r'(?<!\*)\*(?!\*)'), '');
+    return result.trim();
   }
 }

@@ -174,7 +174,40 @@ class RCCourseApi extends Api {
     return null;
   }
 
-  /// 获取处理后的课程列表
+  /// 获取全部课程列表（不限于正在上课）
+  ///
+  /// 接口 `/v/course_meta/learning_list/` 返回该账号加入的全部课堂，
+  /// 每条包含 course_id / classroom_id / 课程名 / 教师信息。
+  /// `classroom_top` 为 true 时表示用户置顶，排在前面。
+  static Future<List<Course>?> getAllCoursesList() async {
+    final courses = await getCourses();
+    if (courses == null) return null;
+
+    final data = courses['data'];
+    if (data is! List || data.isEmpty) return const [];
+
+    final list = <Course>[];
+    for (final item in data) {
+      if (item is! Map) continue;
+      try {
+        list.add(Course.fromRCJson(Map<String, dynamic>.from(item)));
+      } catch (e) {
+        logger.e('解析课程失败: $e');
+      }
+    }
+
+    // 置顶课程优先，其余保持接口顺序
+    final pinned = <Course>[];
+    final normal = <Course>[];
+    for (var i = 0; i < list.length; i++) {
+      final raw = data[i];
+      final isTop = raw is Map && raw['classroom_top'] == true;
+      (isTop ? pinned : normal).add(list[i]);
+    }
+    return [...pinned, ...normal];
+  }
+
+  /// 获取处理后的课程列表（仅正在上课的课程）
   static Future<List<Course>?> getCoursesList([List<dynamic>? onLessonCourses]) async {
     late Map<String, dynamic>? courses;
     if (onLessonCourses == null) {

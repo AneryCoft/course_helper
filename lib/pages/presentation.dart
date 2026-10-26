@@ -12,9 +12,16 @@ import 'dart:io' show WebSocket, File;
 import '../api/course.dart';
 import '../api/image.dart';
 import '../api/api_service.dart';
+import '../api/ai.dart';
 import '../models/presentation.dart';
 import '../session/account.dart';
+import '../setting/ai_setting.dart';
 import '../platform.dart';
+import '../ui/classroom_icons.dart';
+import '../ui/design_tokens.dart';
+import '../ui/math_text.dart';
+import '../ui/widgets.dart';
+import '../utils/ai_response_formatter.dart';
 import '../utils/logger.dart';
 import '../utils/storage.dart';
 import '../utils/time.dart';
@@ -89,6 +96,13 @@ class _PresentationPageState extends State<PresentationPage> {
   bool _isDownloading = false;
   int _downloadedCount = 0;
   int _downloadTotal = 0;
+
+  // AI 讲解
+  bool _isExplaining = false;
+  String? _explanation;
+  String? _explanationError;
+  String? _explanationReasoning;
+  int? _explainedSlideIndex;
 
 
   @override
@@ -763,42 +777,6 @@ class _PresentationPageState extends State<PresentationPage> {
     });
   }
 
-  /// 普通（非全屏）模式下的 PPT 展示区：幻灯片 + 页码 + 下载/全屏按钮
-  Widget _buildSlideViewer() {
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Stack(
-        children: [
-          PageView.builder(
-            controller: _pageController,
-            itemCount: _slides.length,
-            onPageChanged: (index) {
-              setState(() {
-                _currentSlideIndex = index;
-                _currentProblem = _slides[index]['problem'];
-              });
-            },
-            itemBuilder: (context, index) => _buildSlideImage(_slides[index]),
-          ),
-          Positioned(
-            left: 16,
-            top: 16,
-            child: _buildPageIndicator(),
-          ),
-          Positioned(
-            right: 12,
-            top: 16,
-            child: _buildDownloadButton(),
-          ),
-          Positioned(
-            right: 12,
-            bottom: 12,
-            child: _buildFullscreenButton(),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// 单张幻灯片图片（含加载中与错误占位），普通模式与全屏模式共用
   Widget _buildSlideImage(Map<String, dynamic> slide) {
@@ -994,8 +972,158 @@ class _PresentationPageState extends State<PresentationPage> {
     );
   }
 
+  /// 让 AI 讲解当前幻灯片
+  Future<void> _explainCurrentSlide() async {
+    if (_isExplaining) return;
+
+    if (_slides.isEmpty || _currentSlideIndex >= _slides.length) {
+      _showSnack('暂无幻灯片可讲解');
+      return;
+    }
+
+    if (!AiSetting.isConfigured) {
+      _showSnack('请先在「设置 - AI 调用设置」中配置 API 地址与 Token');
+      return;
+    }
+    if (AiSetting.model.isEmpty) {
+      _showSnack('请先在 AI 调用设置中选择模型');
+      return;
+    }
+
+    final slide = _slides[_currentSlideIndex];
+    final coverUrl = slide['coverAlt'] as String?;
+    if (coverUrl == null || coverUrl.isEmpty) {
+      _showSnack('当前页没有可用的幻灯片图片');
+      return;
+    }
+
+    setState(() {
+      _isExplaining = true;
+      _explanation = null;
+      _explanationError = null;
+      _explanationReasoning = null;
+      _explainedSlideIndex = _currentSlideIndex;
+    });
+
+    try {
+      final result = await AiService.explainSlide(
+        model: AiSetting.model,
+        imageUrl: coverUrl,
+        slideIndex: _currentSlideIndex,
+        totalSlides: _slides.length,
+        courseName: widget.title,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _explanation = AiResponseFormatter.toDisplayText(result.content);
+        _explanationReasoning = result.reasoning;
+        _isExplaining = false;
+      });
+      _showExplanationSheet();
+    } on AiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _explanationError = e.message;
+        _isExplaining = false;
+      });
+      _showSnack('AI 讲解失败：${e.message}');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _explanationError = '$e';
+        _isExplaining = false;
+      });
+      _showSnack('AI 讲解失败：$e');
+    }
+  }
+
+  /// 弹出讲解面板
+  void _showExplanationSheet() {
+    final explanation = _explanation;
+    if (explanation == null || explanation.isEmpty) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.95,
+        builder: (ctx, controller) {
+          final cs = Theme.of(ctx).colorScheme;
+          return ListView(
+            controller: controller,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.auto_awesome, size: 18, color: cs.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'AI 讲解 · 第 ${(_explainedSlideIndex ?? 0) + 1} 页',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                  ),
+                ],
+              ),
+              const Divider(),
+              if (_explanationReasoning != null &&
+                  _explanationReasoning!.trim().isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: cs.outlineVariant.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  child: Text(
+                    _explanationReasoning!,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.5,
+                      fontFamily: 'monospace',
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              AiMarkdown(
+                explanation,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  height: 1.65,
+                  color: cs.onSurface,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return PopScope(
       canPop: !_isFullScreen,
       onPopInvokedWithResult: (didPop, result) {
@@ -1004,316 +1132,593 @@ class _PresentationPageState extends State<PresentationPage> {
         }
       },
       child: Scaffold(
-        appBar: _isFullScreen ? null : AppBar(
-        title: Text(widget.title),
-      ),
-      body: _isLoading
-          ? UiHelper.loading(message: '加载 PPT 中...')
-          : !_isInitialized
-              ? UiHelper.loading(message: '等待课堂数据...')
-              : _isFullScreen
-                  ? ColoredBox(
-                      color: Colors.black,
-                      child: _buildFullScreenPPT(),
-                    )
-                  : Column(
+        backgroundColor: cs.surface,
+        appBar: _isFullScreen
+            ? null
+            : AppBar(
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildSlideViewer(),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          children: [
-                            if (_currentProblem != null)
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  border: Border(
-                                    top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant, width: 1),
-                                    bottom: BorderSide(color: Theme.of(context).colorScheme.outlineVariant, width: 1),
-                                  ),
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.max,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _isProblemExpanded = !_isProblemExpanded;
-                                        });
-                                      },
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Theme.of(context).colorScheme.primary,
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              _getProblemTypeLabel(_currentProblem!.problemType),
-                                              style: TextStyle(
-                                                color: Theme.of(context).colorScheme.onPrimary,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          if (_currentProblem!.problemType == 3 && _currentProblem!.pollingCount != null && _currentProblem!.pollingCount! > 1)
-                                            Text(
-                                              '（最多${_currentProblem!.pollingCount}项）',
-                                              style: TextStyle(
-                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          const SizedBox(width: 8),
-                                          if (_currentProblem!.score > 0)
-                                            Text(
-                                              '(${(_currentProblem!.score / 100).toStringAsFixed(0)}分)',
-                                              style: TextStyle(
-                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          const Spacer(),
-                                          if (_currentProblem != null && _unlockedProblemIds.contains(_currentProblem!.problemId) && _countdownSeconds != null)
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: Theme.of(context).colorScheme.errorContainer,
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    Icons.timer_outlined,
-                                                    size: 18,
-                                                    color: Theme.of(context).colorScheme.onErrorContainer,
-                                                  ),
-                                                  const SizedBox(width: 6),
-                                                  Text(
-                                                    '${_countdownSeconds! ~/ 60}:${(_countdownSeconds! % 60).toString().padLeft(2, '0')}',
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Theme.of(context).colorScheme.onErrorContainer,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          const SizedBox(width: 12),
-                                          Icon(
-                                            _isProblemExpanded
-                                                ? Icons.keyboard_arrow_up
-                                                : Icons.keyboard_arrow_down,
-                                            size: 20,
-                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (_isProblemExpanded) ...[
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        _currentProblem!.body,
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      _buildAnswerOptions(),
-                                      if ((_currentProblem != null && _unlockedProblemIds.contains(_currentProblem!.problemId)) || 
-                                          (_timelineProblemId != null && _unlockedProblemIds.contains(_timelineProblemId!))) ...[
-                                        const SizedBox(height: 16),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
-                                          children: [
-                                            ElevatedButton(
-                                              onPressed: () async {await _submitAnswer();},
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: Theme.of(context).colorScheme.primary,
-                                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                              ),
-                                              child: const Text(
-                                                '提交',
-                                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                                              ),
-                                            )
-                                          ]
-                                        ),
-                                      ],
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              controller: _scrollController,
-                              padding: const EdgeInsets.all(12),
-                              itemCount: _timeline.length,
-                              itemBuilder: (context, index) {
-                                final event = _timeline[index];
-                                return _buildTimelineItem(event);
-                              },
-                            ),
-                          ],
+                    Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (_slides.isNotEmpty)
+                      Text(
+                        '第 ${_currentSlideIndex + 1} / ${_slides.length} 页',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
-                    ),
                   ],
                 ),
+                actions: [
+                  if (_currentProblem != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: MetaChip(
+                        label: '有题目',
+                        icon: Icons.quiz_outlined,
+                        color: cs.error,
+                      ),
+                    ),
+                ],
+              ),
+        body: _isLoading
+            ? UiHelper.loading(message: '加载 PPT 中...')
+            : !_isInitialized
+                ? UiHelper.loading(message: '等待课堂数据...')
+                : _isFullScreen
+                    ? ColoredBox(
+                        color: Colors.black,
+                        child: _buildFullScreenPPT(),
+                      )
+                    : Column(
+                        children: [
+                          // 幻灯片区域（含底部工具栏）
+                          _buildSlideSection(context),
+                          // 题目卡片
+                          if (_currentProblem != null) _buildProblemCard(context),
+                          // 课堂动态
+                          Expanded(child: _buildTimelineSection(context)),
+                        ],
+                      ),
       ),
     );
   }
 
-  Widget _buildTimelineItem(TimelineEvent event) {
-    Color bgColor;
-    IconData icon;
-    
-    switch (event.type) {
-      case 'event':
-        switch (event.code) {
-          case 'LESSON_START':
-            bgColor = Colors.green;
-            icon = Icons.school;
-            break;
-          case 'SHOW_PRESENTATION':
-          case 'START_PRESENTATION':
-            bgColor = Colors.blue;
-            icon = Icons.slideshow;
-            break;
-          case 'SHOW_FINISH':
-            bgColor = Colors.orange;
-            icon = Icons.stop_circle;
-            break;
-          case 'LESSON_FINISH':
-            bgColor = Colors.red;
-            icon = Icons.school;
-          default:
-            bgColor = Colors.grey;
-            icon = Icons.info;
-        }
-        break;
-      // case 'slide':
-      //   bgColor = Colors.blue;
-      //   icon = Icons.slideshow;
-      //   break;
-      case 'problem':
-        bgColor = Colors.purple;
-        icon = Icons.quiz;
-        break;
-      case 'randompick':
-        bgColor = Colors.orange;
-        icon = Icons.person_add;
-        break;
-      case 'locationcheckin_start':
-        bgColor = Colors.teal;
-        icon = Icons.location_on;
-        break;
-      case 'locationcheckin_end':
-        bgColor = Colors.blueGrey;
-        icon = Icons.location_off;
-        break;
-      default:
-        bgColor = Colors.grey;
-        icon = Icons.info;
-    }
-    
-    return GestureDetector(
-      onTap: event.type == 'problem' ? () => _handleTimelineProblemClick(event) : null,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: bgColor.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(
-                icon,
-                color: bgColor,
-                size: 20,
-              ),
+  /// 幻灯片区域：图片 + 悬浮工具条
+  Widget _buildSlideSection(BuildContext context) {
+    return Container(
+      color: Colors.black,
+      child: Stack(
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: _slides.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentSlideIndex = index;
+                  _currentProblem = _slides[index]['problem'];
+                  // 换页后清除上一页的讲解
+                  if (_explainedSlideIndex != index) {
+                    _explanation = null;
+                    _explanationError = null;
+                  }
+                });
+              },
+              itemBuilder: (context, index) => _buildSlideImage(_slides[index]),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
+          ),
+
+          // 左上：页码
+          Positioned(
+            left: AppSpacing.md,
+            top: AppSpacing.md,
+            child: _buildPageIndicator(),
+          ),
+
+          // 右上：下载
+          Positioned(
+            right: AppSpacing.md,
+            top: AppSpacing.md,
+            child: _buildDownloadButton(),
+          ),
+
+          // 底部：操作栏
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.75),
+                    Colors.transparent,
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _getEventTitle(event),
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
+              ),
+              child: Row(
+                children: [
+                  // AI 讲解
+                  _buildAiExplainButton(),
+                  // 讲解失败提示
+                  if (_explanationError != null &&
+                      _explainedSlideIndex == _currentSlideIndex) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    Flexible(
+                      child: InkWell(
+                        onTap: _explainCurrentSlide,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.error_outline_rounded,
+                                size: 13,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  '讲解失败，点击重试',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        if (event.type == 'problem')
-                          Icon(
-                            Icons.arrow_forward_ios,
-                            size: 14,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      formatRelativeTime(event.timestamp),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    if (event.subtitle != null && event.subtitle!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        event.subtitle!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: _getSubtitleColor(event.subtitle!),
-                        ),
+                  ],
+                  const Spacer(),
+                  // 全屏
+                  _buildFullscreenButton(),
+                ],
+              ),
+            ),
+          ),
+
+          // 讲解加载遮罩
+          if (_isExplaining)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.55),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      const Text(
+                        'AI 正在阅读这一页…',
+                        style: TextStyle(color: Colors.white, fontSize: 13),
                       ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
-          ],
+        ],
+      ),
+    );
+  }
+
+  /// AI 讲解按钮
+  Widget _buildAiExplainButton() {
+    final hasExplanation = _explanation != null &&
+        _explanation!.isNotEmpty &&
+        _explainedSlideIndex == _currentSlideIndex;
+
+    return Material(
+      color: Colors.white.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: InkWell(
+        onTap: _isExplaining
+            ? null
+            : (hasExplanation ? _showExplanationSheet : _explainCurrentSlide),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                hasExplanation
+                    ? Icons.menu_book_rounded
+                    : Icons.auto_awesome,
+                size: 15,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                hasExplanation ? '查看讲解' : 'AI 讲解',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  /// 题目卡片
+  Widget _buildProblemCard(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final problem = _currentProblem!;
+    final isUnlocked = _unlockedProblemIds.contains(problem.problemId);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.page,
+        AppSpacing.md,
+        AppSpacing.page,
+        0,
+      ),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: cs.error.withValues(alpha: 0.25)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 头部
+          InkWell(
+            onTap: () =>
+                setState(() => _isProblemExpanded = !_isProblemExpanded),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.errorContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                    ),
+                    child: Text(
+                      _getProblemTypeLabel(problem.problemType),
+                      style: TextStyle(
+                        color: cs.onErrorContainer,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  if (problem.problemType == 3 &&
+                      problem.pollingCount != null &&
+                      problem.pollingCount! > 1)
+                    MetaChip(label: '最多${problem.pollingCount}项'),
+                  if (problem.score > 0) ...[
+                    const SizedBox(width: 4),
+                    MetaChip(
+                      label: '${(problem.score / 100).toStringAsFixed(0)} 分',
+                    ),
+                  ],
+                  const Spacer(),
+                  // 倒计时
+                  if (isUnlocked && _countdownSeconds != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cs.errorContainer,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.timer_outlined,
+                            size: 14,
+                            color: cs.onErrorContainer,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_countdownSeconds! ~/ 60}:'
+                            '${(_countdownSeconds! % 60).toString().padLeft(2, '0')}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: cs.onErrorContainer,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(width: AppSpacing.xs),
+                  AnimatedRotation(
+                    turns: _isProblemExpanded ? 0.5 : 0,
+                    duration: AppDuration.fast,
+                    child: Icon(
+                      Icons.expand_more_rounded,
+                      size: 20,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 内容
+          AnimatedCrossFade(
+            duration: AppDuration.fast,
+            crossFadeState: _isProblemExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            firstChild: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                0,
+                AppSpacing.md,
+                AppSpacing.md,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(height: 1),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    problem.body,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildAnswerOptions(),
+                  if (isUnlocked ||
+                      (_timelineProblemId != null &&
+                          _unlockedProblemIds.contains(_timelineProblemId!))) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () async => _submitAnswer(),
+                        child: const Text('提交答案'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            secondChild: const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 课堂动态区域
+  Widget _buildTimelineSection(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.page + AppSpacing.xs,
+            AppSpacing.md,
+            AppSpacing.page,
+            AppSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              Text(
+                '课堂动态',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: cs.primary,
+                ),
+              ),
+              const SizedBox(width: 6),
+              if (_timeline.isNotEmpty)
+                MetaChip(label: '${_timeline.length}', color: cs.primary),
+              const Spacer(),
+              if (_timeline.isNotEmpty)
+                Text(
+                  '共 ${_timeline.length} 条',
+                  style: TextStyle(fontSize: 11, color: cs.outline),
+                ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _timeline.isEmpty
+              ? EmptyState(
+                  icon: Icons.forum_outlined,
+                  title: '暂无课堂动态',
+                  description: '老师开始上课后，签到、题目、点名等事件会显示在这里',
+                )
+              : ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.page,
+                    0,
+                    AppSpacing.page,
+                    AppSpacing.lg,
+                  ),
+                  itemCount: _timeline.length,
+                  itemBuilder: (context, index) =>
+                      _buildTimelineItem(_timeline[index]),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimelineItem(TimelineEvent event) {
+    final cs = Theme.of(context).colorScheme;
+    final iconType = iconTypeForEvent(event.type, event.code);
+    final accent = _eventAccentColor(iconType, cs);
+    final isClickable = event.type == 'problem';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Material(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: isClickable
+              ? () => _handleTimelineProblemClick(event)
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 自定义图标
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  alignment: Alignment.center,
+                  child: ClassroomIcon(iconType, size: 20, color: accent),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _getEventTitle(event),
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                          if (isClickable)
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              size: 17,
+                              color: cs.primary,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        formatRelativeTime(event.timestamp),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: cs.outline,
+                        ),
+                      ),
+                      if (event.subtitle != null &&
+                          event.subtitle!.isNotEmpty) ...[
+                        const SizedBox(height: 5),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getSubtitleColor(event.subtitle!)
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(AppRadius.xs),
+                          ),
+                          child: Text(
+                            event.subtitle!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: _getSubtitleColor(event.subtitle!),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 事件对应的强调色
+  Color _eventAccentColor(ClassroomIconType type, ColorScheme cs) {
+    switch (type) {
+      case ClassroomIconType.lessonStart:
+        return const Color(0xFF2E9E5B);
+      case ClassroomIconType.lessonEnd:
+        return const Color(0xFFD9534F);
+      case ClassroomIconType.presentationStart:
+        return const Color(0xFF3B82F6);
+      case ClassroomIconType.presentationEnd:
+        return const Color(0xFFF59E0B);
+      case ClassroomIconType.problem:
+        return cs.tertiary;
+      case ClassroomIconType.randomPick:
+        return const Color(0xFFF97316);
+      case ClassroomIconType.checkIn:
+        return const Color(0xFF14B8A6);
+      case ClassroomIconType.checkInEnd:
+        return const Color(0xFF64748B);
+      case ClassroomIconType.info:
+        return cs.outline;
+    }
   }
 
   String _getEventTitle(TimelineEvent event) {

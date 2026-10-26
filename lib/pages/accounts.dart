@@ -397,14 +397,28 @@ class _AccountsPageState extends State<AccountsPage> {
 
     return Scaffold(
       backgroundColor: cs.surface,
-      floatingActionButton: AnimatedScale(
+      // MainPage 使用 extendBody，FAB 需上抬导航栏高度，否则会被遮住
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: AnimatedSlide(
         duration: AppDuration.normal,
-        scale: _isMultiSelectMode ? 0 : 1,
-        child: FloatingActionButton.extended(
-          onPressed: _showAddAccountSheet,
-          elevation: 2,
-          icon: const Icon(Icons.person_add_alt_1_rounded),
-          label: const Text('添加账号'),
+        offset: _isMultiSelectMode ? const Offset(0, 2) : Offset.zero,
+        child: AnimatedOpacity(
+          duration: AppDuration.fast,
+          opacity: _isMultiSelectMode ? 0 : 1,
+          child: Padding(
+            padding: const EdgeInsets.only(
+              bottom: AppSpacing.navBar + AppSpacing.fabGap,
+            ),
+            child: IgnorePointer(
+              ignoring: _isMultiSelectMode,
+              child: FloatingActionButton.extended(
+                onPressed: _showAddAccountSheet,
+                elevation: 2,
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                label: const Text('添加账号'),
+              ),
+            ),
+          ),
         ),
       ),
       body: SafeArea(
@@ -502,8 +516,15 @@ class _AccountsPageState extends State<AccountsPage> {
                   bottom: AppSpacing.bottomInset,
                 ),
                 sliver: SliverList.builder(
-                  itemCount: _accounts.length,
+                  // 多一项：列表末尾的「添加账号」卡片
+                  itemCount: _accounts.length + 1,
                   itemBuilder: (context, index) {
+                    if (index == _accounts.length) {
+                      return _AddAccountTile(
+                        onTap: _showAddAccountSheet,
+                        hidden: _isMultiSelectMode,
+                      );
+                    }
                     final user = _accounts[index];
                     return AccountCard(
                       user: user,
@@ -715,6 +736,63 @@ class AccountCard extends StatelessWidget {
                   ),
                 if (isCurrent && !multiSelect)
                   Icon(Icons.check_circle_rounded, size: 20, color: cs.primary),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddAccountTile extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool hidden;
+
+  const _AddAccountTile({required this.onTap, required this.hidden});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (hidden) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.page,
+        vertical: AppSpacing.sm - 2,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.lg,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(
+                color: cs.outlineVariant.withValues(alpha: 0.8),
+                width: 1.2,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.add_circle_outline_rounded,
+                    size: 20, color: cs.primary),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  '添加账号',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: cs.primary,
+                  ),
+                ),
               ],
             ),
           ),

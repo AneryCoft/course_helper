@@ -13,7 +13,16 @@ class Course {
   final String? endDate;
 
   final String? lessonId;
-  
+
+  /// 课堂全名（如「2026秋-高等数学（一）-0011（讲授）」）
+  final String? classroomName;
+
+  /// 是否为教师身份（role=6 为教师，role=5 为学生）
+  final bool isTeacher;
+
+  /// 是否被用户置顶
+  final bool pinned;
+
   CourseSettings? settings;
 
 
@@ -30,6 +39,9 @@ class Course {
     this.beginDate,
     this.endDate,
     this.lessonId,
+    this.classroomName,
+    this.isTeacher = false,
+    this.pinned = false,
     this.settings,
   });
 
@@ -53,6 +65,10 @@ class Course {
   }
 
   factory Course.fromRCJson(Map<String, dynamic> json) {
+    // role: 6 = 教师，5 = 学生
+    final role = json['role'];
+    final isTeacher = role == 6;
+
     return Course(
       courseId: json['course_id']?.toString() ?? '',
       classId: json['classroom_id']?.toString() ?? '',
@@ -60,8 +76,11 @@ class Course {
       name: json['course_name'] ?? '未知课程',
       teacher: json['teacher']?['name'] ?? '未知教师',
       note: json['classroom_name'],
+      classroomName: json['classroom_name'],
+      isTeacher: isTeacher,
+      pinned: json['classroom_top'] == true,
       state: true,
-      lessonId : json['lesson_id']
+      lessonId: json['lesson_id'],
     );
   }
 
@@ -93,6 +112,9 @@ class Course {
       beginDate: beginDate,
       endDate: endDate,
       lessonId: lessonId,
+      classroomName: classroomName,
+      isTeacher: isTeacher,
+      pinned: pinned,
       settings: settings,
     );
   }

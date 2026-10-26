@@ -54,6 +54,56 @@ class SliverPageHeader extends StatelessWidget {
   }
 }
 
+/// 普通 ListView / Column 中的页面级标题头部
+///
+/// 与 [SliverPageHeader] 视觉一致，但用于非 sliver 场景。
+class SliverPageHeaderProxy extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final List<Widget> actions;
+
+  const SliverPageHeaderProxy({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.actions = const [],
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.page + AppSpacing.xs,
+        AppSpacing.lg,
+        AppSpacing.page,
+        AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: tt.headlineMedium),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          ...actions,
+        ],
+      ),
+    );
+  }
+}
+
 /// 通用空状态：图标 + 标题 + 说明 + 可选操作按钮。
 class EmptyState extends StatelessWidget {
   final IconData icon;

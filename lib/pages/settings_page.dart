@@ -244,54 +244,6 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-/// 在普通 ListView 中模拟页面级标题头部
-class SliverPageHeaderProxy extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-  final List<Widget> actions;
-
-  const SliverPageHeaderProxy({
-    super.key,
-    required this.title,
-    this.subtitle,
-    this.actions = const [],
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.page + AppSpacing.xs,
-        AppSpacing.lg,
-        AppSpacing.page,
-        AppSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: tt.headlineMedium),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle!,
-                    style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          ...actions,
-        ],
-      ),
-    );
-  }
-}
-
 /// 圆角卡片分组容器：把多个设置项包成一张卡片
 class _CardGroup extends StatelessWidget {
   final List<Widget> children;

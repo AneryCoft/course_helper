@@ -212,6 +212,7 @@ class _LoginPageState extends State<LoginPage> {
   // 腾讯验证码参数
   String? _ticket;
   String? _randstr;
+  bool _hasShownCaptchaHint = false;
 
   @override
   void initState() {
@@ -381,24 +382,39 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   /// 显示腾讯验证码并进行验证
+  ///
+  /// 说明：人机验证是平台的安全机制，本应用只负责调起官方验证组件，
+  /// 不做任何绕过处理。这里主要优化等待与失败时的反馈体验。
   Future<bool?> _showTencentCaptcha() async {
     final config = TencentCaptchaConfig(
       bizState: 'tencent-captcha',
       enableDarkMode: Theme.of(context).brightness == Brightness.dark
     );
 
-    try {
-      late Map<dynamic, dynamic>? verifyResult;
+    // 首次触发时提示用户为什么会出现验证
+    if (!_hasShownCaptchaHint) {
+      _hasShownCaptchaHint = true;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('平台要求人机验证，请按提示完成操作'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
 
+    try {
       final Completer<bool?> completer = Completer<bool?>();
 
       await TencentCaptcha.verify(
         config: config,
         onSuccess: (data) {
-          verifyResult = data;
-          if (verifyResult != null) {
-            _ticket = verifyResult!['ticket'];
-            _randstr = verifyResult!['randstr'];
+          final ticket = data?['ticket'];
+          final randstr = data?['randstr'];
+          if (ticket != null && randstr != null) {
+            _ticket = ticket;
+            _randstr = randstr;
             completer.complete(true);
           } else {
             completer.complete(false);
@@ -406,8 +422,15 @@ class _LoginPageState extends State<LoginPage> {
         },
         onFail: (data) {
           if (mounted) {
+            final message = data['errorMessage']?.toString() ?? '';
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('验证失败：${data['errorMessage']}')),
+              SnackBar(
+                content: Text(
+                  message.isEmpty
+                      ? '验证未通过，请重试'
+                      : '验证未通过：$message',
+                ),
+              ),
             );
           }
           completer.complete(false);
@@ -419,7 +442,7 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('验证异常：$e')),
+          SnackBar(content: Text('验证组件加载失败，请检查网络后重试：$e')),
         );
       }
       return false;

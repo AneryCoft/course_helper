@@ -14,6 +14,12 @@ class AppSpacing {
   /// 页面统一水平内边距
   static const double page = 16;
 
+  /// 底部导航栏高度（MainPage 使用 extendBody，内层 FAB 需要抬这么高）
+  static const double navBar = 72;
+
+  /// FAB 相对导航栏的额外间距
+  static const double fabGap = 12;
+
   /// 底部导航等悬浮元素避让高度
   static const double bottomInset = 96;
 }

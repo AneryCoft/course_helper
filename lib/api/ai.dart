@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
+import '../models/chat_session.dart';
 import '../setting/ai_setting.dart';
 import '../utils/logger.dart';
 
@@ -26,9 +28,21 @@ class AiException implements Exception {
   String toString() => message;
 }
 
+/// 单次对话的完整结果
+class AiChatResult {
+  /// 正文
+  final String content;
+
+  /// 思考过程（模型未返回时为空）
+  final String reasoning;
+
+  const AiChatResult({required this.content, this.reasoning = ''});
+
+  bool get hasReasoning => reasoning.trim().isNotEmpty;
+}
+
 /// 单道题的 AI 解答结果
-class AiAnswer {
-  /// 选择题选项名，如 ['A'] 或 ['A', 'C']
+class AiAnswer {  /// 选择题选项名，如 ['A'] 或 ['A', 'C']
   final List<String> options;
 
   /// 填空题每空的答案（按空顺序）
@@ -160,11 +174,33 @@ class AiService {
   }
 
   /// 发起一次对话补全，返回模型输出的文本
+  ///
+  /// [messages] 支持纯文本消息与 OpenAI 多模态数组格式（用于图片）。
+  /// [reasoningEffort] 非空时请求模型进行深度思考（需服务端支持）。
   static Future<String> chat({
     required String model,
-    required List<Map<String, String>> messages,
+    required List<Map<String, dynamic>> messages,
     double temperature = 0.3,
     bool jsonMode = true,
+    ReasoningEffort? reasoningEffort,
+  }) async {
+    final result = await chatDetailed(
+      model: model,
+      messages: messages,
+      temperature: temperature,
+      jsonMode: jsonMode,
+      reasoningEffort: reasoningEffort,
+    );
+    return result.content;
+  }
+
+  /// 发起对话并返回正文与思考过程
+  static Future<AiChatResult> chatDetailed({
+    required String model,
+    required List<Map<String, dynamic>> messages,
+    double temperature = 0.3,
+    bool jsonMode = true,
+    ReasoningEffort? reasoningEffort,
   }) async {
     final body = <String, dynamic>{
       'model': model,
@@ -174,6 +210,9 @@ class AiService {
     };
     if (jsonMode) {
       body['response_format'] = {'type': 'json_object'};
+    }
+    if (reasoningEffort != null) {
+      body['reasoning_effort'] = reasoningEffort.apiValue;
     }
 
     final Response<String> response;
@@ -216,20 +255,188 @@ class AiService {
     if (content is! String || content.trim().isEmpty) {
       throw const AiException('AI 返回内容为空，请更换模型后重试');
     }
-    return content;
+
+    // 部分模型把思考过程放在 reasoning_content，部分放在 reasoning
+    final reasoning = message is Map
+        ? (message['reasoning_content'] ?? message['reasoning'] ?? '').toString()
+        : '';
+
+    return AiChatResult(
+      content: content,
+      reasoning: reasoning.trim(),
+    );
   }
 
-  /// 连通性测试：发送一条极短的消息
+  /// 连通性测试：发送一条极短的消息（同时验证角色卡是否生效）
   static Future<String> testConnection(String model) async {
     final content = await chat(
       model: model,
-      messages: const [
-        {'role': 'user', 'content': '请只回复两个字：正常'},
-      ],
+      messages: buildTestMessages(),
       temperature: 0,
       jsonMode: false,
     );
     return content.trim();
+  }
+
+  /// 对话模式的补充提示词
+  ///
+  /// 与答题模式不同：对话不需要 JSON 输出，而是要自然语言 + 规范数学排版。
+  static const String chatSupplement =
+      '你正在进行日常对话，请用自然语言直接回答，不要输出 JSON、代码块或字段名。\n'
+      '\n【数学排版要求】\n'
+      '1. 不要使用计算机写法，改用标准数学表达：\n'
+      '   - 分式写成 \\frac{分子}{分母}，例如 \\frac{x+1}{x-2}\n'
+      '   - 乘方写成 x^{2}，不要写 x^2 或 x*x\n'
+      '   - 根号写成 \\sqrt{x}\n'
+      '   - 乘号用 \\times 或 \\cdot，不要用 *\n'
+      '   - 小于等于、大于等于写成 \\leq、\\geq\n'
+      '2. 行内公式用 \$...\$ 包裹，独立成行的公式用 \$\$...\$\$ 包裹。\n'
+      '3. 方程组或分段函数必须使用大括号：\n'
+      r'   $$\begin{cases} x + y = 5 \\ 2x - y = 1 \end{cases}$$' '\n'
+      '4. 所有 LaTeX 反斜杠必须正确转义，确保能正常渲染。';
+
+  /// 让 AI 讲解一张幻灯片
+  ///
+  /// 从网络下载幻灯片图片并转成 base64 传给视觉模型。
+  /// 需要选择支持视觉的模型（如 GLM-4.1V、Qwen3-VL）。
+  static Future<AiChatResult> explainSlide({
+    required String model,
+    required String imageUrl,
+    required int slideIndex,
+    required int totalSlides,
+    String? courseName,
+    Map<String, String>? imageHeaders,
+  }) async {
+    // 下载图片
+    final Uint8List bytes;
+    try {
+      final response = await _client.get<List<int>>(
+        imageUrl,
+        options: Options(
+          headers: imageHeaders,
+          responseType: ResponseType.bytes,
+        ),
+      );
+      final status = response.statusCode ?? 0;
+      if (status < 200 || status >= 300) {
+        throw AiException('获取幻灯片失败（HTTP $status）');
+      }
+      final data = response.data;
+      if (data == null || data.isEmpty) {
+        throw const AiException('幻灯片内容为空');
+      }
+      bytes = Uint8List.fromList(data);
+    } on AiException {
+      rethrow;
+    } on DioException catch (e) {
+      throw AiException(_describeDioError(e));
+    }
+
+    // 控制体积，过大时直接提示
+    if (bytes.length > 4 * 1024 * 1024) {
+      throw const AiException('幻灯片图片过大，无法分析');
+    }
+
+    final mime = _guessImageMime(imageUrl);
+    final base64Image = base64Encode(bytes);
+
+    final contextLine = [
+      if (courseName != null && courseName.trim().isNotEmpty)
+        '课程：$courseName',
+      '这是第 ${slideIndex + 1} 页，共 $totalSlides 页。',
+    ].join('\n');
+
+    final messages = <Map<String, dynamic>>[
+      {
+        'role': 'system',
+        'content': '你是一位擅长课堂讲解的老师。请根据幻灯片内容，'
+            '用中文清晰地讲解这一页的知识点。要求：\n'
+            '1. 先概括这一页讲了什么（一句话）；\n'
+            '2. 再逐点展开讲解，讲清概念、公式或逻辑关系；\n'
+            '3. 如果有公式，用 \$...\$ 或 \$\$...\$\$ 规范书写；\n'
+            '4. 如果页面信息不足，如实说明，不要编造；\n'
+            '5. 最后用一句话总结重点。',
+      },
+      {
+        'role': 'user',
+        'content': [
+          {
+            'type': 'text',
+            'text': '$contextLine\n\n请讲解这一页的内容。',
+          },
+          {
+            'type': 'image_url',
+            'image_url': {'url': 'data:$mime;base64,$base64Image'},
+          },
+        ],
+      },
+    ];
+
+    return chatDetailed(
+      model: model,
+      messages: messages,
+      temperature: 0.5,
+      jsonMode: false,
+    );
+  }
+
+  static String _guessImageMime(String url) {
+    final lower = url.toLowerCase();
+    if (lower.contains('.png')) return 'image/png';
+    if (lower.contains('.webp')) return 'image/webp';
+    if (lower.contains('.gif')) return 'image/gif';
+    return 'image/jpeg';
+  }
+
+  /// 构建对话用的 system 消息（含角色卡设定）
+  static List<Map<String, String>> buildChatSystemMessages() {
+    final card = AiSetting.activeCard;
+    final persona = card.persona.trim();
+    // 对话模式不使用答题用的系统提示词（其中要求 JSON），改用对话专用补充
+    final extra = AiSetting.chatSystemPrompt.trim().isEmpty
+        ? chatSupplement
+        : AiSetting.chatSystemPrompt;
+
+    final messages = <Map<String, String>>[];
+    if (persona.isNotEmpty) {
+      messages.add({
+        'role': 'system',
+        'content': '$persona\n\n【对话要求】\n$extra',
+      });
+    } else {
+      messages.add({'role': 'system', 'content': extra});
+    }
+    return messages;
+  }
+
+  /// 多轮对话
+  ///
+  /// 使用当前角色卡，并按 [contextLimit] 裁剪历史上下文。
+  /// [reasoningEffort] 非空时启用深度思考并返回思考过程。
+  static Future<AiChatResult> chatWithHistory({
+    required String model,
+    required List<ChatMessage> history,
+    required int contextLimit,
+    double temperature = 0.6,
+    ReasoningEffort? reasoningEffort,
+  }) async {
+    final window = ContextWindow(contextLimit);
+    final messages = window.build(
+      systemMessages: buildChatSystemMessages(),
+      history: history,
+    );
+
+    if (messages.length <= 1) {
+      throw const AiException('没有可发送的消息');
+    }
+
+    return chatDetailed(
+      model: model,
+      messages: messages,
+      temperature: temperature,
+      jsonMode: false,
+      reasoningEffort: reasoningEffort,
+    );
   }
 
   /// 默认提示词模板
@@ -261,6 +468,10 @@ class AiService {
   /// 批量解答题目
   ///
   /// [questions] 为按题目顺序排列的题目描述文本，返回的 Map 以题目下标为键。
+  ///
+  /// 调用时使用当前角色卡：
+  /// - 角色设定 + 系统提示词共同构成 system 消息；
+  /// - 随机取一条开场白作为 assistant 首条消息，稳定模型行为并减少每次输出漂移。
   static Future<Map<int, AiAnswer>> solveQuestions({
     required String model,
     required List<String> questions,
@@ -281,16 +492,54 @@ class AiService {
         ? defaultSystemPrompt
         : AiSetting.systemPrompt;
 
+    final messages = <Map<String, String>>[];
+
+    // 角色卡：设定作为 system 主体，系统提示词作为补充约束
+    final card = AiSetting.activeCard;
+    final persona = card.persona.trim();
+    final systemContent = persona.isEmpty
+        ? systemPrompt
+        : '$persona\n\n【补充要求】\n$systemPrompt';
+    messages.add({'role': 'system', 'content': systemContent});
+
+    // 角色卡：开场白作为 assistant 首条消息（示例对话），稳定输出风格
+    final greeting = card.randomGreeting().trim();
+    if (greeting.isNotEmpty) {
+      messages.add({'role': 'assistant', 'content': greeting});
+    }
+
+    messages.add({'role': 'user', 'content': '$prompt$_formatContract'});
+
     final content = await chat(
       model: model,
-      messages: [
-        {'role': 'system', 'content': systemPrompt},
-        {'role': 'user', 'content': '$prompt$_formatContract'},
-      ],
+      messages: messages,
       temperature: 0.2,
     );
 
     return _parseAnswers(content);
+  }
+
+  /// 生成用于连通性测试的消息（同样带上角色卡设定）
+  static List<Map<String, String>> buildTestMessages() {
+    final card = AiSetting.activeCard;
+    final persona = card.persona.trim();
+    final systemPrompt = AiSetting.systemPrompt.trim().isEmpty
+        ? defaultSystemPrompt
+        : AiSetting.systemPrompt;
+
+    final messages = <Map<String, String>>[];
+    if (persona.isNotEmpty) {
+      messages.add({
+        'role': 'system',
+        'content': '$persona\n\n【补充要求】\n$systemPrompt',
+      });
+      final greeting = card.randomGreeting().trim();
+      if (greeting.isNotEmpty) {
+        messages.add({'role': 'assistant', 'content': greeting});
+      }
+    }
+    messages.add({'role': 'user', 'content': '请只回复两个字：正常'});
+    return messages;
   }
 
   /// 解析 AI 返回的 JSON 答案（公开以便测试与复用）

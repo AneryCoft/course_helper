@@ -8,6 +8,7 @@ import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 import 'package:flutter_bmflocation/flutter_bmflocation.dart';
 
 import './pages/accounts.dart';
+import './pages/ai_chat_page.dart';
 import './pages/courses/list.dart';
 import './pages/login.dart';
 import './pages/settings_page.dart';
@@ -132,6 +133,11 @@ class _MainPageState extends State<MainPage> {
       selectedIcon: Icons.auto_stories,
     ),
     _NavItem(
+      label: '对话',
+      icon: Icons.chat_bubble_outline_rounded,
+      selectedIcon: Icons.chat_bubble_rounded,
+    ),
+    _NavItem(
       label: '账号',
       icon: Icons.people_alt_outlined,
       selectedIcon: Icons.people_alt,
@@ -166,50 +172,78 @@ class _MainPageState extends State<MainPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        icon: Icon(
-          Icons.favorite_rounded,
-          color: Theme.of(context).colorScheme.error,
-          size: 32,
-        ),
-        title: const Text('支持开发者'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              child: Image.asset(
-                'images/mm_reward_qrcode.png',
-                width: 220,
-                height: 220,
-              ),
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return AlertDialog(
+          icon: Icon(Icons.favorite_rounded, color: cs.error, size: 30),
+          title: const Text('支持开发者'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  child: Image.asset(
+                    'images/mm_reward_qrcode.png',
+                    width: 200,
+                    height: 200,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  '一款开源软件的开发纯属为爱发电\n如果可以，请您赞助支持，哪怕只是 1 元，谢谢！',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        height: 1.55,
+                        color: cs.onSurfaceVariant,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              '一款开源软件的开发纯属为爱发电\n如果可以，请您赞助支持，哪怕只是 1 元，谢谢！',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
+          ),
+          // 主按钮独占一行，两个次要操作并排在下方，避免三个按钮挤成竖排
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => _saveImageAndSponsor(context),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(46),
+                    ),
+                    child: const Text('保存赞赏码并前往赞助'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('以后再说'),
+                      ),
+                    ),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          StorageManager.prefs.setBool(_hasSponsoredKey, true);
+                          Navigator.pop(context);
+                        },
+                        child: const Text('我已赞助'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              StorageManager.prefs.setBool(_hasSponsoredKey, true);
-              Navigator.pop(context);
-            },
-            child: const Text('我已赞助'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('以后再说'),
-          ),
-          FilledButton(
-            onPressed: () => _saveImageAndSponsor(context),
-            child: const Text('去赞助'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -242,31 +276,17 @@ class _MainPageState extends State<MainPage> {
 
     return Scaffold(
       extendBody: true,
-      body: AnimatedSwitcher(
-        duration: AppDuration.normal,
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: ScaleTransition(
-              scale: Tween<double>(begin: 0.985, end: 1).animate(animation),
-              child: child,
-            ),
-          );
-        },
-        // IndexedStack 保持各页面状态，外层 key 用于驱动动画
-        child: KeyedSubtree(
-          key: ValueKey<int>(_selectedIndex),
-          child: IndexedStack(
-            index: _selectedIndex,
-            children: [
-              CoursesPage(key: coursesPageKey),
-              const AccountsPage(),
-              const SettingsPage(),
-            ],
-          ),
-        ),
+      // 直接使用 IndexedStack 保持各页面 State 不被销毁。
+      // 注意：不要用 AnimatedSwitcher/KeyedSubtree 包裹，否则每次切换
+      // 都会重建子树，导致对话记录、滚动位置等状态丢失。
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          CoursesPage(key: coursesPageKey),
+          const AiChatPage(embedded: true),
+          const AccountsPage(),
+          const SettingsPage(),
+        ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

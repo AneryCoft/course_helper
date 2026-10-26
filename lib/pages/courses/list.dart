@@ -21,6 +21,7 @@ import '../actives/quiz.dart';
 import '../actives/evaluate.dart';
 import '../actives/vote.dart';
 import '../actives/questionnaire.dart';
+import '../accounts.dart';
 import 'content.dart';
 import '../presentation.dart';
 import '../push/groups.dart';
@@ -77,8 +78,20 @@ class CoursesPage extends StatefulWidget {
 final GlobalKey<CoursesPageState> coursesPageKey = GlobalKey<CoursesPageState>();
 
 class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
+  /// 正在上课的课程（按是否有未读消息排序）
   List<Course> _courses = [];
+
+  /// 全部课程（不限于正在上课）
+  List<Course> _allCourses = [];
+
   bool _isLoading = true;
+  bool _isLoadingAll = false;
+  String? _allCoursesError;
+
+  /// 当前页：0 = 正在上课，1 = 全部课程
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+
   StreamSubscription? _accountChangeSubscription;
   StreamSubscription? _messageStoreSubscription;
   Timer? _refreshTimer;
@@ -87,6 +100,7 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
 
   void refreshCourses() {
     _loadCourses();
+    _loadAllCourses();
   }
 
   void onVisibilityChanged(bool visible) {
@@ -157,6 +171,7 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     if (!AccountManager.hasActiveSession()) {
       setState(() {
         _courses = [];
+        _allCourses = [];
         _isLoading = false;
       });
       return;
@@ -177,6 +192,43 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
       setState(() {
         _courses = [];
         _isLoading = false;
+      });
+    }
+  }
+
+  /// 加载全部课程（学习通与雨课堂都支持）
+  Future<void> _loadAllCourses() async {
+    if (!AccountManager.hasActiveSession()) {
+      setState(() {
+        _allCourses = [];
+        _allCoursesError = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingAll = true;
+      _allCoursesError = null;
+    });
+
+    try {
+      List<Course>? all;
+      if (PlatformManager().isRainClassroom) {
+        all = await RCCourseApi.getAllCoursesList();
+      } else {
+        all = await CXCourseApi.getCoursesList();
+      }
+      if (!mounted) return;
+      setState(() {
+        _allCourses = all ?? [];
+        _isLoadingAll = false;
+      });
+    } catch (e) {
+      logger.e('加载全部课程失败: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoadingAll = false;
+        _allCoursesError = '$e';
       });
     }
   }
@@ -420,7 +472,6 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final courses = _sortedCourses();
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -440,81 +491,344 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
           : null,
       body: SafeArea(
         bottom: false,
-        child: RefreshIndicator(
-          onRefresh: _loadCourses,
-          edgeOffset: 80,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverPageHeader(
-                title: '课程',
-                subtitle: _isLoading
-                    ? '正在同步…'
-                    : courses.isEmpty
-                        ? (PlatformManager().isRainClassroom ? '暂无正在上课的课程' : '暂无课程')
-                        : '${courses.length} 门课程'
-                            '${_totalUnread > 0 ? ' · $_totalUnread 条新消息' : ''}',
-                actions: [
-                  IconButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ScanPage(onScanResult: handleScanContent),
-                        ),
-                      );
-                    },
-                    tooltip: '扫码',
-                    icon: const Icon(Icons.qr_code_scanner_rounded),
-                  ),
-                  IconButton(
-                    onPressed: _loadCourses,
-                    tooltip: '刷新',
-                    icon: const Icon(Icons.refresh_rounded),
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
+        child: Column(
+          children: [
+            // 顶部标题 + 分段切换
+            SliverPageHeaderProxy(
+              title: '课程',
+              subtitle: _currentPage == 0
+                  ? (_isLoading
+                      ? '正在同步…'
+                      : _courses.isEmpty
+                          ? '暂无正在上课的课程'
+                          : '${_courses.length} 门正在上课'
+                              '${_totalUnread > 0 ? ' · $_totalUnread 条新消息' : ''}')
+                  : (_isLoadingAll
+                      ? '正在加载…'
+                      : '共 ${_allCourses.length} 门课程'),
+              actions: [
+                IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ScanPage(onScanResult: handleScanContent),
+                      ),
+                    );
+                  },
+                  tooltip: '扫码',
+                  icon: const Icon(Icons.qr_code_scanner_rounded),
+                ),
+                IconButton(
+                  onPressed: refreshCourses,
+                  tooltip: '刷新',
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+              ],
+            ),
+
+            // 分段切换
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.page,
+                0,
+                AppSpacing.page,
+                AppSpacing.sm,
+              ),
+              child: _SegmentSwitcher(
+                current: _currentPage,
+                labels: const ['正在上课', '全部课程'],
+                counts: [_courses.length, _allCourses.length],
+                onChanged: (index) {
+                  _pageController.animateToPage(
+                    index,
+                    duration: AppDuration.normal,
+                    curve: Curves.easeOutCubic,
+                  );
+                },
+              ),
+            ),
+
+            // 双页滑动
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() => _currentPage = index);
+                  if (index == 1 && _allCourses.isEmpty && !_isLoadingAll) {
+                    _loadAllCourses();
+                  }
+                },
+                children: [
+                  _buildOnLessonPage(context),
+                  _buildAllCoursesPage(context),
                 ],
               ),
-
-              if (_isLoading && _courses.isEmpty) const SliverToBoxAdapter(
-                child: ListSkeleton(count: 4),
-              ) else if (courses.isEmpty) ...[
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: EmptyState(
-                    icon: Icons.school_outlined,
-                    title: PlatformManager().isRainClassroom ? '暂无正在上课的课程' : '还没有课程',
-                    description: PlatformManager().isRainClassroom
-                        ? '老师开始上课后，课程会自动出现在这里'
-                        : '请先在账号页添加并登录账号',
-                    actionLabel: '刷新试试',
-                    onAction: _loadCourses,
-                  ),
-                ),
-              ] else
-                SliverPadding(
-                  padding: const EdgeInsets.only(
-                    top: AppSpacing.sm,
-                    bottom: AppSpacing.bottomInset,
-                  ),
-                  sliver: SliverList.builder(
-                    itemCount: courses.length,
-                    itemBuilder: (context, index) {
-                      final course = courses[index];
-                      return CourseCard(
-                        course: course,
-                        unread: ActivityMessageStore()
-                            .countOf(course.courseId, course.classId),
-                        index: index,
-                        onTap: () => _openCourse(course),
-                      );
-                    },
-                  ),
-                ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  /// 第一页：正在上课
+  Widget _buildOnLessonPage(BuildContext context) {
+    final courses = _sortedCourses();
+
+    return RefreshIndicator(
+      onRefresh: _loadCourses,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          if (_isLoading && _courses.isEmpty)
+            const SliverToBoxAdapter(child: ListSkeleton(count: 4))
+          else if (courses.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: EmptyState(
+                icon: Icons.school_outlined,
+                title: PlatformManager().isRainClassroom
+                    ? '暂无正在上课的课程'
+                    : '还没有课程',
+                description: PlatformManager().isRainClassroom
+                    ? '老师开始上课后，课程会自动出现在这里\n向右滑动可查看全部课程'
+                    : '请先添加并登录账号，课程会自动同步',
+                actionLabel: AccountManager.hasActiveSession()
+                    ? '刷新试试'
+                    : '添加账号',
+                onAction: AccountManager.hasActiveSession()
+                    ? _loadCourses
+                    : () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AccountsPage(),
+                          ),
+                        ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.only(
+                top: AppSpacing.xs,
+                bottom: AppSpacing.bottomInset,
+              ),
+              sliver: SliverList.builder(
+                itemCount: courses.length,
+                itemBuilder: (context, index) {
+                  final course = courses[index];
+                  return CourseCard(
+                    course: course,
+                    unread: ActivityMessageStore()
+                        .countOf(course.courseId, course.classId),
+                    index: index,
+                    onTap: () => _openCourse(course),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 第二页：全部课程
+  Widget _buildAllCoursesPage(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    if (_isLoadingAll && _allCourses.isEmpty) {
+      return const ListSkeleton(count: 6);
+    }
+
+    if (_allCoursesError != null && _allCourses.isEmpty) {
+      return EmptyState(
+        icon: Icons.cloud_off_rounded,
+        title: '加载失败',
+        description: _allCoursesError,
+        actionLabel: '重试',
+        onAction: _loadAllCourses,
+      );
+    }
+
+    if (_allCourses.isEmpty) {
+      return EmptyState(
+        icon: Icons.library_books_outlined,
+        title: '暂无课程',
+        description: '当前账号还没有加入任何课程',
+        actionLabel: '刷新试试',
+        onAction: _loadAllCourses,
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadAllCourses,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(
+          top: AppSpacing.xs,
+          bottom: AppSpacing.bottomInset,
+        ),
+        itemCount: _allCourses.length + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.page + AppSpacing.xs,
+                AppSpacing.xs,
+                AppSpacing.page,
+                AppSpacing.sm,
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    '全部课程',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                      color: cs.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  MetaChip(
+                    label: '${_allCourses.length}',
+                    color: cs.primary,
+                  ),
+                  const Spacer(),
+                  if (_allCourses.any((c) => c.isTeacher))
+                    MetaChip(
+                      label: '含任教课程',
+                      icon: Icons.badge_outlined,
+                      color: cs.tertiary,
+                    ),
+                ],
+              ),
+            );
+          }
+
+          final course = _allCourses[index - 1];
+          final isOnLesson = course.lessonId != null;
+          return AllCourseCard(
+            course: course,
+            isOnLesson: isOnLesson,
+            onTap: () => _openAllCourse(course),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 从「全部课程」打开课程
+  void _openAllCourse(Course course) {
+    if (course.lessonId != null && PlatformManager().isRainClassroom) {
+      // 正在上课，直接进入课堂
+      _openCourse(course);
+      return;
+    }
+
+    if (PlatformManager().isChaoxing) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CourseContentPage(
+            courseId: course.courseId,
+            courseName: course.name,
+            classId: course.classId,
+            cpi: course.cpi ?? '',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // 雨课堂非上课状态：提示暂无课堂
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.sm,
+              AppSpacing.xl,
+              AppSpacing.xl,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        course.name,
+                        style: Theme.of(ctx).textTheme.titleLarge,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                if (course.classroomName != null)
+                  Text(
+                    course.classroomName!,
+                    style: TextStyle(fontSize: 12, color: cs.outline),
+                  ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Icon(Icons.person_outline_rounded,
+                        size: 15, color: cs.onSurfaceVariant),
+                    const SizedBox(width: 5),
+                    Text(
+                      course.teacher,
+                      style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    if (course.isTeacher)
+                      MetaChip(label: '任教', color: cs.tertiary)
+                    else
+                      MetaChip(label: '学生', color: cs.outline),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded,
+                          size: 16, color: cs.outline),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '该课程当前没有进行中的课堂。\n老师开始上课后可在此进入。',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            height: 1.5,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('知道了'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -539,7 +853,6 @@ class CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
             ),
     );
   }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -727,6 +1040,230 @@ class _CourseAvatar extends StatelessWidget {
           color: Colors.white,
           fontSize: 22,
           fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// 顶部分段切换器
+class _SegmentSwitcher extends StatelessWidget {
+  final int current;
+  final List<String> labels;
+  final List<int> counts;
+  final ValueChanged<int> onChanged;
+
+  const _SegmentSwitcher({
+    required this.current,
+    required this.labels,
+    required this.counts,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++)
+            Expanded(
+              child: GestureDetector(
+                onTap: () => onChanged(i),
+                behavior: HitTestBehavior.opaque,
+                child: AnimatedContainer(
+                  duration: AppDuration.fast,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: current == i ? cs.surface : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    boxShadow: current == i
+                        ? [
+                            BoxShadow(
+                              color: cs.shadow.withValues(alpha: 0.08),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        labels[i],
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: current == i
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: current == i
+                              ? cs.onSurface
+                              : cs.onSurfaceVariant,
+                        ),
+                      ),
+                      if (counts[i] > 0) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: current == i
+                                ? cs.primary
+                                : cs.outlineVariant,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                          ),
+                          child: Text(
+                            '${counts[i]}',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: current == i
+                                  ? cs.onPrimary
+                                  : cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 「全部课程」列表项
+class AllCourseCard extends StatelessWidget {
+  final Course course;
+  final bool isOnLesson;
+  final VoidCallback onTap;
+
+  const AllCourseCard({
+    super.key,
+    required this.course,
+    required this.isOnLesson,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = accentFromSeed(cs, course.name);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.page,
+        vertical: AppSpacing.sm - 3,
+      ),
+      child: Material(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              children: [
+                // 头像
+                AvatarWidget(
+                  imageUrl: course.image,
+                  size: 44,
+                  borderRadius: AppRadius.sm,
+                  iconSize: 22,
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              course.name,
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isOnLesson) ...[
+                            const SizedBox(width: 6),
+                            MetaChip(
+                              label: '上课中',
+                              icon: Icons.play_arrow_rounded,
+                              color: cs.primary,
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person_outline_rounded,
+                            size: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 3),
+                          Flexible(
+                            child: Text(
+                              course.teacher,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: cs.onSurfaceVariant,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (course.isTeacher) ...[
+                            const SizedBox(width: 6),
+                            MetaChip(label: '任教', color: accent),
+                          ],
+                        ],
+                      ),
+                      if (course.classroomName != null &&
+                          course.classroomName!.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          course.classroomName!,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: cs.outline,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 19,
+                  color: cs.outlineVariant,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
