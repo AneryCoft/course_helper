@@ -17,6 +17,7 @@ import './platform.dart';
 import './utils/storage.dart';
 import './utils/logger.dart';
 import 'push/easemob.dart';
+import 'push/notification.dart';
 import 'push/update.dart';
 
 // 赞助对话框显示状态键
@@ -59,6 +60,8 @@ void main() async {
   await AccountManager.initialize();
 
   await CookieManager.initialize();
+
+  await NotificationService().initialize();
 
   await EasemobIM().initialize();
 
