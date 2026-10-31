@@ -160,8 +160,8 @@ class _AttendListWidgetState extends State<AttendListWidget> {
           children: [
             AvatarWidget(
               imageUrl: CXImageApi.getAvatarUrlByUid(uid, 80),
-              size: 40,
-              borderRadius: 20,
+              size: 50,
+              borderRadius: 8,
               iconSize: 20
             ),
             const SizedBox(width: 12),
