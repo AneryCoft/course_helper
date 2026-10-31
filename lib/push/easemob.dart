@@ -174,7 +174,17 @@ class EasemobIM {
         priority: Priority.high
       );
 
-      final notificationDetails = NotificationDetails(android: androidDetails);
+      final darwinDetails = DarwinNotificationDetails(
+        presentSound: true,
+        presentAlert: false,
+        presentBanner: false,
+        presentList: false
+      ); // 前台只声音通知
+
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: darwinDetails
+      );
 
       final int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
