@@ -116,14 +116,14 @@ class _PickPageState extends State<PickPage> {
     }
   }
 
-  Future<void> _notifyPicked(List<({String uid, String name})> picked) async {
+  void _notifyPicked(List<({String uid, String name})> picked) {
     final displayNames = picked
         .map((p) => p.name.isEmpty ? 'ID: ${p.uid}' : p.name)
         .toList();
     final body = picked.length == 1 ?
     '你被选中了：${displayNames.first}' : '你有 ${picked.length} 个账号被选中：${displayNames.join('、')}';
 
-    await NotificationService().show(
+    NotificationService().show(
       title: '选人活动',
       body: body,
       androidDetails: const AndroidNotificationDetails(
