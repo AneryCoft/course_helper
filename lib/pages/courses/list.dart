@@ -18,6 +18,7 @@ import '../actives/quiz.dart';
 import '../actives/evaluate.dart';
 import '../actives/vote.dart';
 import '../actives/questionnaire.dart';
+import '../actives/pick.dart';
 import 'content.dart';
 import '../presentation.dart';
 import '../push/groups.dart';
@@ -115,7 +116,16 @@ class CoursesPage extends StatefulWidget {
           ),
         );
         break;
-      
+
+      case ActiveType.pick:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PickPage(active: active),
+          ),
+        );
+        break;
+
       default:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
