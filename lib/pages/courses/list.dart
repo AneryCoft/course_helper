@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:collection/collection.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../platform.dart';
 import '../../api/course.dart';
@@ -23,6 +24,7 @@ import 'content.dart';
 import '../presentation.dart';
 import '../push/groups.dart';
 import '../../push/easemob.dart';
+import '../../push/notification.dart';
 
 
 class CoursesPage extends StatefulWidget {
@@ -145,6 +147,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   StreamSubscription? _messageStoreSubscription;
   Timer? _refreshTimer;
   List<dynamic> _lastOnLessonCourses = [];
+  bool _hasInitialOnLessonData = false;
   bool _isVisible = false;
 
   void refreshCourses() {
@@ -184,6 +187,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
           ActivityMessageStore().clearAll();
           if (mounted) {
             _lastOnLessonCourses = [];
+            _hasInitialOnLessonData = false;
             _loadCourses();
           }
           _startPeriodicRefresh();
@@ -210,14 +214,49 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         final onLessonCourses = await RCCourseApi.getOnLesson();
         if (onLessonCourses != null && mounted) {
           if (!const DeepCollectionEquality().equals(_lastOnLessonCourses, onLessonCourses)) {
+            final newCourseIds = _hasInitialOnLessonData ?
+            _diffNewCourseIds(_lastOnLessonCourses, onLessonCourses) : <String>[];
             _lastOnLessonCourses = onLessonCourses;
-            _loadCourses(onLessonCourses);
+            _hasInitialOnLessonData = true;
+            await _loadCourses(onLessonCourses);
+            if (newCourseIds.isNotEmpty) {
+              _notifyNewLessons(newCourseIds);
+            }
           }
         }
       } catch (e) {
         logger.e('Periodic refresh error: $e');
       }
     });
+  }
+
+  List<String> _diffNewCourseIds(List<dynamic> previous, List<dynamic> current) {
+    final previousIds = previous
+        .map((e) => (e['courseId'] ?? '').toString())
+        .toSet();
+    return current
+        .where((e) => !previousIds.contains((e['courseId'] ?? '').toString()))
+        .map((e) => (e['courseId'] ?? '').toString())
+        .toList();
+  }
+
+  void _notifyNewLessons(List<String> courseIds) {
+    for (final courseId in courseIds) {
+      final course = _courses.firstWhereOrNull((c) => c.courseId == courseId);
+      final name = course?.name;
+      NotificationService().show(
+        title: '课堂开始',
+        body: '$name 开始上课了',
+        androidDetails: const AndroidNotificationDetails(
+          'lesson_start_channel',
+          '课堂开始',
+          channelDescription: '雨课堂课堂开始上课通知',
+          importance: Importance.high,
+          priority: Priority.high,
+          visibility: NotificationVisibility.public
+        ),
+      );
+    }
   }
 
   Future<void> _loadCourses([List<dynamic>? onLessonCourses]) async {
