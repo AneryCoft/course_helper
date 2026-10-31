@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart' hide NotificationVisibility;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:disable_battery_optimization/disable_battery_optimization.dart';
@@ -15,6 +16,7 @@ import '../api/api_service.dart';
 import '../models/presentation.dart';
 import '../session/account.dart';
 import '../platform.dart';
+import '../push/notification.dart';
 import '../utils/logger.dart';
 import '../utils/storage.dart';
 import '../utils/time.dart';
@@ -428,6 +430,7 @@ class _PresentationPageState extends State<PresentationPage> {
                   timestamp: DateTime.fromMillisecondsSinceEpoch(dt)
                 ));
               });
+              _notifyRandomPick(data);
             }
           }
           break;
@@ -487,6 +490,23 @@ class _PresentationPageState extends State<PresentationPage> {
     } catch (e) {
       logger.e('解析消息失败：$e');
     }
+  }
+
+  void _notifyRandomPick(dynamic data) {
+    final uid = data['uid'].toString();
+    if (!AccountManager.allAccounts.any((u) => u.uid == uid)) {
+      return;
+    }
+
+    NotificationService().show(
+      title: '随机点名',
+      body: '你被选中了：${data['name']}',
+      androidDetails: const AndroidNotificationDetails(
+        'random_pick_channel',
+        '随机点名',
+        channelDescription: '雨课堂随机点名通知'
+      )
+    );
   }
 
   void _addTimelineEvents(List timeline) {
