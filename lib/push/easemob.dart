@@ -171,7 +171,8 @@ class EasemobIM {
         '课程活动',
         channelDescription: '接收课程活动通知',
         importance: Importance.high,
-        priority: Priority.high
+        priority: Priority.high,
+        visibility: NotificationVisibility.public
       );
 
       final darwinDetails = DarwinNotificationDetails(
