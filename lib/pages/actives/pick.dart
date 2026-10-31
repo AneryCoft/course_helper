@@ -5,6 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../../api/image.dart';
 import '../../../api/pick.dart';
 import '../../../models/active.dart';
+import '../../../push/notification.dart';
 import '../../../session/account.dart';
 import '../widget/avatar.dart';
 
@@ -26,13 +27,9 @@ class _PickPageState extends State<PickPage> {
 
   Timer? _pollTimer;
 
-  final FlutterLocalNotificationsPlugin _notificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
   @override
   void initState() {
     super.initState();
-    _initNotifications();
     _loadPickList();
     _startPolling();
   }
@@ -41,21 +38,6 @@ class _PickPageState extends State<PickPage> {
   void dispose() {
     _pollTimer?.cancel();
     super.dispose();
-  }
-
-  Future<void> _initNotifications() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-    await _notificationsPlugin.initialize(
-      settings: const InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings,
-      ),
-    );
   }
 
   void _startPolling() {
@@ -135,34 +117,20 @@ class _PickPageState extends State<PickPage> {
   }
 
   Future<void> _notifyPicked(List<({String uid, String name})> picked) async {
-    final androidDetails = AndroidNotificationDetails(
-      'course_pick_channel',
-      '选人',
-      channelDescription: '选人通知'
-    );
-    final darwinDetails = DarwinNotificationDetails(
-        presentSound: true,
-        presentAlert: false,
-        presentBanner: false,
-        presentList: false
-    ); // 前台只声音通知
-    final notificationDetails = NotificationDetails(
-      android: androidDetails,
-      iOS: darwinDetails
-    );
-    final int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-
     final displayNames = picked
         .map((p) => p.name.isEmpty ? 'ID: ${p.uid}' : p.name)
         .toList();
     final body = picked.length == 1 ?
     '你被选中了：${displayNames.first}' : '你有 ${picked.length} 个账号被选中：${displayNames.join('、')}';
 
-    await _notificationsPlugin.show(
-      id: notificationId,
+    await NotificationService().show(
       title: '选人活动',
       body: body,
-      notificationDetails: notificationDetails
+      androidDetails: const AndroidNotificationDetails(
+        'course_pick_channel',
+        '选人',
+        channelDescription: '选人通知'
+      )
     );
   }
 

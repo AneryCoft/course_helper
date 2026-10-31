@@ -12,6 +12,7 @@ import '../models/active.dart';
 import '../platform.dart';
 import '../utils/logger.dart';
 import '../utils/time.dart';
+import 'notification.dart';
 
 /// 环信即时通讯
 class EasemobIM {
@@ -23,8 +24,6 @@ class EasemobIM {
 
   bool _isLoggedIn = false;
   bool get isLoggedIn => _isLoggedIn;
-
-  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
 
   Function(bool)? _onConnectionChanged;
 
@@ -40,17 +39,6 @@ class EasemobIM {
     Function(ChatMessage)? onMessageReceived
   }) async {
     try {
-      // 初始化本地通知插件
-      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-      const iosSettings = DarwinInitializationSettings(
-        requestAlertPermission: false,
-        requestBadgePermission: false,
-        requestSoundPermission: false
-      );
-      await _notificationsPlugin.initialize(
-        settings: const InitializationSettings(android: androidSettings, iOS: iosSettings)
-      );
-
       final options = ChatOptions.withAppKey(_appKey, osType: 2);
       // 使用Linux登录 避免让移动设备掉线
 
@@ -166,35 +154,18 @@ class EasemobIM {
       final courseName = (courseInfo?['coursename'] ??
           message.attributes!['em_apns_ext']['em_push_title'] ?? '').toString();
 
-      final androidDetails = AndroidNotificationDetails(
-        'course_activity_channel',
-        '课程活动',
-        channelDescription: '接收课程活动通知',
-        importance: Importance.high,
-        priority: Priority.high,
-        visibility: NotificationVisibility.public
-      );
-
-      final darwinDetails = DarwinNotificationDetails(
-        presentSound: true,
-        presentAlert: false,
-        presentBanner: false,
-        presentList: false
-      ); // 前台只声音通知
-
-      final notificationDetails = NotificationDetails(
-        android: androidDetails,
-        iOS: darwinDetails
-      );
-
-      final int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-
-      await _notificationsPlugin.show(
-        id: notificationId,
+      await NotificationService().show(
         title: '课程活动',
         body: '收到来自$courseName的$activeTypeName活动',
-        notificationDetails: notificationDetails,
         payload: '${active.id}|$courseId|$classId',
+        androidDetails: const AndroidNotificationDetails(
+          'course_activity_channel',
+          '课程活动',
+          channelDescription: '接收课程活动通知',
+          importance: Importance.high,
+          priority: Priority.high,
+          visibility: NotificationVisibility.public,
+        ),
       );
 
       ActivityMessageStore().add(courseId, classId);
