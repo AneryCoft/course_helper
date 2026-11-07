@@ -133,10 +133,16 @@ class EasemobIM {
 
   Future<void> _handleMessage(ChatMessage message) async {
     if (message.attributes != null) {
-      final attachment = message.attributes!['attachment'];
+      logger.d('消息: ${message.toJson()}');
+
+      final attachment = message.attributes?['attachment'];
+      if (attachment == null) return;
+
       final activeInfo = attachment['att_chat_course'];
 
-      final String activeTypeName = activeInfo['atypeName'];
+      final activeTypeName = activeInfo['atypeName'];
+      if (activeTypeName == null) return;
+
       Active active = Active(
         type: activeInfo['atype'],
         id: activeInfo['aid'].toString(),
@@ -179,8 +185,6 @@ class EasemobIM {
       ));
       _scheduleDialog();
     }
-
-    logger.d('消息: ${message.toJson()}');
   }
 
   void _scheduleDialog() {
