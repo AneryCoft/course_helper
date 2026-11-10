@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 enum ActiveType {
+  unknown(0, '未知'), // 任务的activeId是空字符串
   signIn(2, '签到'),
   answer(4, '抢答'),
   topicDiscuss(5, '主题讨论'),
@@ -84,7 +85,7 @@ class Active {
     required this.status,
     this.extras,
     this.signType
-  }) : activeType = ActiveType.fromValue(type) ?? ActiveType.signIn;
+  }) : activeType = ActiveType.fromValue(type) ?? ActiveType.unknown;
 
   factory Active.fromJson(Map<String, dynamic> json) {
     int activeType = json['activeType'] is int ?
