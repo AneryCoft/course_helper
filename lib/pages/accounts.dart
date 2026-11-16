@@ -95,6 +95,24 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
     await AccountManager.setCurrentSession(user.uid);
   }
 
+  void _onReorderStart(int index) {
+    setState(() {
+      _isMultiSelectMode = true;
+      _selectedAccounts.add(_accounts[index].uid);
+    });
+  }
+
+  void _onReorder(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    // 当前账号固定在首位
+    final currentIndex = _accounts.indexWhere((u) => u.uid == _currentAccountId);
+    final minIndex = currentIndex == -1 ? 0 : currentIndex + 1;
+    if (newIndex < minIndex) newIndex = minIndex;
+    if (oldIndex == newIndex) return;
+    AccountManager.moveAccount(oldIndex, newIndex);
+    setState(() {});
+  }
+
   Future<void> _navigateToPasswordLogin() async {
     final result = await Navigator.push(
       context,
@@ -306,10 +324,6 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
         ],
       ),
       onTap: _isMultiSelectMode ? null : () => _switchToAccount(user),
-      onLongPress: () {
-        _toggleMultiSelect();
-        _toggleSelection(user.uid);
-      },
     );
   }
 
@@ -431,6 +445,12 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
+          if (_isMultiSelectMode)
+            IconButton(
+              icon: const Icon(Icons.done),
+              tooltip: '完成',
+              onPressed: _toggleMultiSelect
+            ),
           if (_isMultiSelectMode)
             IconButton(
               icon: const Icon(Icons.delete),
@@ -575,16 +595,28 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
           ],
         ),
       )
-          : ListView.builder(
+          : ReorderableListView.builder(
+        buildDefaultDragHandles: false,
         itemCount: _accounts.length,
+        onReorder: _onReorder,
+        onReorderStart: _onReorderStart,
         itemBuilder: (context, index) {
           final user = _accounts[index];
           final isSelected = _selectedAccounts.contains(user.uid);
           final isCurrent = user.uid == _currentAccountId;
-          return Card(
+          final card = Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: isCurrent ? Theme.of(context).colorScheme.primaryContainer : null,
             child: _buildListItemContent(context, user, isSelected, isCurrent),
+          );
+          if (isCurrent) {
+            // 当前账号不可拖拽，仅需唯一 key
+            return KeyedSubtree(key: ValueKey(user.uid), child: card);
+          }
+          return ReorderableDelayedDragStartListener(
+            key: ValueKey(user.uid),
+            index: index,
+            child: card
           );
         },
       ),

@@ -159,6 +159,17 @@ class AccountManager {
     }
   }
 
+  static Future<void> moveAccount(int fromIndex, int toIndex) async {
+    if (fromIndex < 0 || fromIndex >= _accounts.length ||
+        toIndex < 0 || toIndex >= _accounts.length ||
+        fromIndex == toIndex) {
+      return;
+    }
+    final user = _accounts.removeAt(fromIndex);
+    _accounts.insert(toIndex, user);
+    await _saveAccounts();
+  }
+
   /// 切换到对应平台的账号
   static Future<void> switchToPlatformAccounts() async {
     _accounts = await _getAllAccountsFromStorage();
