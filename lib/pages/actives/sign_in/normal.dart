@@ -39,7 +39,8 @@ class NormalSign implements SignStrategy {
       params.courseId,
       params.active.id,
       objectId: objectId,
-      validate: validate
+      validate: validate,
+      url: params.active.url
     );
   }
 

@@ -26,7 +26,8 @@ class PatternSign implements SignStrategy {
       address: params.address,
       latitude: params.latitude,
       longitude: params.longitude,
-      validate: validate
+      validate: validate,
+      url: params.active.url
     );
   }
 

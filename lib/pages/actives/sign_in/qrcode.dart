@@ -51,7 +51,8 @@ class QRCodeSign implements SignStrategy {
       enc2: enc2,
       validate: validate,
       faceId: faceId,
-      faceEnc: faceEnc
+      faceEnc: faceEnc,
+      url: params.active.url
     );
   }
 

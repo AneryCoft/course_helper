@@ -21,7 +21,7 @@ import '../actives/vote.dart';
 import '../actives/questionnaire.dart';
 import '../actives/pick.dart';
 import 'content.dart';
-import '../presentation.dart';
+import '../presentation/presentation.dart';
 import '../push/groups.dart';
 import '../../push/easemob.dart';
 import '../../push/notification.dart';

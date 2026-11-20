@@ -73,6 +73,7 @@ class SignInApi extends Api {
       String activeId, {
         String? objectId,
         String? validate,
+        required String url
       }) async {
     final base = {
       'activeId': activeId,
@@ -99,6 +100,7 @@ class SignInApi extends Api {
       method: withPhoto ? 'POST' : 'GET',
       params: params,
       body: formData,
+      headers: {'Referer': url},
       responseType: ResponseType.plain,
       userId: user?.uid
     );
@@ -123,7 +125,7 @@ class SignInApi extends Api {
 
   /// 手势 签到码签到
   Future<String?> codeSign(String courseId, String activeId, String signCode,
-      {String? address, double? latitude, double? longitude, String? validate}) async {
+      {String? address, double? latitude, double? longitude, String? validate, required String url}) async {
     final formData = {
       'activeId': activeId,
       'courseId': courseId,
@@ -152,13 +154,13 @@ class SignInApi extends Api {
       formData['locationResult'] = location.toResultJson();
     }
 
-    final response = await ApiService.sendRequest(_signUrl, method: 'POST', body: formData, responseType: ResponseType.plain, userId: user?.uid);
+    final response = await ApiService.sendRequest(_signUrl, method: 'POST', body: formData, headers: {'Referer': url}, responseType: ResponseType.plain, userId: user?.uid);
     return response?.data;
   }
 
   /// 位置签到
   Future<String?> locationSign(String courseId, String activeId, String address,
-      double latitude, double longitude, {String? validate, String? faceId, String? faceEnc}) async {
+      double latitude, double longitude, {String? validate, String? faceId, String? faceEnc, required String url}) async {
     final formData = {
       'name': user?.name ?? '',
       'address': address,
@@ -197,7 +199,7 @@ class SignInApi extends Api {
     final location = Location(user: user, address: address, latitude: latitude, longitude: longitude);
     formData['locationResult'] = location.toResultJson();
 
-    final response = await ApiService.sendRequest(_signUrl, method: 'POST', body: formData, responseType: ResponseType.plain, userId: user?.uid);
+    final response = await ApiService.sendRequest(_signUrl, method: 'POST', body: formData, headers: {'Referer': url}, responseType: ResponseType.plain, userId: user?.uid);
     return response?.data;
   }
 
@@ -217,7 +219,7 @@ class SignInApi extends Api {
   /// 需要验证码时第一次发送会返回validate_${enc2}
   /// enc2用于固定enc
   Future<String?> qrCodeSign(String courseId, String activeId, String enc,
-      {String? address, double? latitude, double? longitude, String? enc2, String? validate, String? faceId, String? faceEnc}) async {
+      {String? address, double? latitude, double? longitude, String? enc2, String? validate, String? faceId, String? faceEnc, required String url}) async {
     final formData = {
       'enc': enc,
       'name': user?.name ?? '',
@@ -262,7 +264,7 @@ class SignInApi extends Api {
       formData['faceEnc'] = faceEnc;
     }
 
-    final response = await ApiService.sendRequest(_signUrl, method: 'POST', body: formData, responseType: ResponseType.plain, userId: user?.uid);
+    final response = await ApiService.sendRequest(_signUrl, method: 'POST', body: formData, headers: {'Referer': url}, responseType: ResponseType.plain, userId: user?.uid);
     return response?.data;
   }
 

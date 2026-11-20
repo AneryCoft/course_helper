@@ -48,7 +48,8 @@ class LocationSign implements SignStrategy {
       params.longitude!,
       validate: validate,
       faceId: faceId,
-      faceEnc: faceEnc
+      faceEnc: faceEnc,
+      url: params.active.url
     );
   }
 
