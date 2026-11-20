@@ -4,10 +4,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 
 import '../../api/image.dart';
-import '../../api/api_service.dart';
 import '../../models/course.dart';
 import '../../setting/course_setting.dart';
 import '../widget/baidu_map.dart';
+import '../widget/image_thumbnail.dart';
 
 
 class CourseSettingsPage extends StatefulWidget {
@@ -146,35 +146,6 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
       _imageObjectIds.removeAt(index);
       _localImagePaths.remove(objectId);
     });
-  }
-
-  /// 放大图片对话框
-  void _showImageDialog(BuildContext context, String objectId, String? localPath) {
-    showDialog(
-      context: context,
-      builder: (context) => GestureDetector(
-        onTap: () => Navigator.of(context).pop(),
-        child: Container(
-          color: Colors.black12,
-          child: InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4.0,
-            child: Center(
-              child: localPath != null
-                  ? Image.file(
-                      File(localPath),
-                      fit: BoxFit.contain,
-                    )
-                  : Image.network(
-                      CXImageApi.getImageUrl(objectId),
-                      headers: HeadersManager.chaoxingHeaders,
-                      fit: BoxFit.contain,
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   void _showMapPicker() {
@@ -437,89 +408,21 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
                                   final isUploading = objectId.startsWith('temp_');
                                   return Padding(
                                     padding: const EdgeInsets.only(right: 8),
-                                    child: Stack(
-                                      children: [
-                                        GestureDetector(
-                                          onTap: !isUploading ? () {
-                                            _showImageDialog(context, objectId, localPath);
-                                          } : null,
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: Stack(
-                                              children: [
-                                                localPath != null
-                                                    ? Image.file(
-                                                        File(localPath),
-                                                        width: 80,
-                                                        height: 80,
-                                                        fit: BoxFit.contain,
-                                                      )
-                                                    : Image.network(
-                                                        CXImageApi.getImageUrl(objectId),
-                                                        width: 80,
-                                                        height: 80,
-                                                        fit: BoxFit.contain,
-                                                        headers: HeadersManager.chaoxingHeaders,
-                                                        loadingBuilder: (context, child, loadingProgress) {
-                                                          if (loadingProgress == null) return child;
-                                                          return Container(
-                                                            width: 80,
-                                                            height: 80,
-                                                            color: Colors.grey.shade200,
-                                                            child: Center(
-                                                              child: CircularProgressIndicator(
-                                                                strokeWidth: 2,
-                                                                value: loadingProgress.expectedTotalBytes != null
-                                                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                                                    : null,
-                                                              ),
-                                                            ),
-                                                          );
-                                                        },
-                                                        errorBuilder: (context, error, stackTrace) {
-                                                          return Container(
-                                                            width: 80,
-                                                            height: 80,
-                                                            color: Colors.grey.shade200,
-                                                            child: const Icon(Icons.broken_image, color: Colors.grey),
-                                                          );
-                                                        },
-                                                      ),
-                                                if (isUploading)
-                                                  Container(
-                                                    width: 80,
-                                                    height: 80,
-                                                    color: Colors.black.withValues(alpha: 0.3),
-                                                    child: const Center(
-                                                      child: CircularProgressIndicator(
-                                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                      ),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        Positioned(
-                                          top: 4,
-                                          right: 4,
-                                          child: GestureDetector(
-                                            onTap: () => _removeImage(index),
-                                            child: Container(
-                                              padding: const EdgeInsets.all(2),
-                                              decoration: BoxDecoration(
-                                                color: Colors.red.withValues(alpha: 0.8),
-                                                shape: BoxShape.circle,
+                                    child: ImageThumbnail(
+                                      file: localPath != null ? File(localPath) : null,
+                                      objectId: objectId,
+                                      fit: BoxFit.contain,
+                                      overlay: isUploading
+                                          ? Container(
+                                              color: Colors.black.withValues(alpha: 0.3),
+                                              child: const Center(
+                                                child: CircularProgressIndicator(
+                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                ),
                                               ),
-                                              child: const Icon(
-                                                Icons.close,
-                                                size: 14,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                            )
+                                          : null,
+                                      onDelete: () => _removeImage(index),
                                     ),
                                   );
                                 },

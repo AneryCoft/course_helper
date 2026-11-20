@@ -6,6 +6,7 @@ import '../../../api/api_service.dart';
 import '../../../session/account.dart';
 import '../../widget/accounts_selector.dart';
 import '../../widget/avatar.dart';
+import '../../widget/image_thumbnail.dart';
 import 'sign_in.dart';
 
 class AttendListWidget extends StatefulWidget {
@@ -113,7 +114,7 @@ class _AttendListWidgetState extends State<AttendListWidget> {
     if (title != null && title.isNotEmpty) {
       if (widget.state.needPhoto) {
         extraWidget = GestureDetector(
-          onTap: () => _showImageDialog(context, title),
+          onTap: () => showImageViewer(context, objectId: title),
           child: Image.network(
             CXImageApi.getImageUrlWithSize(title, 50, 60),
             headers: HeadersManager.chaoxingHeaders,
@@ -187,29 +188,6 @@ class _AttendListWidgetState extends State<AttendListWidget> {
           ],
         ),
       ),
-      ),
-    );
-  }
-
-  void _showImageDialog(BuildContext context, String imageUrl) {
-    showDialog(
-      context: context,
-      builder: (context) => GestureDetector(
-        onTap: () => Navigator.of(context).pop(),
-        child: Container(
-          color: Colors.black12,
-          child: InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4.0,
-            child: Center(
-              child: Image.network(
-                CXImageApi.getImageUrlWithSize(imageUrl, null, null),
-                headers: HeadersManager.chaoxingHeaders,
-                fit: BoxFit.contain
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

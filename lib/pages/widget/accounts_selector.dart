@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import '../../models/user.dart';
 import '../../session/account.dart';
-import '../../api/api_service.dart';
-import '../../api/image.dart';
 import '../../utils/logger.dart';
+import 'image_thumbnail.dart';
 
 class AccountsSelector extends StatefulWidget {
   final ValueChanged<List<User>> onSelectionChanged;
@@ -14,6 +13,9 @@ class AccountsSelector extends StatefulWidget {
   /// uid -> 状态信息
   final Map<String, AccountStatusInfo>? initialStatuses;
 
+  /// 照片删除时回调
+  final ValueChanged<String>? onImageDeleted;
+
   const AccountsSelector({
     super.key,
     required this.onSelectionChanged,
@@ -21,6 +23,7 @@ class AccountsSelector extends StatefulWidget {
     this.initiallyExpanded = true,
     this.initialSelected,
     this.initialStatuses,
+    this.onImageDeleted,
   });
 
   @override
@@ -169,6 +172,16 @@ class AccountsSelectorState extends State<AccountsSelector> {
     });
   }
 
+  void _removeImageForUser(String uid) {
+    setState(() {
+      _userImages.remove(uid);
+      _userObjectIds.remove(uid);
+      _uploadingUsers.remove(uid);
+      _failedUsers.remove(uid);
+    });
+    widget.onImageDeleted?.call(uid);
+  }
+
   void setUserStatus(String uid, AccountStatus status, {String? message}) {
     setState(() {
       _userStatuses[uid] = AccountStatusInfo(status, message: message);
@@ -202,37 +215,6 @@ class AccountsSelectorState extends State<AccountsSelector> {
         message: message,
         showDuration: const Duration(seconds: 5),
         child: Icon(icon, size: 25, color: color)
-      ),
-    );
-  }
-
-  /// 放大图片对话框
-  void _showImageDialog(BuildContext context, String uid, String? imageUrl) {
-    if (imageUrl == null && !_userImages.containsKey(uid)) return;
-    
-    showDialog(
-      context: context,
-      builder: (context) => GestureDetector(
-        onTap: () => Navigator.of(context).pop(),
-        child: Container(
-          color: Colors.black12,
-          child: InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4.0,
-            child: Center(
-              child: _userImages.containsKey(uid)
-                  ? Image.file(
-                      _userImages[uid]!,
-                      fit: BoxFit.contain,
-                    )
-                  : Image.network(
-                      imageUrl!,
-                      headers: HeadersManager.chaoxingHeaders,
-                      fit: BoxFit.contain,
-                    ),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -333,74 +315,33 @@ class AccountsSelectorState extends State<AccountsSelector> {
                             padding: const EdgeInsets.only(right: 8.0),
                             child: Stack(
                               children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    final imageUrl = _userImages.containsKey(user.uid)
-                                        ? null
-                                        : CXImageApi.getImageUrl(_userObjectIds[user.uid]!);
-                                    _showImageDialog(context, user.uid, imageUrl);
-                                  },
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: _userImages.containsKey(user.uid)
-                                        ? Image.file(
-                                            _userImages[user.uid]!,
-                                            width: 40,
-                                            height: 40,
-                                            fit: BoxFit.cover,
-                                          )
-                                        : Image.network(
-                                            CXImageApi.getImageUrl(_userObjectIds[user.uid]!),
-                                            width: 40,
-                                            height: 40,
-                                            fit: BoxFit.cover,
-                                            headers: HeadersManager.chaoxingHeaders,
-                                            loadingBuilder: (context, child, loadingProgress) {
-                                              if (loadingProgress == null) return child;
-                                              return Container(
-                                                width: 40,
-                                                height: 40,
-                                                color: Colors.grey.shade200,
-                                                child: Center(
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    value: loadingProgress.expectedTotalBytes != null
-                                                        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                                        : null,
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Container(
-                                                width: 40,
-                                                height: 40,
-                                                color: Colors.grey.shade200,
-                                                child: const Icon(Icons.broken_image, size: 20, color: Colors.grey),
-                                              );
-                                            },
+                                ImageThumbnail(
+                                  file: _userImages[user.uid],
+                                  objectId: _userObjectIds[user.uid],
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: 4,
+                                  overlay: _uploadingUsers.contains(user.uid)
+                                      ? Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(alpha: 0.3),
+                                            borderRadius: BorderRadius.circular(4),
                                           ),
-                                  ),
+                                          child: const Center(
+                                            child: SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : null,
+                                  onDelete: (!_uploadingUsers.contains(user.uid) && !_failedUsers.contains(user.uid)) ?
+                                      () => _removeImageForUser(user.uid) : null,
                                 ),
-                                if (_uploadingUsers.contains(user.uid))
-                                  Positioned.fill(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withValues(alpha: 0.3),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: const Center(
-                                        child: SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
                                 if (_failedUsers.contains(user.uid))
                                   Positioned(
                                     top: 0,

@@ -67,6 +67,10 @@ class SignParams {
     return _userObjectIds[userId];
   }
 
+  void removeUserObjectId(String userId) {
+    _userObjectIds.remove(userId);
+  }
+
   void setUserObjectIds(Map<String, String> objectIds) {
     _userObjectIds.addAll(objectIds);
   }
@@ -229,6 +233,12 @@ class SignInPageState extends State<SignInPage> {
 
   void setUserUploadFailed(String uid) {
     _accountsSelectorKey.currentState?.setUploadFailed(uid);
+  }
+
+  /// 删除账号的照片
+  void removeImageForUser(String uid) {
+    _signParams.removeUserObjectId(uid);
+    if (mounted) setState(() {});
   }
 
   /// 设置账号状态图标（同时写入本地状态与选择器）
@@ -448,6 +458,7 @@ class SignInPageState extends State<SignInPage> {
                       _assignImages();
                     }
                   },
+                  onImageDeleted: removeImageForUser,
                   title: '选择签到账号',
                   initialStatuses: _accountStatuses,
                 ),

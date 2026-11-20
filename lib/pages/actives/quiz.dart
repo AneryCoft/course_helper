@@ -14,6 +14,7 @@ import '../../../models/active.dart';
 import '../../../session/account.dart';
 import '../../../utils/logger.dart';
 import '../widget/accounts_selector.dart';
+import '../widget/image_thumbnail.dart';
 
 class QuizPage extends StatefulWidget {
   final Active active;
@@ -726,33 +727,6 @@ class _QuizPageState extends State<QuizPage> {
     return urls;
   }
 
-  /// 放大图片对话框
-  void _showImageDialog(String url, String heroTag) {
-    showDialog(
-      context: context,
-      builder: (context) => GestureDetector(
-        onTap: () => Navigator.of(context).pop(),
-        child: Container(
-          color: Colors.black12,
-          child: InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4.0,
-            child: Center(
-              child: Hero(
-                tag: heroTag,
-                child: Image.network(
-                    url,
-                    headers: HeadersManager.chaoxingHeaders,
-                    fit: BoxFit.contain
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   /// 为简答题选择并上传图片
   Future<void> _pickImages(dynamic quiz, int quizIndex) async {
     try {
@@ -888,7 +862,7 @@ class _QuizPageState extends State<QuizPage> {
                               return Padding(
                                 padding: const EdgeInsets.only(right: 6),
                                 child: GestureDetector(
-                                  onTap: () => _showImageDialog(url, 'blank_image_${quizIndex}_${index}_$imgIndex'),
+                                  onTap: () => showImageViewer(context, url: url, heroTag: 'blank_image_${quizIndex}_${index}_$imgIndex'),
                                   child: Hero(
                                     tag: 'blank_image_${quizIndex}_${index}_$imgIndex',
                                     child: Image.network(
@@ -977,7 +951,7 @@ class _QuizPageState extends State<QuizPage> {
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 8),
                                   child: GestureDetector(
-                                    onTap: () => _showImageDialog(url, 'quiz_image_${quizIndex}_$index'),
+                                    onTap: () => showImageViewer(context, url: url, heroTag: 'quiz_image_${quizIndex}_$index'),
                                     child: Hero(
                                       tag: 'quiz_image_${quizIndex}_$index',
                                       child: Image.network(
@@ -1020,47 +994,12 @@ class _QuizPageState extends State<QuizPage> {
                 if (objectId == null || objectId.isEmpty) {
                   return const SizedBox.shrink();
                 }
-                final imageUrl = CXImageApi.getImageUrl(objectId);
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: Stack(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _showImageDialog(imageUrl, 'short_answer_image_${quizIndex}_$index'),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Hero(
-                            tag: 'short_answer_image_${quizIndex}_$index',
-                            child: Image.network(
-                              imageUrl,
-                              headers: HeadersManager.chaoxingHeaders,
-                              width: 80,
-                              height: 80,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 4,
-                        top: 4,
-                        child: GestureDetector(
-                          onTap: () => _removeShortAnswerImage(quiz, index),
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.8),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              size: 14,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: ImageThumbnail(
+                    objectId: objectId,
+                    heroTag: 'short_answer_image_${quizIndex}_$index',
+                    onDelete: () => _removeShortAnswerImage(quiz, index),
                   ),
                 );
               },
