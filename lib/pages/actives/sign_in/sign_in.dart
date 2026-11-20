@@ -728,13 +728,13 @@ class SignLocationUi {
       SignInPageState state, {
         required List<Widget> Function(BuildContext context) buildChildren,
       }) {
-    final hasLocation = state.signParams.address != null;
+    final hasLocation = state.designatedPlace != null;
 
     return FutureBuilder<CourseSettings?>(
       future: loadCourseLocation(state),
       builder: (context, snapshot) {
         // 课程配置选择位置（仅在未选择位置且有配置时自动填充）
-        if (!state.skipLocationAutoFill && !hasLocation && snapshot.hasData && snapshot.data?.location != null) {
+        if (!state.skipLocationAutoFill && hasLocation && snapshot.hasData && snapshot.data?.location != null) {
           final location = snapshot.data!.location!;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (state.mounted && !state.skipLocationAutoFill && state.signParams.address == null) {
