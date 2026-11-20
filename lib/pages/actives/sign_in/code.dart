@@ -27,6 +27,7 @@ class CodeSign implements SignStrategy {
       latitude: params.latitude,
       longitude: params.longitude,
       validate: validate,
+      url: params.active.url,
     );
   }
 
