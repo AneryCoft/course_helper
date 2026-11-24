@@ -257,18 +257,39 @@ class RCCourseApi extends Api {
     final response = await ApiService.sendRequest(url, headers: headers, userId: user?.uid);
     if (response == null) return null;
 
-    // {'needLocationSignIn': False, 'signed': True, 'mode': 'signed', 'checkInTime': 1789133627322, 'address': ''}
-    return response.data;
+    // 无位置签到时： {'needLocationSignIn': False, 'signed': True, 'mode': 'signed', 'checkInTime': 1789133627322, 'address': ''}
+    // 有位置签到时：
+    /*
+    "needLocationSignIn": true,
+    "canSign": true,
+    "reason": "ok",
+    "serverTime": int,
+    "session": {
+      "centerLat": double,
+      "centerLng": double,
+      "radiusM": 50,
+      "startMs": int,
+      "lateAfterMs": int,
+      "endMs": int,
+      "timeoutMode": 0,
+      "version": 1,
+      "classroomId": int,
+      "locationName": ""
+    },
+    "wouldBeLate": true,
+    "pastOfficialEnd": true
+     */
+    return response.data['data'];
   }
 
   Future<Map<String, dynamic>?> submitLocationCheckIn(String lessonId, double latitude, double longitude, String address) async {
     final url = '/api/v3/lesson/location-checkin/submit';
     final headers = {'authorization': 'Bearer $bearerToken'};
     final jsonData = {
-      "lat": latitude,
-      "lng": longitude,
+      "lat": latitude.toString(),
+      "lng": longitude.toString(),
       "lessonId": lessonId,
-      "source": 54,
+      "source": 27,
       "address": address
     };
     final response = await ApiService.sendRequest(url, method: 'POST', headers: headers, body: jsonData, userId: user?.uid);

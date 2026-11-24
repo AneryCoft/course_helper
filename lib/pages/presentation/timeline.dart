@@ -125,13 +125,18 @@ mixin _TimelineMixin on _PresentationPageStateBase {
         bgColor = Colors.orange;
         icon = Icons.person_add;
         break;
-      case 'locationcheckin_start':
-        bgColor = Colors.teal;
-        icon = Icons.location_on;
-        break;
-      case 'locationcheckin_end':
-        bgColor = Colors.blueGrey;
-        icon = Icons.location_off;
+      case 'notification':
+        if (event.code == 'location_checkin_need_sign') {
+          bgColor = Colors.teal;
+          icon = Icons.location_on;
+        } else if (event.code == 'location_checkin_signed') {
+          bgColor = Colors.green;
+          icon = Icons.location_on;
+        }
+        else {
+          bgColor = Colors.yellowAccent;
+          icon = Icons.notifications;
+        }
         break;
       default:
         bgColor = Colors.grey;
