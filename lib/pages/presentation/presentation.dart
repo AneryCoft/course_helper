@@ -75,6 +75,9 @@ abstract class _PresentationPageStateBase extends State<PresentationPage> {
   // 全屏状态
   bool _isFullScreen = false;
 
+  // 控件可见性
+  bool _isControlsVisible = true;
+
   // 下载进度
   bool _isDownloading = false;
   int _downloadedCount = 0;

@@ -7,32 +7,8 @@ mixin _PptViewMixin on _PresentationPageStateBase {
       aspectRatio: 16 / 9,
       child: Stack(
         children: [
-          PageView.builder(
-            controller: _pageController,
-            itemCount: _slides.length,
-            onPageChanged: (index) {
-              setState(() {
-                _currentSlideIndex = index;
-                _currentProblem = _slides[index]['problem'];
-              });
-            },
-            itemBuilder: (context, index) => _buildSlideImage(_slides[index]),
-          ),
-          Positioned(
-            left: 16,
-            top: 16,
-            child: _buildPageIndicator(),
-          ),
-          Positioned(
-            right: 12,
-            top: 16,
-            child: _buildDownloadButton(),
-          ),
-          Positioned(
-            right: 12,
-            bottom: 12,
-            child: _buildFullscreenButton(),
-          ),
+          _buildSlidePager(),
+          ..._buildOverlayControls(),
         ],
       ),
     );
@@ -74,39 +50,58 @@ mixin _PptViewMixin on _PresentationPageStateBase {
           height: constraints.maxHeight,
           child: Stack(
             children: [
-              Positioned.fill(
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: _slides.length,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _currentSlideIndex = index;
-                      _currentProblem = _slides[index]['problem'];
-                    });
-                  },
-                  itemBuilder: (context, index) => _buildSlideImage(_slides[index]),
-                ),
-              ),
-              Positioned(
-                left: 16,
-                top: 16,
-                child: _buildPageIndicator(),
-              ),
-              Positioned(
-                right: 12,
-                top: 16,
-                child: _buildDownloadButton(),
-              ),
-              Positioned(
-                right: 12,
-                bottom: 12,
-                child: _buildFullscreenButton(),
-              ),
+              Positioned.fill(child: _buildSlidePager()),
+              ..._buildOverlayControls(),
             ],
           ),
         );
       },
     );
+  }
+
+  Widget _buildSlidePager() {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _toggleControls,
+      child: PageView.builder(
+        controller: _pageController,
+        itemCount: _slides.length,
+        onPageChanged: (index) {
+          setState(() {
+            _currentSlideIndex = index;
+            _currentProblem = _slides[index]['problem'];
+          });
+        },
+        itemBuilder: (context, index) => _buildSlideImage(_slides[index]),
+      ),
+    );
+  }
+
+  List<Widget> _buildOverlayControls() {
+    if (!_isControlsVisible) return const [];
+    return [
+      Positioned(
+        left: 16,
+        top: 16,
+        child: _buildPageIndicator(),
+      ),
+      Positioned(
+        right: 12,
+        top: 16,
+        child: _buildDownloadButton(),
+      ),
+      Positioned(
+        right: 12,
+        bottom: 12,
+        child: _buildFullscreenButton(),
+      ),
+    ];
+  }
+
+  void _toggleControls() {
+    setState(() {
+      _isControlsVisible = !_isControlsVisible;
+    });
   }
 
   Widget _buildPageIndicator() {
