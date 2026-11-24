@@ -6,15 +6,23 @@ import 'package:flutter_baidu_mapapi_search/flutter_baidu_mapapi_search.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_bmflocation/flutter_bmflocation.dart';
 
+import '../../api/map_tencent.dart';
 import '../../utils/logger.dart';
 
-class BaiduMapWidget extends StatefulWidget {
-  final Function(BMFCoordinate)? onLocationSelected;
-  final Function(BMFCoordinate, String)? onLocationSelectedWithAddress;
+class MapPoint {
+  final double latitude;
+  final double longitude;
+
+  const MapPoint(this.latitude, this.longitude);
+}
+
+class LocationMapWidget extends StatefulWidget {
+  final Function(MapPoint)? onLocationSelected;
+  final Function(MapPoint, String)? onLocationSelectedWithAddress;
   final bool showLocationButton;
   final bool showCurrentLocationInfo;
 
-  const BaiduMapWidget({
+  const LocationMapWidget({
     super.key,
     this.onLocationSelected,
     this.onLocationSelectedWithAddress,
@@ -23,10 +31,10 @@ class BaiduMapWidget extends StatefulWidget {
   });
 
   @override
-  State<BaiduMapWidget> createState() => _BaiduMapWidgetState();
+  State<LocationMapWidget> createState() => _LocationMapWidgetState();
 }
 
-class _BaiduMapWidgetState extends State<BaiduMapWidget> {
+class _LocationMapWidgetState extends State<LocationMapWidget> {
   BMFMapController? _mapController;
   BMFCoordinate? _currentPosition;
   BMFCoordinate? _markerPosition;
@@ -223,10 +231,7 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
     return status.isGranted || PermissionStatus.limited == status;
   }
 
-  Future<String> _updateMarkerToPosition(
-      BMFCoordinate position, {
-        bool triggerCallback = false,
-      }) async {
+  Future<String> _updateMarkerToPosition(BMFCoordinate position, {bool triggerCallback = false}) async {
     if (_isDisposed || _mapController == null) return '';
 
     await _mapController!.cleanAllMarkers();
@@ -244,6 +249,9 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
     String address = await _getAddressFromCoordinate(position);
     if (_isDisposed || !mounted) return address;
 
+    logger.d('_updateMarkerToPosition address: $address');
+    // 逆地理编码
+
     setState(() {
       _markerPosition = position;
       _locationInfo = '地址：$address\n纬度：${position.latitude.toStringAsFixed(6)}, 经度：${position.longitude.toStringAsFixed(6)}';
@@ -256,28 +264,43 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
     return address;
   }
 
+  MapPoint _toMapPoint(BMFCoordinate coordinate) => MapPoint(coordinate.latitude, coordinate.longitude);
+
   void _triggerCallback(BMFCoordinate coordinate, String address) {
+    final point = _toMapPoint(coordinate);
     if (widget.onLocationSelectedWithAddress != null) {
-      widget.onLocationSelectedWithAddress!(coordinate, address);
+      widget.onLocationSelectedWithAddress!(point, address);
     } else if (widget.onLocationSelected != null) {
-      widget.onLocationSelected!(coordinate);
+      widget.onLocationSelected!(point);
     }
   }
 
   void _moveToMarkerPosition() {
     if (_isDisposed || _mapController == null || _markerPosition == null) return;
-    _mapController!
-        .setCenterCoordinate(_markerPosition!, true, animateDurationMs: 1000);
+    _mapController!.setCenterCoordinate(_markerPosition!, true, animateDurationMs: 1000);
     _mapController!.setZoomTo(20.0, animateDurationMs: 1000);
   }
 
   Future<String> _getAddressFromCoordinate(BMFCoordinate coordinate) async {
     if (_isDisposed) return '未知位置';
+
+    final baiduAddress = await _baiduReverseGeocode(coordinate);
+    if (_isDisposed) return '未知位置';
+    if (baiduAddress != null) return baiduAddress;
+
+    // 百度逆地理编码失败，使用腾讯
+    final tencentAddress = await TencentMapApi()
+        .reverseGeocode(coordinate.latitude, coordinate.longitude);
+    if (_isDisposed) return '未知位置';
+    return tencentAddress ?? '未知位置';
+  }
+
+  Future<String?> _baiduReverseGeocode(BMFCoordinate coordinate) async {
     try {
       BMFReverseGeoCodeSearchOption option =
       BMFReverseGeoCodeSearchOption(location: coordinate);
       BMFReverseGeoCodeSearch search = BMFReverseGeoCodeSearch();
-      Completer<String> completer = Completer<String>();
+      Completer<String?> completer = Completer<String?>();
 
       search.onGetReverseGeoCodeSearchResult(
           callback: (BMFReverseGeoCodeSearchResult? result,
@@ -292,17 +315,17 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
                 address = result.poiList!.first.name ?? '';
               }
             }
-            completer.complete(address.isNotEmpty ? address : '未知位置');
+            completer.complete(address.isNotEmpty ? address : null);
           });
 
       await search.reverseGeoCodeSearch(option);
 
       return await completer.future.timeout(
         const Duration(seconds: 3),
-        onTimeout: () => '未知位置',
+        onTimeout: () => null,
       );
     } catch (e) {
-      return '未知位置';
+      return null;
     }
   }
 
@@ -329,9 +352,7 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
               _mapController = controller;
 
               if (_currentPosition != null) {
-                _updateMarkerToPosition(_currentPosition!,
-                    triggerCallback: true)
-                    .then((_) {
+                _updateMarkerToPosition(_currentPosition!, triggerCallback: true).then((_) {
                   if (_isDisposed || !mounted) return;
                   if (!_hasMovedToLocation) {
                     _moveToMarkerPosition();
