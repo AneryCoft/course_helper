@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -13,7 +12,7 @@ import '../../../models/course.dart';
 import '../../../session/account.dart';
 import '../../../utils/logger.dart';
 import '../../widget/accounts_selector.dart';
-import '../../widget/baidu_map.dart';
+import '../../widget/map.dart';
 import '../../widget/captcha.dart';
 import 'normal.dart';
 import 'pattern.dart';
@@ -144,23 +143,6 @@ class SignInPageState extends State<SignInPage> {
 
   int _signTypeId = 0;
 
-  int _status = 0;
-  /*
-  status:
-    0: unsign // 未签
-    1: signed // 已签
-    1: SignSuccessfully // 签到成功
-    2: signedbyteacher // 教师代签
-    4: PersonalLeave2 // 请假
-    5: Absence // 缺勤
-    7: SickLeave // 病假
-    8: PersonalLeave // 事假
-    9: Late // 迟到
-    10: LeaveEarly // 早退
-    11: SignExpiredy // 签到已过期
-    12: PublicLeave // 公假
-  */
-
   // 签到状态管理
   bool _isLoading = false;
   bool _isMultiSigning = false;
@@ -185,6 +167,8 @@ class SignInPageState extends State<SignInPage> {
 
   // 账号状态（uid -> 状态信息），用于初始化选择器并同步更新
   final Map<String, AccountStatusInfo> _accountStatuses = {};
+
+  int _status = 0;
 
   // 签到状态文字描述
   static const Map<int, String> _statusTexts = {
@@ -728,7 +712,7 @@ class SignLocationUi {
       SignInPageState state, {
         required List<Widget> Function(BuildContext context) buildChildren,
       }) {
-    final hasLocation = state.designatedPlace != null;
+    final hasLocation = state.designatedPlace != null || state.widget.active.signType == SignType.location;
 
     return FutureBuilder<CourseSettings?>(
       future: loadCourseLocation(state),
@@ -879,7 +863,7 @@ class SignLocationUi {
   /// 位置选择页面
   static Future<void> showPicker(SignInPageState state, {bool autoSign = false}) async {
     final BuildContext context = state.context;
-    BMFCoordinate? selectedCoordinate;
+    MapPoint? selectedCoordinate;
     String? selectedAddress;
 
     await Navigator.push(
@@ -890,7 +874,7 @@ class SignLocationUi {
           body: Column(
             children: [
               Expanded(
-                child: BaiduMapWidget(
+                child: LocationMapWidget(
                   onLocationSelectedWithAddress: (coordinate, address) {
                     selectedCoordinate = coordinate;
                     selectedAddress = address;

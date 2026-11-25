@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 
 import '../../api/image.dart';
 import '../../models/course.dart';
 import '../../setting/course_setting.dart';
-import '../widget/baidu_map.dart';
+import '../widget/map.dart';
 import '../widget/image_thumbnail.dart';
 
 
@@ -149,7 +148,7 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
   }
 
   void _showMapPicker() {
-    BMFCoordinate? selectedCoordinate;
+    MapPoint? selectedCoordinate;
     String? selectedAddress;
 
     Navigator.push(
@@ -164,7 +163,7 @@ class _CourseSettingsPageState extends State<CourseSettingsPage> {
           body: Column(
             children: [
               Expanded(
-                child: BaiduMapWidget(
+                child: LocationMapWidget(
                   showLocationButton: true,
                   showCurrentLocationInfo: true,
                   onLocationSelectedWithAddress: (coordinate, address) {
