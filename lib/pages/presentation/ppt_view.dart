@@ -655,13 +655,16 @@ mixin _PptViewMixin on _PresentationPageStateBase {
       },
       child: Column(
         children: options.map((option) {
-          return RadioListTile<String>(
-            value: option.key,
-            title: Text('${option.key}. ${option.value}'),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-            activeColor: Theme.of(context).colorScheme.primary,
-            controlAffinity: ListTileControlAffinity.trailing,
-            toggleable: true,
+          return Material(
+            type: MaterialType.transparency,
+            child: RadioListTile<String>(
+              value: option.key,
+              title: Text('${option.key}. ${option.value}'),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              activeColor: Theme.of(context).colorScheme.primary,
+              controlAffinity: ListTileControlAffinity.trailing,
+              toggleable: true,
+            ),
           );
         }).toList(),
       ),
@@ -680,23 +683,26 @@ mixin _PptViewMixin on _PresentationPageStateBase {
       children: options.map((option) {
         final key = option.key;
         final isSelected = (_answer ?? []).contains(key);
-        return CheckboxListTile(
-          value: isSelected,
-          title: Text('$key. ${option.value}'),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-          activeColor: Theme.of(context).colorScheme.primary,
-          controlAffinity: ListTileControlAffinity.trailing,
-          onChanged: (value) {
-            setState(() {
-              final selectedKeys = _answer?.toSet() ?? <String>{};
-              if (value == true) {
-                selectedKeys.add(key);
-              } else {
-                selectedKeys.remove(key);
-              }
-              _answer = selectedKeys.toList();
-            });
-          },
+        return Material(
+          type: MaterialType.transparency,
+          child: CheckboxListTile(
+            value: isSelected,
+            title: Text('$key. ${option.value}'),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+            activeColor: Theme.of(context).colorScheme.primary,
+            controlAffinity: ListTileControlAffinity.trailing,
+            onChanged: (value) {
+              setState(() {
+                final selectedKeys = _answer?.toSet() ?? <String>{};
+                if (value == true) {
+                  selectedKeys.add(key);
+                } else {
+                  selectedKeys.remove(key);
+                }
+                _answer = selectedKeys.toList();
+              });
+            },
+          ),
         );
       }).toList(),
     );
