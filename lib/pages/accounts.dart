@@ -60,6 +60,19 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
       _accounts = AccountManager.allAccounts;
       _currentAccountId = AccountManager.currentSessionId;
     });
+
+    final invalidCount = _accounts.where((u) => !u.status).length;
+    if (invalidCount == 0) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('有 $invalidCount 个账号已失效，请重新登录'),
+          duration: const Duration(seconds: 3)
+        ),
+      );
+    });
   }
 
   void _toggleSelection(String userId) {
@@ -275,8 +288,7 @@ class _AccountsPageState extends State<AccountsPage> with TickerProviderStateMix
     );
   }
 
-  Widget _buildListItemContent(
-      BuildContext context, User user, bool isSelected, bool isCurrentAccount) {
+  Widget _buildListItemContent(BuildContext context, User user, bool isSelected, bool isCurrentAccount) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       leading: AvatarWidget(key: ValueKey(user.avatar), imageUrl: user.avatar),
