@@ -113,7 +113,7 @@ class ImageThumbnail extends StatelessWidget {
         ),
         if (overlay != null) Positioned.fill(child: overlay!),
         if (onDelete != null)
-          Positioned(right: 4, top: 4, child: _DeleteBadge(onTap: onDelete!)),
+          Positioned(right: 0, bottom: 0, child: _DeleteBadge(onTap: onDelete!)),
       ],
     );
   }
